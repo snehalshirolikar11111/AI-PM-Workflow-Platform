@@ -477,7 +477,7 @@ const Index = () => {
     { id:6, text:"Q2 OKR progress: 43% overall",                     src:"OKR sync",        type:"okr" },
   ]);
   const [privTogs, setPrivTogs]     = useState<Record<PrivKey, boolean>>({ persist:true, learn:true, session:false, audit:true });
-  const [agentRuns, setAgentRuns]   = useState<Record<string, any>>({});
+  const [agentRuns, setAgentRuns]   = useState<any[]>([]);
   const [projects, setProjects]         = useState<any[]>([]);
   const [okrs, setOkrs]                 = useState<typeof OKRS_DEFAULT>(OKRS_DEFAULT);
   const [stakeholders, setStakeholders] = useState<typeof STAKEHOLDERS_DEFAULT>(STAKEHOLDERS_DEFAULT);
@@ -512,23 +512,39 @@ const Index = () => {
     };
   }, []);
 
+  // ─ Initial fetch: agent_runs (last 50) ─
   useEffect(() => {
-    const runsCh = supabase
+    async function loadRuns() {
+      const { data } = await supabase
+        .from("agent_runs")
+        .select("*")
+        .order("ran_at", { ascending: false })
+        .limit(50);
+      if (data) setAgentRuns(data);
+    }
+    loadRuns();
+  }, []);
+
+  // ─ Realtime: agent_runs (INSERT prepend, UPDATE replace by id) ─
+  useEffect(() => {
+    const channel = supabase
       .channel("agent-runs-live")
       .on(
         "postgres_changes",
         { event: "*", schema: "public", table: "agent_runs" },
         (payload) => {
-          const r: any = payload.new ?? payload.old;
-          if (!r?.id) return;
-          setAgentRuns((prev) => ({ ...prev, [r.id]: r }));
+          if (payload.eventType === "INSERT") {
+            setAgentRuns((prev) => [payload.new, ...prev]);
+          }
+          if (payload.eventType === "UPDATE") {
+            setAgentRuns((prev) =>
+              prev.map((r) => r.id === (payload.new as any).id ? payload.new : r)
+            );
+          }
         }
       )
       .subscribe();
-
-    return () => {
-      supabase.removeChannel(runsCh);
-    };
+    return () => { supabase.removeChannel(channel); };
   }, []);
 
   // ─ Initial fetch: projects ─
@@ -1393,6 +1409,41 @@ const Index = () => {
                       <div className={`kpi-d ${up?"d-up":"d-dn"}`}>{up?"▲":"▼"} {d}</div>
                     </div>
                   ))}
+                </div>
+
+                {/* Live agent runs */}
+                <div className="card">
+                  <div className="ch">
+                    <div className="ct">Live Agent Runs · last 50</div>
+                    <span className="mono dim" style={{fontSize:10}}>
+                      <span className="sdot" style={{display:"inline-block",background:"var(--grn)",marginRight:6,verticalAlign:"middle"}}/>
+                      realtime
+                    </span>
+                  </div>
+                  <div className="cb0">
+                    {agentRuns.length === 0 ? (
+                      <div style={{padding:"16px",fontSize:12,color:"var(--mut)"}}>No agent runs yet — they'll appear here as they happen.</div>
+                    ) : (
+                      <div style={{maxHeight:280,overflowY:"auto"}}>
+                        {agentRuns.slice(0, 50).map((r:any, i:number) => {
+                          const status = (r.status ?? "running").toLowerCase();
+                          const dot =
+                            status === "done" || status === "success" || status === "completed" ? "var(--grn)" :
+                            status === "error" || status === "failed" ? "var(--red)" :
+                            status === "running" ? "var(--acc)" : "var(--mut)";
+                          const when = r.ran_at ? new Date(r.ran_at).toLocaleTimeString([], {hour:"2-digit",minute:"2-digit"}) : "—";
+                          return (
+                            <div key={r.id ?? i} style={{display:"grid",gridTemplateColumns:"14px 1fr 90px 60px",alignItems:"center",gap:10,padding:"9px 16px",borderBottom:"1px solid var(--bdr)",fontSize:12}}>
+                              <span className="sdot" style={{background:dot}}/>
+                              <span>{r.agent_name ?? r.agent ?? r.name ?? "Agent"}</span>
+                              <span className="mono dim" style={{fontSize:10,textTransform:"uppercase",letterSpacing:"0.08em"}}>{status}</span>
+                              <span className="mono dim" style={{fontSize:11,textAlign:"right"}}>{when}</span>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
                 </div>
 
                 <div className="g2">
