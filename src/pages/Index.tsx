@@ -512,23 +512,39 @@ const Index = () => {
     };
   }, []);
 
+  // ─ Initial fetch: agent_runs (last 50) ─
   useEffect(() => {
-    const runsCh = supabase
+    async function loadRuns() {
+      const { data } = await supabase
+        .from("agent_runs")
+        .select("*")
+        .order("ran_at", { ascending: false })
+        .limit(50);
+      if (data) setAgentRuns(data);
+    }
+    loadRuns();
+  }, []);
+
+  // ─ Realtime: agent_runs (INSERT prepend, UPDATE replace by id) ─
+  useEffect(() => {
+    const channel = supabase
       .channel("agent-runs-live")
       .on(
         "postgres_changes",
         { event: "*", schema: "public", table: "agent_runs" },
         (payload) => {
-          const r: any = payload.new ?? payload.old;
-          if (!r?.id) return;
-          setAgentRuns((prev) => ({ ...prev, [r.id]: r }));
+          if (payload.eventType === "INSERT") {
+            setAgentRuns((prev) => [payload.new, ...prev]);
+          }
+          if (payload.eventType === "UPDATE") {
+            setAgentRuns((prev) =>
+              prev.map((r) => r.id === (payload.new as any).id ? payload.new : r)
+            );
+          }
         }
       )
       .subscribe();
-
-    return () => {
-      supabase.removeChannel(runsCh);
-    };
+    return () => { supabase.removeChannel(channel); };
   }, []);
 
   // ─ Initial fetch: projects ─
