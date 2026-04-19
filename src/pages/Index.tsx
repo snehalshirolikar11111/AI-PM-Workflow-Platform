@@ -1,4 +1,5 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { supabase } from "@/integrations/supabase/client";
 
 type PrdTheme = { lbl: string; n: number };
 type PrdResult = {
@@ -476,6 +477,48 @@ const Index = () => {
     { id:6, text:"Q2 OKR progress: 43% overall",                     src:"OKR sync",        type:"okr" },
   ]);
   const [privTogs, setPrivTogs]     = useState<Record<PrivKey, boolean>>({ persist:true, learn:true, session:false, audit:true });
+  const [agentRuns, setAgentRuns]   = useState<Record<string, any>>({});
+
+  // ─ Realtime: tasks (INSERT) → prepend to todos; agent_runs (*) → live status map ─
+  useEffect(() => {
+    const tasksCh = supabase
+      .channel("tasks-live")
+      .on(
+        "postgres_changes",
+        { event: "INSERT", schema: "public", table: "tasks" },
+        (payload) => {
+          const r: any = payload.new;
+          setTodos((prev) => [
+            {
+              text: r.text ?? r.title ?? "Untitled task",
+              pri: r.pri ?? r.priority ?? "med",
+              done: r.done ?? false,
+              ai: r.ai ?? "AI-drafted",
+            },
+            ...prev,
+          ]);
+        }
+      )
+      .subscribe();
+
+    const runsCh = supabase
+      .channel("agent-runs-live")
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "agent_runs" },
+        (payload) => {
+          const r: any = payload.new ?? payload.old;
+          if (!r?.id) return;
+          setAgentRuns((prev) => ({ ...prev, [r.id]: r }));
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(tasksCh);
+      supabase.removeChannel(runsCh);
+    };
+  }, []);
 
   const toggleTodo = (i: number) => setTodos(t => t.map((x,j) => j===i ? {...x,done:!x.done} : x));
   const toggleOkr  = (i: number) => setExpandedOkr(p => p.includes(i) ? p.filter(x=>x!==i) : [...p,i]);
