@@ -845,14 +845,20 @@ const Index = () => {
                   <div className="ch"><div className="ct">Focus List · Today</div></div>
                   <div className="cb">
                     <div className="col" style={{gap:6}}>
-                      {todos.map((t,i) => (
-                        <div key={i} className="todo-item" onClick={() => toggleTodo(i)}>
-                          <div className={`todo-chk${t.done?" dn":""}`}>{t.done?"✓":""}</div>
-                          <span className={`todo-txt${t.done?" dn":""}`}>{t.text}</span>
-                          {t.ai && <span className="ai-note">🤖 {t.ai}</span>}
-                          <span className={`tag ${t.pri==="high"?"tag-red":t.pri==="med"?"tag-amb":"tag-grn"}`}>{t.pri}</span>
-                        </div>
-                      ))}
+                      {todos.map((t,i) => {
+                        const text = t.text ?? t.title ?? "Untitled task";
+                        const pri  = t.pri  ?? t.priority ?? "med";
+                        const done = t.done ?? t.completed ?? false;
+                        const ai   = t.ai   ?? t.source ?? null;
+                        return (
+                          <div key={t.id ?? i} className="todo-item" onClick={() => toggleTodo(i)}>
+                            <div className={`todo-chk${done?" dn":""}`}>{done?"✓":""}</div>
+                            <span className={`todo-txt${done?" dn":""}`}>{text}</span>
+                            {ai && <span className="ai-note">🤖 {ai}</span>}
+                            <span className={`tag ${pri==="high"?"tag-red":pri==="med"?"tag-amb":"tag-grn"}`}>{pri}</span>
+                          </div>
+                        );
+                      })}
                     </div>
                   </div>
                 </div>
