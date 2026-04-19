@@ -482,28 +482,37 @@ const Index = () => {
   const [okrs, setOkrs]                 = useState<typeof OKRS_DEFAULT>(OKRS_DEFAULT);
   const [stakeholders, setStakeholders] = useState<typeof STAKEHOLDERS_DEFAULT>(STAKEHOLDERS_DEFAULT);
 
-  // ─ Realtime: tasks (INSERT) → prepend to todos; agent_runs (*) → live status map ─
+  // ─ Initial fetch: tasks (most recent first) ─
   useEffect(() => {
-    const tasksCh = supabase
+    async function loadTasks() {
+      const { data } = await supabase
+        .from("tasks")
+        .select("*")
+        .order("created_at", { ascending: false });
+      if (data) setTodos(data);
+    }
+    loadTasks();
+  }, []);
+
+  // ─ Realtime: tasks (INSERT) prepend; agent_runs (*) live status map ─
+  useEffect(() => {
+    const channel = supabase
       .channel("tasks-live")
       .on(
         "postgres_changes",
         { event: "INSERT", schema: "public", table: "tasks" },
         (payload) => {
-          const r: any = payload.new;
-          setTodos((prev) => [
-            {
-              text: r.text ?? r.title ?? "Untitled task",
-              pri: r.pri ?? r.priority ?? "med",
-              done: r.done ?? false,
-              ai: r.ai ?? "AI-drafted",
-            },
-            ...prev,
-          ]);
+          setTodos((prev) => [payload.new, ...prev]);
         }
       )
       .subscribe();
 
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, []);
+
+  useEffect(() => {
     const runsCh = supabase
       .channel("agent-runs-live")
       .on(
@@ -518,7 +527,6 @@ const Index = () => {
       .subscribe();
 
     return () => {
-      supabase.removeChannel(tasksCh);
       supabase.removeChannel(runsCh);
     };
   }, []);
