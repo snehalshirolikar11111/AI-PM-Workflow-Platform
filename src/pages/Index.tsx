@@ -366,7 +366,7 @@ const AGENTS = [
   { ic:"🔭", col:"ic-pur", name:"Competitive Intel Agent", trig:"Daily / on-demand", desc:"Monitors competitor websites, product blogs, App Store reviews and tech news. Surfaces relevant changes as a clean weekly digest with implications for your roadmap.", inputs:["Competitor URLs","G2/Capterra","App Store","Tech news feeds"] },
 ];
 
-const PROJECTS = [
+const PROJECTS_DEFAULT = [
   { name:"Mobile Onboarding V2", pct:78, status:"on-track", owner:"Ana + Raj",       due:"Apr 30" },
   { name:"B2B Dashboard Revamp",  pct:45, status:"at-risk",  owner:"Chen + Dev team", due:"May 15" },
   { name:"Payments Integration",  pct:20, status:"delayed",  owner:"Priya",           due:"May 28" },
