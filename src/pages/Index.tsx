@@ -462,7 +462,7 @@ const AGE_TAG = { recent:"tag-grn", old:"tag-amb", stale:"tag-red" };
 
 const Index = () => {
   const [page, setPage]             = useState("overview");
-  const [todos, setTodos]           = useState<typeof TODOS_INIT>(TODOS_INIT);
+  const [todos, setTodos]           = useState<any[]>([]);
   const [expandedOkr, setExpandedOkr] = useState<number[]>([0,1,2]);
   const [shFilter, setShFilter]     = useState("All");
   const [prdInput, setPrdInput]     = useState("");
