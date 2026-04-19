@@ -601,7 +601,11 @@ const Index = () => {
     })();
   }, []);
 
-  const toggleTodo = (i: number) => setTodos(t => t.map((x,j) => j===i ? {...x,done:!x.done} : x));
+  const toggleTodo = (i: number) => setTodos(t => t.map((x,j) => {
+    if (j !== i) return x;
+    const cur = x.done ?? x.completed ?? false;
+    return "completed" in x ? {...x, completed: !cur} : {...x, done: !cur};
+  }));
   const toggleOkr  = (i: number) => setExpandedOkr(p => p.includes(i) ? p.filter(x=>x!==i) : [...p,i]);
   const forgetMem  = (id: number) => setMemLog(m => m.filter(x => x.id!==id));
   const togglePriv = (k: PrivKey) => setPrivTogs(p => ({...p,[k]:!p[k]}));
