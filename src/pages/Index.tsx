@@ -478,7 +478,7 @@ const Index = () => {
   ]);
   const [privTogs, setPrivTogs]     = useState<Record<PrivKey, boolean>>({ persist:true, learn:true, session:false, audit:true });
   const [agentRuns, setAgentRuns]   = useState<Record<string, any>>({});
-  const [projects, setProjects]         = useState<typeof PROJECTS_DEFAULT>(PROJECTS_DEFAULT);
+  const [projects, setProjects]         = useState<any[]>([]);
   const [okrs, setOkrs]                 = useState<typeof OKRS_DEFAULT>(OKRS_DEFAULT);
   const [stakeholders, setStakeholders] = useState<typeof STAKEHOLDERS_DEFAULT>(STAKEHOLDERS_DEFAULT);
 
@@ -531,7 +531,36 @@ const Index = () => {
     };
   }, []);
 
-  // ─ Initial fetch: projects, okrs (+ KRs), stakeholders ─
+  // ─ Initial fetch: projects ─
+  useEffect(() => {
+    async function loadProjects() {
+      const { data } = await supabase
+        .from("projects")
+        .select("*")
+        .order("created_at", { ascending: true });
+      if (data) setProjects(data);
+    }
+    loadProjects();
+  }, []);
+
+  // ─ Realtime: projects (UPDATE) → live progress / status ─
+  useEffect(() => {
+    const channel = supabase
+      .channel("projects-live")
+      .on(
+        "postgres_changes",
+        { event: "UPDATE", schema: "public", table: "projects" },
+        (payload) => {
+          setProjects((prev) =>
+            prev.map((p) => p.id === (payload.new as any).id ? payload.new : p)
+          );
+        }
+      )
+      .subscribe();
+    return () => { supabase.removeChannel(channel); };
+  }, []);
+
+  // ─ Initial fetch: okrs (+ KRs), stakeholders ─
   useEffect(() => {
     const monthShort = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
     const fmtDue = (d: string | null) => {
@@ -540,23 +569,13 @@ const Index = () => {
       if (isNaN(dt.getTime())) return d;
       return `${monthShort[dt.getMonth()]} ${dt.getDate()}`;
     };
+    void fmtDue; // kept for future use
 
     (async () => {
-      const [pRes, oRes, sRes] = await Promise.all([
-        supabase.from("projects").select("name,progress,status,owner,due_date").order("due_date", { ascending: true }),
+      const [oRes, sRes] = await Promise.all([
         supabase.from("okrs").select("id,objective,owner,overall_pct,color,icon,sort_order").order("sort_order", { ascending: true }),
         supabase.from("stakeholders").select("name,initials,role,type,color,influence").order("influence", { ascending: false }),
       ]);
-
-      if (pRes.data && pRes.data.length) {
-        setProjects(pRes.data.map((r: any) => ({
-          name: r.name,
-          pct: r.progress ?? 0,
-          status: r.status ?? "planning",
-          owner: r.owner ?? "—",
-          due: fmtDue(r.due_date),
-        })));
-      }
 
       if (oRes.data && oRes.data.length) {
         const okrIds = oRes.data.map((o: any) => o.id);
@@ -900,20 +919,32 @@ const Index = () => {
                   <div className="th-row" style={{gridTemplateColumns:"1fr 1fr 90px 120px 60px"}}>
                     <span>Project</span><span>Progress</span><span>Status</span><span>Owner</span><span>Due</span>
                   </div>
-                  {projects.map((p,i) => (
-                    <div key={i} className="tr" style={{gridTemplateColumns:"1fr 1fr 90px 120px 60px"}}>
-                      <span style={{fontWeight:500}}>{p.name}</span>
-                      <div className="bar-wrap">
-                        <div className="bar-track">
-                          <div className="bar-fill" style={{width:`${p.pct}%`,background:(BAR_COLOR as Record<string,string>)[p.status]}}/>
+                  {projects.map((p,i) => {
+                    const pct    = p.pct ?? p.progress ?? 0;
+                    const status = p.status ?? "planning";
+                    const due    = p.due ?? (p.due_date
+                      ? (() => {
+                          const dt = new Date(p.due_date);
+                          if (isNaN(dt.getTime())) return p.due_date;
+                          const m = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+                          return `${m[dt.getMonth()]} ${dt.getDate()}`;
+                        })()
+                      : "—");
+                    return (
+                      <div key={p.id ?? i} className="tr" style={{gridTemplateColumns:"1fr 1fr 90px 120px 60px"}}>
+                        <span style={{fontWeight:500}}>{p.name}</span>
+                        <div className="bar-wrap">
+                          <div className="bar-track">
+                            <div className="bar-fill" style={{width:`${pct}%`,background:(BAR_COLOR as Record<string,string>)[status]}}/>
+                          </div>
+                          <span className="bar-pct">{pct}%</span>
                         </div>
-                        <span className="bar-pct">{p.pct}%</span>
+                        <span className={`tag ${(STATUS_COLOR as Record<string,string>)[status]}`}>{status.replace("-"," ")}</span>
+                        <span className="dim" style={{fontSize:12}}>{p.owner ?? "—"}</span>
+                        <span className="mono dim" style={{fontSize:11}}>{due}</span>
                       </div>
-                      <span className={`tag ${(STATUS_COLOR as Record<string,string>)[p.status]}`}>{p.status.replace("-"," ")}</span>
-                      <span className="dim" style={{fontSize:12}}>{p.owner}</span>
-                      <span className="mono dim" style={{fontSize:11}}>{p.due}</span>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
 
                 <div className="infobox ib-red" style={{display:"flex",gap:12,alignItems:"flex-start"}}>
