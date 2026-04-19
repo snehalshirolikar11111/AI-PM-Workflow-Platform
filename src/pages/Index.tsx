@@ -1824,12 +1824,12 @@ export default function Index() {
                 <div style={{display:"flex", flexDirection:"column", gap:12}}>
                   <div className="card">
                     <div className="card-title">⚙️ Memory Settings</div>
-                    {[
-                      { key:"persistentMemory", label:"Persistent memory", sub:"Agent remembers across sessions" },
-                      { key:"agentLearning", label:"Agent learning", sub:"Agents improve from your usage patterns" },
-                      { key:"sessionOnly", label:"Session-only mode", sub:"Wipe all memory when you close the app" },
-                      { key:"auditLog", label:"Audit log", sub:"Record every agent action for compliance" },
-                    ].map(({key, label, sub}) => (
+                    {([
+                      { key:"persistentMemory" as const, label:"Persistent memory", sub:"Agent remembers across sessions" },
+                      { key:"agentLearning" as const, label:"Agent learning", sub:"Agents improve from your usage patterns" },
+                      { key:"sessionOnly" as const, label:"Session-only mode", sub:"Wipe all memory when you close the app" },
+                      { key:"auditLog" as const, label:"Audit log", sub:"Record every agent action for compliance" },
+                    ]).map(({key, label, sub}) => (
                       <div key={key} className="toggle-row">
                         <div>
                           <div className="toggle-label">{label}</div>
