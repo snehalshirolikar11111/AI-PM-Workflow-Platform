@@ -1411,6 +1411,41 @@ const Index = () => {
                   ))}
                 </div>
 
+                {/* Live agent runs */}
+                <div className="card">
+                  <div className="ch">
+                    <div className="ct">Live Agent Runs · last 50</div>
+                    <span className="mono dim" style={{fontSize:10}}>
+                      <span className="sdot" style={{display:"inline-block",background:"var(--grn)",marginRight:6,verticalAlign:"middle"}}/>
+                      realtime
+                    </span>
+                  </div>
+                  <div className="cb0">
+                    {agentRuns.length === 0 ? (
+                      <div style={{padding:"16px",fontSize:12,color:"var(--mut)"}}>No agent runs yet — they'll appear here as they happen.</div>
+                    ) : (
+                      <div style={{maxHeight:280,overflowY:"auto"}}>
+                        {agentRuns.slice(0, 50).map((r:any, i:number) => {
+                          const status = (r.status ?? "running").toLowerCase();
+                          const dot =
+                            status === "done" || status === "success" || status === "completed" ? "var(--grn)" :
+                            status === "error" || status === "failed" ? "var(--red)" :
+                            status === "running" ? "var(--acc)" : "var(--mut)";
+                          const when = r.ran_at ? new Date(r.ran_at).toLocaleTimeString([], {hour:"2-digit",minute:"2-digit"}) : "—";
+                          return (
+                            <div key={r.id ?? i} style={{display:"grid",gridTemplateColumns:"14px 1fr 90px 60px",alignItems:"center",gap:10,padding:"9px 16px",borderBottom:"1px solid var(--bdr)",fontSize:12}}>
+                              <span className="sdot" style={{background:dot}}/>
+                              <span>{r.agent_name ?? r.agent ?? r.name ?? "Agent"}</span>
+                              <span className="mono dim" style={{fontSize:10,textTransform:"uppercase",letterSpacing:"0.08em"}}>{status}</span>
+                              <span className="mono dim" style={{fontSize:11,textAlign:"right"}}>{when}</span>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
+                </div>
+
                 <div className="g2">
                   {/* Adoption funnel */}
                   <div className="card">
