@@ -985,7 +985,7 @@ const Index = () => {
 
                 {/* Objectives */}
                 <div className="col">
-                  {OKRS.map((obj,oi) => (
+                  {okrs.map((obj,oi) => (
                     <div key={oi} className="okr-blk">
                       <div className="okr-hd" onClick={() => toggleOkr(oi)}>
                         <div className="okr-ico" style={{background:`${obj.color}18`,border:`1px solid ${obj.color}30`}}>{obj.ic}</div>
