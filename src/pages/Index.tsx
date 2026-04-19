@@ -812,7 +812,7 @@ const Index = () => {
                   <div className="th-row" style={{gridTemplateColumns:"1fr 1fr 90px 120px 60px"}}>
                     <span>Project</span><span>Progress</span><span>Status</span><span>Owner</span><span>Due</span>
                   </div>
-                  {PROJECTS.map((p,i) => (
+                  {projects.map((p,i) => (
                     <div key={i} className="tr" style={{gridTemplateColumns:"1fr 1fr 90px 120px 60px"}}>
                       <span style={{fontWeight:500}}>{p.name}</span>
                       <div className="bar-wrap">
