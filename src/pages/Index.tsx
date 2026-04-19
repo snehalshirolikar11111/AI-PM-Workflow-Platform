@@ -1422,7 +1422,7 @@ export default function Index() {
                   <div className="card">
                     <div className="card-title">📅 This Week's Load</div>
                     <div style={{display:"flex",alignItems:"flex-end",gap:6,height:60,marginBottom:8}}>
-                      {[["M",8,"#10b981"],["T",5,"#10b981"],["W",9,"#f59e0b"],["Th",11,"#ef4444"],["F",6,"#10b981"]].map(([d,h,c])=>(
+                      {([["M",8,"#10b981"],["T",5,"#10b981"],["W",9,"#f59e0b"],["Th",11,"#ef4444"],["F",6,"#10b981"]] as [string, number, string][]).map(([d,h,c])=>(
                         <div key={d} style={{flex:1,display:"flex",flexDirection:"column",alignItems:"center",gap:4}}>
                           <div style={{width:"100%",background:c,borderRadius:"3px 3px 0 0",height:`${(h/12)*52}px`,opacity:0.7}}/>
                           <span style={{fontFamily:"DM Mono",fontSize:9,color:"var(--muted)"}}>{d}</span>
