@@ -366,7 +366,7 @@ const AGENTS = [
   { ic:"🔭", col:"ic-pur", name:"Competitive Intel Agent", trig:"Daily / on-demand", desc:"Monitors competitor websites, product blogs, App Store reviews and tech news. Surfaces relevant changes as a clean weekly digest with implications for your roadmap.", inputs:["Competitor URLs","G2/Capterra","App Store","Tech news feeds"] },
 ];
 
-const PROJECTS = [
+const PROJECTS_DEFAULT = [
   { name:"Mobile Onboarding V2", pct:78, status:"on-track", owner:"Ana + Raj",       due:"Apr 30" },
   { name:"B2B Dashboard Revamp",  pct:45, status:"at-risk",  owner:"Chen + Dev team", due:"May 15" },
   { name:"Payments Integration",  pct:20, status:"delayed",  owner:"Priya",           due:"May 28" },
@@ -417,7 +417,7 @@ const SCHEDULE = [
 
 const EV_CLS = { deep:"ev-deep", meet:"ev-meet", admin:"ev-admin", buf:"ev-buf", break:"ev-break" };
 
-const OKRS = [
+const OKRS_DEFAULT = [
   { ic:"🚀", color:"#00d4ff", obj:"Accelerate User Activation & Time-to-Value", owner:"You + Growth team", pct:62,
     krs:[
       { name:"D7 activation rate: 34% → 50%",              cur:41,  tgt:50,  unit:"%",    st:"on-track" },
@@ -441,7 +441,7 @@ const OKRS = [
 const KR_COLOR = { "on-track":"var(--grn)", "at-risk":"var(--amb)", "planning":"var(--pur)" };
 const KR_TAG   = { "on-track":"tag-grn",    "at-risk":"tag-amb",    "planning":"tag-pur" };
 
-const STAKEHOLDERS = [
+const STAKEHOLDERS_DEFAULT = [
   { name:"Sarah Mitchell", in:"SM", col:"#7c3aed", role:"Chief Product Officer",   type:"Executive",  proj:["All Projects"],                      inf:5, last:"2d ago",  age:"recent" },
   { name:"James Okafor",  in:"JO", col:"#00d4ff", role:"VP Engineering",           type:"Engineering",proj:["Mobile Onboarding","Payments"],       inf:5, last:"3d ago",  age:"recent" },
   { name:"Ana Reyes",     in:"AR", col:"#10b981", role:"Senior Designer",           type:"Design",     proj:["Mobile Onboarding V2","B2B Dashboard"],inf:3, last:"1d ago",  age:"recent" },
@@ -478,6 +478,9 @@ const Index = () => {
   ]);
   const [privTogs, setPrivTogs]     = useState<Record<PrivKey, boolean>>({ persist:true, learn:true, session:false, audit:true });
   const [agentRuns, setAgentRuns]   = useState<Record<string, any>>({});
+  const [projects, setProjects]         = useState<typeof PROJECTS_DEFAULT>(PROJECTS_DEFAULT);
+  const [okrs, setOkrs]                 = useState<typeof OKRS_DEFAULT>(OKRS_DEFAULT);
+  const [stakeholders, setStakeholders] = useState<typeof STAKEHOLDERS_DEFAULT>(STAKEHOLDERS_DEFAULT);
 
   // ─ Realtime: tasks (INSERT) → prepend to todos; agent_runs (*) → live status map ─
   useEffect(() => {
@@ -518,6 +521,76 @@ const Index = () => {
       supabase.removeChannel(tasksCh);
       supabase.removeChannel(runsCh);
     };
+  }, []);
+
+  // ─ Initial fetch: projects, okrs (+ KRs), stakeholders ─
+  useEffect(() => {
+    const monthShort = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+    const fmtDue = (d: string | null) => {
+      if (!d) return "—";
+      const dt = new Date(d);
+      if (isNaN(dt.getTime())) return d;
+      return `${monthShort[dt.getMonth()]} ${dt.getDate()}`;
+    };
+
+    (async () => {
+      const [pRes, oRes, sRes] = await Promise.all([
+        supabase.from("projects").select("name,progress,status,owner,due_date").order("due_date", { ascending: true }),
+        supabase.from("okrs").select("id,objective,owner,overall_pct,color,icon,sort_order").order("sort_order", { ascending: true }),
+        supabase.from("stakeholders").select("name,initials,role,type,color,influence").order("influence", { ascending: false }),
+      ]);
+
+      if (pRes.data && pRes.data.length) {
+        setProjects(pRes.data.map((r: any) => ({
+          name: r.name,
+          pct: r.progress ?? 0,
+          status: r.status ?? "planning",
+          owner: r.owner ?? "—",
+          due: fmtDue(r.due_date),
+        })));
+      }
+
+      if (oRes.data && oRes.data.length) {
+        const okrIds = oRes.data.map((o: any) => o.id);
+        const { data: krData } = await supabase
+          .from("key_results")
+          .select("okr_id,name,current_value,target_value,unit,status,inverted")
+          .in("okr_id", okrIds);
+        const krByOkr: Record<string, any[]> = {};
+        (krData ?? []).forEach((k: any) => {
+          (krByOkr[k.okr_id] ||= []).push({
+            name: k.name,
+            cur: Number(k.current_value ?? 0),
+            tgt: Number(k.target_value ?? 0),
+            unit: k.unit ?? "",
+            st: k.status ?? "planning",
+            ...(k.inverted ? { inv: true } : {}),
+          });
+        });
+        setOkrs(oRes.data.map((o: any) => ({
+          ic: o.icon ?? "🎯",
+          color: o.color ?? "#00d4ff",
+          obj: o.objective,
+          owner: o.owner ?? "—",
+          pct: o.overall_pct ?? 0,
+          krs: krByOkr[o.id] ?? [],
+        })));
+      }
+
+      if (sRes.data && sRes.data.length) {
+        setStakeholders(sRes.data.map((r: any) => ({
+          name: r.name,
+          in: r.initials ?? r.name?.slice(0,2).toUpperCase() ?? "??",
+          col: r.color ?? "#7c3aed",
+          role: r.role ?? "",
+          type: r.type ?? "",
+          proj: ["All Projects"],
+          inf: r.influence ?? 3,
+          last: "—",
+          age: "recent",
+        })));
+      }
+    })();
   }, []);
 
   const toggleTodo = (i: number) => setTodos(t => t.map((x,j) => j===i ? {...x,done:!x.done} : x));
@@ -565,8 +638,8 @@ const Index = () => {
     }, 2600);
   };
 
-  const shProjects = ["All", ...Array.from(new Set(STAKEHOLDERS.flatMap(s=>s.proj)))];
-  const filteredSh = shFilter === "All" ? STAKEHOLDERS : STAKEHOLDERS.filter(s=>s.proj.includes(shFilter));
+  const shProjects = ["All", ...Array.from(new Set(stakeholders.flatMap(s=>s.proj)))];
+  const filteredSh = shFilter === "All" ? stakeholders : stakeholders.filter(s=>s.proj.includes(shFilter));
   const info = PAGE_INFO[page] || { title:page, sub:"" };
 
   return (
@@ -809,7 +882,7 @@ const Index = () => {
                   <div className="th-row" style={{gridTemplateColumns:"1fr 1fr 90px 120px 60px"}}>
                     <span>Project</span><span>Progress</span><span>Status</span><span>Owner</span><span>Due</span>
                   </div>
-                  {PROJECTS.map((p,i) => (
+                  {projects.map((p,i) => (
                     <div key={i} className="tr" style={{gridTemplateColumns:"1fr 1fr 90px 120px 60px"}}>
                       <span style={{fontWeight:500}}>{p.name}</span>
                       <div className="bar-wrap">
@@ -982,7 +1055,7 @@ const Index = () => {
 
                 {/* Objectives */}
                 <div className="col">
-                  {OKRS.map((obj,oi) => (
+                  {okrs.map((obj,oi) => (
                     <div key={oi} className="okr-blk">
                       <div className="okr-hd" onClick={() => toggleOkr(oi)}>
                         <div className="okr-ico" style={{background:`${obj.color}18`,border:`1px solid ${obj.color}30`}}>{obj.ic}</div>
