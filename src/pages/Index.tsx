@@ -462,7 +462,7 @@ const AGE_TAG = { recent:"tag-grn", old:"tag-amb", stale:"tag-red" };
 
 const Index = () => {
   const [page, setPage]             = useState("overview");
-  const [todos, setTodos]           = useState<typeof TODOS_INIT>(TODOS_INIT);
+  const [todos, setTodos]           = useState<any[]>([]);
   const [expandedOkr, setExpandedOkr] = useState<number[]>([0,1,2]);
   const [shFilter, setShFilter]     = useState("All");
   const [prdInput, setPrdInput]     = useState("");
@@ -482,28 +482,37 @@ const Index = () => {
   const [okrs, setOkrs]                 = useState<typeof OKRS_DEFAULT>(OKRS_DEFAULT);
   const [stakeholders, setStakeholders] = useState<typeof STAKEHOLDERS_DEFAULT>(STAKEHOLDERS_DEFAULT);
 
-  // ─ Realtime: tasks (INSERT) → prepend to todos; agent_runs (*) → live status map ─
+  // ─ Initial fetch: tasks (most recent first) ─
   useEffect(() => {
-    const tasksCh = supabase
+    async function loadTasks() {
+      const { data } = await supabase
+        .from("tasks")
+        .select("*")
+        .order("created_at", { ascending: false });
+      if (data) setTodos(data);
+    }
+    loadTasks();
+  }, []);
+
+  // ─ Realtime: tasks (INSERT) prepend; agent_runs (*) live status map ─
+  useEffect(() => {
+    const channel = supabase
       .channel("tasks-live")
       .on(
         "postgres_changes",
         { event: "INSERT", schema: "public", table: "tasks" },
         (payload) => {
-          const r: any = payload.new;
-          setTodos((prev) => [
-            {
-              text: r.text ?? r.title ?? "Untitled task",
-              pri: r.pri ?? r.priority ?? "med",
-              done: r.done ?? false,
-              ai: r.ai ?? "AI-drafted",
-            },
-            ...prev,
-          ]);
+          setTodos((prev) => [payload.new, ...prev]);
         }
       )
       .subscribe();
 
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, []);
+
+  useEffect(() => {
     const runsCh = supabase
       .channel("agent-runs-live")
       .on(
@@ -518,7 +527,6 @@ const Index = () => {
       .subscribe();
 
     return () => {
-      supabase.removeChannel(tasksCh);
       supabase.removeChannel(runsCh);
     };
   }, []);
@@ -593,7 +601,11 @@ const Index = () => {
     })();
   }, []);
 
-  const toggleTodo = (i: number) => setTodos(t => t.map((x,j) => j===i ? {...x,done:!x.done} : x));
+  const toggleTodo = (i: number) => setTodos(t => t.map((x,j) => {
+    if (j !== i) return x;
+    const cur = x.done ?? x.completed ?? false;
+    return "completed" in x ? {...x, completed: !cur} : {...x, done: !cur};
+  }));
   const toggleOkr  = (i: number) => setExpandedOkr(p => p.includes(i) ? p.filter(x=>x!==i) : [...p,i]);
   const forgetMem  = (id: number) => setMemLog(m => m.filter(x => x.id!==id));
   const togglePriv = (k: PrivKey) => setPrivTogs(p => ({...p,[k]:!p[k]}));
@@ -837,14 +849,20 @@ const Index = () => {
                   <div className="ch"><div className="ct">Focus List · Today</div></div>
                   <div className="cb">
                     <div className="col" style={{gap:6}}>
-                      {todos.map((t,i) => (
-                        <div key={i} className="todo-item" onClick={() => toggleTodo(i)}>
-                          <div className={`todo-chk${t.done?" dn":""}`}>{t.done?"✓":""}</div>
-                          <span className={`todo-txt${t.done?" dn":""}`}>{t.text}</span>
-                          {t.ai && <span className="ai-note">🤖 {t.ai}</span>}
-                          <span className={`tag ${t.pri==="high"?"tag-red":t.pri==="med"?"tag-amb":"tag-grn"}`}>{t.pri}</span>
-                        </div>
-                      ))}
+                      {todos.map((t,i) => {
+                        const text = t.text ?? t.title ?? "Untitled task";
+                        const pri  = t.pri  ?? t.priority ?? "med";
+                        const done = t.done ?? t.completed ?? false;
+                        const ai   = t.ai   ?? t.source ?? null;
+                        return (
+                          <div key={t.id ?? i} className="todo-item" onClick={() => toggleTodo(i)}>
+                            <div className={`todo-chk${done?" dn":""}`}>{done?"✓":""}</div>
+                            <span className={`todo-txt${done?" dn":""}`}>{text}</span>
+                            {ai && <span className="ai-note">🤖 {ai}</span>}
+                            <span className={`tag ${pri==="high"?"tag-red":pri==="med"?"tag-amb":"tag-grn"}`}>{pri}</span>
+                          </div>
+                        );
+                      })}
                     </div>
                   </div>
                 </div>
