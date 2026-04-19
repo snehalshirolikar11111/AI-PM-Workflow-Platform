@@ -477,7 +477,7 @@ const Index = () => {
     { id:6, text:"Q2 OKR progress: 43% overall",                     src:"OKR sync",        type:"okr" },
   ]);
   const [privTogs, setPrivTogs]     = useState<Record<PrivKey, boolean>>({ persist:true, learn:true, session:false, audit:true });
-  const [agentRuns, setAgentRuns]   = useState<Record<string, any>>({});
+  const [agentRuns, setAgentRuns]   = useState<any[]>([]);
   const [projects, setProjects]         = useState<any[]>([]);
   const [okrs, setOkrs]                 = useState<typeof OKRS_DEFAULT>(OKRS_DEFAULT);
   const [stakeholders, setStakeholders] = useState<typeof STAKEHOLDERS_DEFAULT>(STAKEHOLDERS_DEFAULT);
