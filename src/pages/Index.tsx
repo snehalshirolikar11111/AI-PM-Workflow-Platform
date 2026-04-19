@@ -523,6 +523,76 @@ const Index = () => {
     };
   }, []);
 
+  // ─ Initial fetch: projects, okrs (+ KRs), stakeholders ─
+  useEffect(() => {
+    const monthShort = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+    const fmtDue = (d: string | null) => {
+      if (!d) return "—";
+      const dt = new Date(d);
+      if (isNaN(dt.getTime())) return d;
+      return `${monthShort[dt.getMonth()]} ${dt.getDate()}`;
+    };
+
+    (async () => {
+      const [pRes, oRes, sRes] = await Promise.all([
+        supabase.from("projects").select("name,progress,status,owner,due_date").order("due_date", { ascending: true }),
+        supabase.from("okrs").select("id,objective,owner,overall_pct,color,icon,sort_order").order("sort_order", { ascending: true }),
+        supabase.from("stakeholders").select("name,initials,role,type,color,influence").order("influence", { ascending: false }),
+      ]);
+
+      if (pRes.data && pRes.data.length) {
+        setProjects(pRes.data.map((r: any) => ({
+          name: r.name,
+          pct: r.progress ?? 0,
+          status: r.status ?? "planning",
+          owner: r.owner ?? "—",
+          due: fmtDue(r.due_date),
+        })));
+      }
+
+      if (oRes.data && oRes.data.length) {
+        const okrIds = oRes.data.map((o: any) => o.id);
+        const { data: krData } = await supabase
+          .from("key_results")
+          .select("okr_id,name,current_value,target_value,unit,status,inverted")
+          .in("okr_id", okrIds);
+        const krByOkr: Record<string, any[]> = {};
+        (krData ?? []).forEach((k: any) => {
+          (krByOkr[k.okr_id] ||= []).push({
+            name: k.name,
+            cur: Number(k.current_value ?? 0),
+            tgt: Number(k.target_value ?? 0),
+            unit: k.unit ?? "",
+            st: k.status ?? "planning",
+            ...(k.inverted ? { inv: true } : {}),
+          });
+        });
+        setOkrs(oRes.data.map((o: any) => ({
+          ic: o.icon ?? "🎯",
+          color: o.color ?? "#00d4ff",
+          obj: o.objective,
+          owner: o.owner ?? "—",
+          pct: o.overall_pct ?? 0,
+          krs: krByOkr[o.id] ?? [],
+        })));
+      }
+
+      if (sRes.data && sRes.data.length) {
+        setStakeholders(sRes.data.map((r: any) => ({
+          name: r.name,
+          in: r.initials ?? r.name?.slice(0,2).toUpperCase() ?? "??",
+          col: r.color ?? "#7c3aed",
+          role: r.role ?? "",
+          type: r.type ?? "",
+          proj: ["All Projects"],
+          inf: r.influence ?? 3,
+          last: "—",
+          age: "recent",
+        })));
+      }
+    })();
+  }, []);
+
   const toggleTodo = (i: number) => setTodos(t => t.map((x,j) => j===i ? {...x,done:!x.done} : x));
   const toggleOkr  = (i: number) => setExpandedOkr(p => p.includes(i) ? p.filter(x=>x!==i) : [...p,i]);
   const forgetMem  = (id: number) => setMemLog(m => m.filter(x => x.id!==id));
