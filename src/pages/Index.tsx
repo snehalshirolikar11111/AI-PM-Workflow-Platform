@@ -1387,12 +1387,12 @@ const Index = () => {
                     <div className="card">
                       <div className="ch"><div className="ct">Memory Settings</div></div>
                       <div className="cb">
-                        {[
+                        {([
                           {k:"persist", l:"Persistent memory",  s:"Agent remembers across sessions"},
                           {k:"learn",   l:"Agent learning",      s:"Agents improve from your usage patterns"},
                           {k:"session", l:"Session-only mode",   s:"Wipe memory when you close the app"},
                           {k:"audit",   l:"Audit log",           s:"Record every agent action for compliance"},
-                        ].map(({k,l,s})=>(
+                        ] as { k: PrivKey; l: string; s: string }[]).map(({k,l,s})=>(
                           <div key={k} className="tog-row">
                             <div>
                               <div className="tog-lbl">{l}</div>
