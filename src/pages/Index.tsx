@@ -478,7 +478,7 @@ const Index = () => {
   ]);
   const [privTogs, setPrivTogs]     = useState<Record<PrivKey, boolean>>({ persist:true, learn:true, session:false, audit:true });
   const [agentRuns, setAgentRuns]   = useState<Record<string, any>>({});
-  const [projects, setProjects]         = useState<typeof PROJECTS_DEFAULT>(PROJECTS_DEFAULT);
+  const [projects, setProjects]         = useState<any[]>([]);
   const [okrs, setOkrs]                 = useState<typeof OKRS_DEFAULT>(OKRS_DEFAULT);
   const [stakeholders, setStakeholders] = useState<typeof STAKEHOLDERS_DEFAULT>(STAKEHOLDERS_DEFAULT);
 
