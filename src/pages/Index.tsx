@@ -441,7 +441,7 @@ const OKRS_DEFAULT = [
 const KR_COLOR = { "on-track":"var(--grn)", "at-risk":"var(--amb)", "planning":"var(--pur)" };
 const KR_TAG   = { "on-track":"tag-grn",    "at-risk":"tag-amb",    "planning":"tag-pur" };
 
-const STAKEHOLDERS = [
+const STAKEHOLDERS_DEFAULT = [
   { name:"Sarah Mitchell", in:"SM", col:"#7c3aed", role:"Chief Product Officer",   type:"Executive",  proj:["All Projects"],                      inf:5, last:"2d ago",  age:"recent" },
   { name:"James Okafor",  in:"JO", col:"#00d4ff", role:"VP Engineering",           type:"Engineering",proj:["Mobile Onboarding","Payments"],       inf:5, last:"3d ago",  age:"recent" },
   { name:"Ana Reyes",     in:"AR", col:"#10b981", role:"Senior Designer",           type:"Design",     proj:["Mobile Onboarding V2","B2B Dashboard"],inf:3, last:"1d ago",  age:"recent" },
