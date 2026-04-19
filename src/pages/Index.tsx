@@ -557,7 +557,7 @@ const Index = () => {
         }
       )
       .subscribe();
-    return () => supabase.removeChannel(channel);
+    return () => { supabase.removeChannel(channel); };
   }, []);
 
   // ─ Initial fetch: okrs (+ KRs), stakeholders ─
