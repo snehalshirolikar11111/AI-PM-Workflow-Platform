@@ -568,8 +568,8 @@ const Index = () => {
     }, 2600);
   };
 
-  const shProjects = ["All", ...Array.from(new Set(STAKEHOLDERS.flatMap(s=>s.proj)))];
-  const filteredSh = shFilter === "All" ? STAKEHOLDERS : STAKEHOLDERS.filter(s=>s.proj.includes(shFilter));
+  const shProjects = ["All", ...Array.from(new Set(stakeholders.flatMap(s=>s.proj)))];
+  const filteredSh = shFilter === "All" ? stakeholders : stakeholders.filter(s=>s.proj.includes(shFilter));
   const info = PAGE_INFO[page] || { title:page, sub:"" };
 
   return (
