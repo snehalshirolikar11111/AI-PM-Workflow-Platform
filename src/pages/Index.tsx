@@ -417,7 +417,7 @@ const SCHEDULE = [
 
 const EV_CLS = { deep:"ev-deep", meet:"ev-meet", admin:"ev-admin", buf:"ev-buf", break:"ev-break" };
 
-const OKRS = [
+const OKRS_DEFAULT = [
   { ic:"🚀", color:"#00d4ff", obj:"Accelerate User Activation & Time-to-Value", owner:"You + Growth team", pct:62,
     krs:[
       { name:"D7 activation rate: 34% → 50%",              cur:41,  tgt:50,  unit:"%",    st:"on-track" },
