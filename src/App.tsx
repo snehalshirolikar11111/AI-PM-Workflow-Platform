@@ -1,27 +1,51 @@
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Route, Routes } from "react-router-dom";
-import { Toaster as Sonner } from "@/components/ui/sonner";
-import { Toaster } from "@/components/ui/toaster";
-import { TooltipProvider } from "@/components/ui/tooltip";
-import Index from "./pages/Index.tsx";
-import NotFound from "./pages/NotFound.tsx";
+import { useEffect, useState } from "react";
+import { supabase } from "@/integrations/supabase/client";
+import PMDashboard from "@/components/PMDashboard";
+import Login from "@/components/Login";
 
-const queryClient = new QueryClient();
+export default function App() {
+  const [user, setUser]       = useState(null);
+  const [checking, setChecking] = useState(true);
 
-const App = () => (
-  <QueryClientProvider client={queryClient}>
-    <TooltipProvider>
-      <Toaster />
-      <Sonner />
-      <BrowserRouter>
-        <Routes>
-          <Route path="/" element={<Index />} />
-          {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
-          <Route path="*" element={<NotFound />} />
-        </Routes>
-      </BrowserRouter>
-    </TooltipProvider>
-  </QueryClientProvider>
-);
+  useEffect(() => {
+    // Check if a session already exists (e.g. user refreshes page)
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      setUser(session?.user ?? null);
+      setChecking(false);
+    });
 
-export default App;
+    // Listen for login / logout events
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(
+      (_event, session) => {
+        setUser(session?.user ?? null);
+        setChecking(false);
+      }
+    );
+
+    return () => subscription.unsubscribe();
+  }, []);
+
+  // Still checking session — show nothing briefly
+  if (checking) {
+    return (
+      <div style={{
+        minHeight: "100vh",
+        background: "#07090f",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        fontFamily: "DM Sans, sans-serif",
+        color: "#4e5f74",
+        fontSize: 13,
+      }}>
+        Loading...
+      </div>
+    );
+  }
+
+  // Not logged in — show login screen
+  if (!user) return <Login />;
+
+  // Logged in — show dashboard
+  return <PMDashboard />;
+}
