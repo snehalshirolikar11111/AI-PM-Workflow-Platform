@@ -1,5 +1,7 @@
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
+import Login from "@/components/Login";
+import Index from "@/pages/Index";
 
 export default function App() {
   const [ready, setReady] = useState(false);
@@ -11,20 +13,29 @@ export default function App() {
       setReady(true);
     });
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      (_e, session) => setUser(session?.user ?? null)
+      (_e, session) => {
+        setUser(session?.user ?? null);
+      }
     );
     return () => subscription.unsubscribe();
   }, []);
 
   if (!ready) return (
-    <div style={{ minHeight:"100vh", background:"#07090f", display:"flex",
-      alignItems:"center", justifyContent:"center", color:"#4e5f74",
-      fontFamily:"sans-serif", fontSize:13 }}>
+    <div style={{
+      minHeight: "100vh",
+      background: "#07090f",
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "center",
+      color: "#4e5f74",
+      fontFamily: "sans-serif",
+      fontSize: 13,
+    }}>
       Loading...
     </div>
   );
 
-  return <div style={{ color: "white", padding: 20 }}>
-    {user ? "Logged in as: " + user.email : "Not logged in"}
-  </div>;
+  if (!user) return <Login />;
+
+  return <Index />;
 }
