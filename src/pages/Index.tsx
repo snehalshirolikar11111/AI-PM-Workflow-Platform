@@ -1941,13 +1941,12 @@ export default function PMDashboard() {
                     { name:"google_calendar", label:"Google Calendar", icon:"📅", desc:"Events synced to schedule tab", syncFn: () => syncCalendar() },
                   ].map(({ name, label, icon, desc, syncFn }) => {
                     const status = getIntegrationStatus(name);
-                    const isSyncing = syncingIntegration === name;
+                    const displayStatus = syncingIntegration === name ? "syncing" : status.status;
                     return (
                       <div key={name} className="card" style={{padding:16}}>
                         <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:10}}>
                           <div style={{fontSize:24}}>{icon}</div>
-                          <span className={`tag ${status.status==="connected"?"tag-grn":status.status==="error"?"tag-red":"tag-dim"}`} style={{fontSize:9}}>
-                            {status.status === "connected" ? "● Connected" : status.status === "error" ? "● Error" : "○ Disconnected"}
+                         <span className={`tag ${displayStatus === "connected" ? "tag-grn" :displayStatus === "syncing"   ? "tag-blu" :displayStatus === "error"     ? "tag-red" : "tag-dim"}`} style={{fontSize:9}}>{displayStatus === "connected" ? "● Connected" :displayStatus === "syncing"   ? "⟳ Syncing..." :displayStatus === "error"     ? "● Error" : "○ Disconnected"}
                           </span>
                         </div>
                         <div style={{fontFamily:"Syne",fontWeight:700,fontSize:14,marginBottom:3}}>{label}</div>
