@@ -1765,7 +1765,7 @@ export default function PMDashboard() {
                           </div>
                         </div>
                         <span style={{fontSize:11,color:"var(--mut)"}}>{s.type}</span>
-                        <a href={`mailto:${s.email}`} style={{fontFamily:"DM Mono",fontSize:11,color:"var(--acc)",textDecoration:"none"}} onMouseOver={e=>e.target.style.textDecoration="underline"} onMouseOut={e=>e.target.style.textDecoration="none"}>{s.email}</a>
+                        <a href={`mailto:${s.email}`} style={{fontFamily:"DM Mono",fontSize:11,color:"var(--acc)",textDecoration:"none"}} onMouseOver={e=>{ e.currentTarget.style.textDecoration="underline"; }} onMouseOut={e=>{ e.currentTarget.style.textDecoration="none"; }}>{s.email}</a>
                         <div style={{display:"flex",flexWrap:"wrap",gap:3}}>
                           {(s.proj||[]).map((p,j) => <span key={j} style={{fontSize:10,padding:"1px 6px",borderRadius:4,background:"var(--surf2)",border:"1px solid var(--bdr)",color:"var(--mut)"}}>{p}</span>)}
                         </div>
@@ -1983,7 +1983,7 @@ export default function PMDashboard() {
                       </div>
                       {jiraIssues.map((issue,i) => (
                         <div key={issue.id} className="tr" style={{gridTemplateColumns:"80px 1fr 80px 80px 100px"}}>
-                          <a href={`${Deno?.env?.get?.("JIRA_BASE_URL") || "#"}/browse/${issue.jira_key}`} target="_blank" rel="noopener noreferrer"
+                          <a href={`#/browse/${issue.jira_key}`} target="_blank" rel="noopener noreferrer"
                             style={{fontFamily:"DM Mono",fontSize:11,color:"var(--acc)",textDecoration:"none"}}>{issue.jira_key}</a>
                           <span style={{fontSize:12}}>{issue.summary}</span>
                           <span className={`tag ${issue.status?.includes("done")||issue.status?.includes("closed")?"tag-grn":issue.status?.includes("progress")?"tag-blu":"tag-dim"}`} style={{fontSize:9}}>{issue.status}</span>
@@ -2302,7 +2302,7 @@ export default function PMDashboard() {
               </div>
               <div className="form-row">
                 <label className="form-label">Progress (%)</label>
-                <input className="input" type="number" min="0" max="100" value={projForm.progress} onChange={e => setProjForm(p=>({...p,progress:e.target.value}))}/>
+                <input className="input" type="number" min="0" max="100" value={projForm.progress} onChange={e => setProjForm(p=>({...p,progress:Number(e.target.value)}))}/>
               </div>
               <div className="form-row">
                 <label className="form-label">Due Date</label>
