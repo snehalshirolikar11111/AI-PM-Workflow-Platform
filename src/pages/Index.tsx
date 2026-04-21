@@ -456,6 +456,47 @@ export default function PMDashboard() {
     return () => subscription.unsubscribe();
   }, []);
 
+  /* ── Auto-sync all integrations on mount + tab focus ─────────────────── */
+const autoSyncAll = useCallback(async () => {
+  // Run all syncs in parallel, silently — no alerts
+  await Promise.allSettled([
+    supabase.functions.invoke("jira-sync",      { body: { action: "pull" } }),
+    supabase.functions.invoke("webex-sync",     { body: { action: "pull" } }),
+    supabase.functions.invoke("gmail-sync",     { body: { action: "pull" } }),
+    supabase.functions.invoke("calendar-sync",  { body: {} }),
+  ]);
+  // Refresh all data
+  await Promise.allSettled([
+    loadIntegrations(),
+    loadJiraIssues(),
+    loadGmailThreads(),
+    loadCalendarEvents(),
+    loadTasks(),
+    loadMeetings(),
+  ]);
+}, [loadIntegrations, loadJiraIssues, loadGmailThreads, loadCalendarEvents, loadTasks, loadMeetings]);
+
+// Auto-sync on first load
+useEffect(() => {
+  autoSyncAll();
+}, [autoSyncAll]);
+
+// Auto-sync when user switches back to this tab
+useEffect(() => {
+  const onFocus = () => autoSyncAll();
+  window.addEventListener("focus", onFocus);
+  document.addEventListener("visibilitychange", () => {
+    if (document.visibilityState === "visible") autoSyncAll();
+  });
+  return () => window.removeEventListener("focus", onFocus);
+}, [autoSyncAll]);
+
+// Poll every 5 minutes
+useEffect(() => {
+  const interval = setInterval(autoSyncAll, 5 * 60 * 1000);
+  return () => clearInterval(interval);
+}, [autoSyncAll]);
+
   /* ── Fetch tasks ──────────────────────────────────────────────────────── */
   const loadTasks = useCallback(async () => {
     setTodosLoading(true);
