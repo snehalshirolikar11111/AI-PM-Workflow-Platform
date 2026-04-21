@@ -278,7 +278,7 @@ const NAV = [
   { grp:"Strategy",     items:[{ id:"priority",ic:"◈",lbl:"Prioritization"},{ id:"okr",    ic:"◎",lbl:"OKR Tracker"}]},
   { grp:"Intelligence", items:[{ id:"overview",ic:"⬡",lbl:"Workflows"},     { id:"agents", ic:"⬡",lbl:"AI Agents"}, { id:"prd",ic:"📄",lbl:"PRD Agent"}]},
   { grp:"People",       items:[{ id:"stakeholders",ic:"◉",lbl:"Stakeholders"}]},
-  { grp:"Operations",   items:[{ id:"metrics",ic:"◎",lbl:"Pilot Metrics"},  { id:"privacy",ic:"◈",lbl:"Privacy"}]},
+  { grp:"Operations",   items:[{ id:"metrics",ic:"◎",lbl:"Pilot Metrics"},  { id:"privacy",ic:"◈",lbl:"Privacy"}, { id:"integrations",ic:"⚡",lbl:"Integrations"}]},
 ];
 
 const PAGE_INFO = {
@@ -294,6 +294,7 @@ const PAGE_INFO = {
   stakeholders:{ title:"Stakeholders",         sub:"Everyone who matters — filterable by project, with influence and last contact" },
   metrics:     { title:"Pilot Metrics",        sub:"Adoption funnel, time saved, agent usage and threshold alerts" },
   privacy:     { title:"Privacy & Data Controls", sub:"What the system remembers, where data goes, and your right to delete" },
+  integrations:{ title:"Integrations",            sub:"Live connections to Jira, Webex, Gmail and Google Calendar — bidirectional sync" },
 };
 
 const WORKFLOWS = [
@@ -433,6 +434,19 @@ export default function PMDashboard() {
   const [digestInput, setDigestInput]     = useState({ show: false });
   const [updateInput, setUpdateInput]     = useState({ show: false, name: "", role: "" });
 
+  /* Integrations */
+  const [integrations, setIntegrations]   = useState([]);
+  const [jiraIssues, setJiraIssues]       = useState([]);
+  const [gmailThreads, setGmailThreads]   = useState([]);
+  const [calendarEvents, setCalEvents]    = useState([]);
+  const [syncingIntegration, setSyncing]  = useState(null);
+  const [showCreateJira, setShowCreateJira] = useState(false);
+  const [jiraForm, setJiraForm]           = useState({ summary:"", description:"", projectKey:"PM", priority:"med", issueType:"Task" });
+  const [showAddCalEvent, setShowAddCalEvent] = useState(false);
+  const [calForm, setCalForm]             = useState({ title:"", startTime:"", endTime:"", attendees:"", description:"" });
+  const [agentRuns, setAgentRuns]         = useState([]);
+  const [riceScores, setRiceScores]       = useState([]);
+
   /* ── Auth ─────────────────────────────────────────────────────────────── */
   useEffect(() => {
     supabase.auth.getUser().then(({ data: { user } }) => setUser(user));
@@ -537,6 +551,139 @@ export default function PMDashboard() {
         if (data) setPrivTogs({ persist: data.persistent_memory, learn: data.agent_learning, session: data.session_only, audit: data.audit_log });
       });
   }, [user]);
+
+  /* ── Fetch integrations ───────────────────────────────────────────────── */
+  const loadIntegrations = useCallback(async () => {
+    const { data } = await supabase.from("integrations").select("*");
+    if (data) setIntegrations(data);
+  }, []);
+
+  const loadJiraIssues = useCallback(async () => {
+    const { data } = await supabase.from("jira_issues").select("*").order("jira_updated_at", { ascending: false }).limit(50);
+    if (data) setJiraIssues(data);
+  }, []);
+
+  const loadGmailThreads = useCallback(async () => {
+    const { data } = await supabase.from("gmail_threads").select("*").order("received_at", { ascending: false }).limit(30);
+    if (data) setGmailThreads(data);
+  }, []);
+
+  const loadCalendarEvents = useCallback(async () => {
+    const { data } = await supabase.from("schedule_blocks").select("*").order("start_time");
+    if (data) setCalEvents(data);
+  }, []);
+
+  const loadAgentRuns = useCallback(async () => {
+    const { data } = await supabase.from("agent_runs").select("*").order("ran_at", { ascending: false }).limit(20);
+    if (data) setAgentRuns(data);
+  }, []);
+
+  const loadRiceScores = useCallback(async () => {
+    const { data } = await supabase.from("rice_scores").select("*").order("rice_score", { ascending: false });
+    if (data) setRiceScores(data);
+  }, []);
+
+  useEffect(() => {
+    loadIntegrations();
+    loadJiraIssues();
+    loadGmailThreads();
+    loadCalendarEvents();
+    loadAgentRuns();
+    loadRiceScores();
+  }, [loadIntegrations, loadJiraIssues, loadGmailThreads, loadCalendarEvents, loadAgentRuns, loadRiceScores]);
+
+  // Realtime for integrations
+  useEffect(() => {
+    const ch = supabase.channel("integrations-live")
+      .on("postgres_changes", { event: "*", schema: "public", table: "integrations" }, () => loadIntegrations())
+      .on("postgres_changes", { event: "*", schema: "public", table: "jira_issues" }, () => loadJiraIssues())
+      .on("postgres_changes", { event: "*", schema: "public", table: "gmail_threads" }, () => loadGmailThreads())
+      .on("postgres_changes", { event: "*", schema: "public", table: "schedule_blocks" }, () => loadCalendarEvents())
+      .on("postgres_changes", { event: "*", schema: "public", table: "agent_runs" }, () => loadAgentRuns())
+      .on("postgres_changes", { event: "*", schema: "public", table: "rice_scores" }, () => loadRiceScores())
+      .subscribe();
+    return () => supabase.removeChannel(ch);
+  }, [loadIntegrations, loadJiraIssues, loadGmailThreads, loadCalendarEvents, loadAgentRuns, loadRiceScores]);
+
+  /* ── Integration sync functions ───────────────────────────────────────── */
+  const syncJira = async (projectKey) => {
+    setSyncing("jira");
+    const { data, error } = await supabase.functions.invoke("jira-sync", { body: { action: "pull", projectKey } });
+    setSyncing(null);
+    if (error) return alert("Jira sync failed: " + error.message);
+    await Promise.all([loadJiraIssues(), loadTasks(), loadProjects(), loadIntegrations()]);
+    alert(`Jira sync complete — ${data?.synced || 0} issues synced`);
+  };
+
+  const createJiraIssue = async () => {
+    if (!jiraForm.summary.trim()) return;
+    setSyncing("jira-create");
+    const { data, error } = await supabase.functions.invoke("jira-sync", {
+      body: { action: "create_issue", issueData: jiraForm },
+    });
+    setSyncing(null);
+    if (error) return alert("Failed to create Jira issue: " + error.message);
+    setShowCreateJira(false);
+    setJiraForm({ summary:"", description:"", projectKey:"PM", priority:"med", issueType:"Task" });
+    await Promise.all([loadJiraIssues(), loadTasks()]);
+    alert(`Created ${data?.jira_key}`);
+  };
+
+  const syncWebex = async () => {
+    setSyncing("webex");
+    const { data, error } = await supabase.functions.invoke("webex-sync", { body: { action: "pull" } });
+    setSyncing(null);
+    if (error) return alert("Webex sync failed: " + error.message);
+    await Promise.all([loadMeetings(), loadTasks(), loadIntegrations()]);
+    alert(`Webex sync complete — ${data?.synced || 0} meetings synced`);
+  };
+
+  const syncGmail = async () => {
+    setSyncing("gmail");
+    const { data, error } = await supabase.functions.invoke("gmail-sync", { body: { action: "pull" } });
+    setSyncing(null);
+    if (error) return alert("Gmail sync failed: " + error.message);
+    await Promise.all([loadGmailThreads(), loadTasks(), loadIntegrations()]);
+    alert(`Gmail sync complete — ${data?.synced || 0} threads synced`);
+  };
+
+  const syncCalendar = async (date) => {
+    setSyncing("calendar");
+    const { data, error } = await supabase.functions.invoke("calendar-sync", { body: { date } });
+    setSyncing(null);
+    if (error) return alert("Calendar sync failed: " + error.message);
+    await Promise.all([loadCalendarEvents(), loadIntegrations()]);
+    return data?.events || [];
+  };
+
+  const createCalendarEvent = async () => {
+    if (!calForm.title.trim() || !calForm.startTime) return;
+    setSyncing("cal-create");
+    const date = new Date().toISOString().split("T")[0];
+    const { data, error } = await supabase.functions.invoke("calendar-sync", {
+      body: {
+        action: "create_event",
+        title: calForm.title,
+        startTime: `${date}T${calForm.startTime}:00`,
+        endTime: `${date}T${calForm.endTime || calForm.startTime}:00`,
+        attendees: calForm.attendees.split(",").map(e => e.trim()).filter(Boolean),
+        description: calForm.description,
+      },
+    });
+    setSyncing(null);
+    if (error) return alert("Failed to create event: " + error.message);
+    setShowAddCalEvent(false);
+    setCalForm({ title:"", startTime:"", endTime:"", attendees:"", description:"" });
+    await loadCalendarEvents();
+    alert(`Event created! Meet link: ${data?.meet_link || "none"}`);
+  };
+
+  const markGmailRead = async (threadId) => {
+    await supabase.functions.invoke("gmail-sync", { body: { action: "mark_read", threadId } });
+    setGmailThreads(p => p.map(t => t.thread_id === threadId ? { ...t, is_read: true } : t));
+  };
+
+  const getIntegrationStatus = (name) => integrations.find(i => i.name === name) || { status: "disconnected" };
 
   /* ── Task CRUD ────────────────────────────────────────────────────────── */
   const toggleTodo = async (task) => {
@@ -858,32 +1005,67 @@ export default function PMDashboard() {
               <div className="g2" style={{gridTemplateColumns:"1fr 260px"}}>
                 <div className="card">
                   <div className="ch">
-                    <div className="ct">Today · Friday</div>
-                    <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
-                      {[["var(--pur)","Meetings"],["var(--acc)","Deep Work"],["var(--mut)","Admin"],["var(--grn)","Buffer"]].map(([c,l]) => (
-                        <div key={l} style={{display:"flex",alignItems:"center",gap:5,fontSize:11,color:"var(--mut)"}}>
-                          <div style={{width:6,height:6,borderRadius:2,background:c}}/>{l}
-                        </div>
-                      ))}
+                    <div className="ct">Today · {new Date().toLocaleDateString("en-US",{weekday:"long",month:"short",day:"numeric"})}</div>
+                    <div style={{display:"flex",gap:6}}>
+                      <button className="btn btn-sm" onClick={() => syncCalendar()} disabled={syncingIntegration==="calendar"}>
+                        {syncingIntegration==="calendar" ? <span className="spin" style={{width:12,height:12,borderWidth:1.5,display:"inline-block"}}/> : "⟳ Sync Calendar"}
+                      </button>
+                      <button className="btn btn-sm" onClick={() => setShowAddCalEvent(true)}>+ Add Event</button>
                     </div>
                   </div>
                   <div className="cb" style={{padding:"14px 16px 14px 14px"}}>
+                    {calendarEvents.length === 0 && (
+                      <div className="empty" style={{textAlign:"left"}}>
+                        No events loaded. Click "Sync Calendar" to pull today's events from Google Calendar.
+                      </div>
+                    )}
                     <div className="tl-wrap">
-                      {SCHEDULE.map((ev,i) => (
-                        <div key={i} className="tl-slot">
-                          <div className="tl-time">{ev.t}</div>
+                      {[...calendarEvents]
+                        .sort((a,b) => (a.start_time||"").localeCompare(b.start_time||""))
+                        .map((ev,i) => (
+                        <div key={ev.id} className="tl-slot">
+                          <div className="tl-time">{ev.start_time || "—"}</div>
                           <div>
-                            <div className={`tl-ev ${EV_CLS[ev.type]}`}>
-                              <div className="ev-title">{ev.title}</div>
+                            <div className={`tl-ev ev-${ev.block_type || "meet"}`}>
+                              <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start"}}>
+                                <div className="ev-title">{ev.calendar_event_title || ev.label}</div>
+                                <div style={{display:"flex",gap:5,alignItems:"center"}}>
+                                  {ev.meet_link && (
+                                    <a href={ev.meet_link} target="_blank" rel="noopener noreferrer"
+                                      style={{fontFamily:"DM Mono",fontSize:9,color:"var(--acc)",textDecoration:"none",padding:"1px 5px",border:"1px solid rgba(0,212,255,0.2)",borderRadius:3}}>
+                                      Join
+                                    </a>
+                                  )}
+                                  {ev.calendar_event_id && (
+                                    <button className="btn btn-icon btn-danger" style={{width:18,height:18,fontSize:9,opacity:0.5}} title="Delete event"
+                                      onClick={async () => {
+                                        if (!window.confirm("Delete this calendar event?")) return;
+                                        await supabase.functions.invoke("calendar-sync", { body: { action: "delete_event", eventId: ev.calendar_event_id } });
+                                        await loadCalendarEvents();
+                                      }}>✕</button>
+                                  )}
+                                </div>
+                              </div>
                               <div className="ev-meta">
-                                <span>{ev.desc}</span>
-                                <span className="mono dim" style={{fontSize:10}}>{ev.dur}</span>
-                                {ev.ai && <span className="ev-ai-tag">🤖 {ev.ai}</span>}
+                                <span>{ev.start_time} – {ev.end_time}</span>
+                                {ev.attendees?.length > 0 && <span className="dim" style={{fontSize:10}}>{ev.attendees.slice(0,2).join(", ")}{ev.attendees.length > 2 ? ` +${ev.attendees.length-2}` : ""}</span>}
                               </div>
                             </div>
                           </div>
                         </div>
                       ))}
+                      {/* Static protection blocks */}
+                      {calendarEvents.filter(e => e.block_type === "deep").length === 0 && (
+                        SCHEDULE.filter(s => s.type === "deep").map((ev,i) => (
+                          <div key={`static-${i}`} className="tl-slot" style={{opacity:0.5}}>
+                            <div className="tl-time">{ev.t}</div>
+                            <div><div className="tl-ev ev-deep">
+                              <div className="ev-title">{ev.title}</div>
+                              <div className="ev-meta"><span>{ev.desc}</span><span className="ev-ai-tag">🤖 {ev.ai}</span></div>
+                            </div></div>
+                          </div>
+                        ))
+                      )}
                     </div>
                   </div>
                 </div>
@@ -892,21 +1074,23 @@ export default function PMDashboard() {
                     <div className="ch"><div className="ct">Day at a Glance</div></div>
                     <div className="cb">
                       <div className="g2" style={{gap:8,marginBottom:14}}>
-                        {[["5","Meetings"],["3h","Deep Work"],["1.5h","Admin"],["1h","Buffer"]].map(([v,l]) => (
+                        {[
+                          [calendarEvents.filter(e=>e.block_type==="meet").length.toString(),"Meetings"],
+                          [calendarEvents.filter(e=>e.block_type==="deep").length + "h","Deep Work"],
+                          [calendarEvents.length.toString(),"Total Events"],
+                          [calendarEvents.filter(e=>e.meet_link).length.toString(),"Have Meet Link"],
+                        ].map(([v,l]) => (
                           <div key={l} style={{background:"var(--surf2)",border:"1px solid var(--bdr)",borderRadius:7,padding:"9px 11px"}}>
                             <div style={{fontFamily:"Syne",fontWeight:800,fontSize:20,color:"var(--acc)",lineHeight:1}}>{v}</div>
                             <div style={{fontSize:10,color:"var(--mut)",marginTop:3}}>{l}</div>
                           </div>
                         ))}
                       </div>
-                      <div className="section-lbl">Energy Curve</div>
-                      <div style={{display:"flex",alignItems:"flex-end",gap:2,height:32}}>
-                        {[70,85,90,80,60,50,75,80,85,70,55,45,50].map((h,i) => (
-                          <div key={i} style={{flex:1,borderRadius:"2px 2px 0 0",height:`${h}%`,background:h>75?"var(--grn)":h>60?"var(--amb)":"var(--red)",opacity:0.65}}/>
-                        ))}
-                      </div>
-                      <div style={{display:"flex",justifyContent:"space-between",fontSize:9,fontFamily:"DM Mono",color:"var(--mut)",marginTop:4}}>
-                        <span>8am</span><span>1pm</span><span>5pm</span>
+                      <div className="section-lbl">Calendar Status</div>
+                      <div style={{fontSize:12,color:"var(--mut)"}}>
+                        {getIntegrationStatus("google_calendar").status === "connected"
+                          ? `Last synced: ${new Date(getIntegrationStatus("google_calendar").last_synced_at).toLocaleTimeString()}`
+                          : "Not synced. Click ⟳ to connect Google Calendar."}
                       </div>
                     </div>
                   </div>
@@ -1135,26 +1319,30 @@ export default function PMDashboard() {
                     <div className="ch">
                       <div className="ct">RICE Score · AI-Calculated</div>
                       <button className="btn btn-sm" onClick={async () => {
-                        const items = projects.map(p => ({ title: p.name, description: "" }));
+                        const items = projects.map(p => ({ title: p.name, description: `Status: ${p.status}, Progress: ${p.progress}%` }));
                         const { data } = await supabase.functions.invoke("prioritization", { body: { items } });
-                        alert(data?.summary || "Scoring complete. Check rice_scores table.");
+                        await loadRiceScores();
+                        alert(data?.summary || "Scoring complete.");
                       }}>⚡ Score Backlog</button>
                     </div>
                     <div className="th-row" style={{gridTemplateColumns:"1fr 32px 32px 32px 32px 80px"}}>
                       <span>Feature</span><span>R</span><span>I</span><span>C</span><span>E</span><span>Score</span>
                     </div>
-                    {[...RICE_STATIC].sort((a,b) => b.score-a.score).map((it,i) => (
+                    {(riceScores.length > 0 ? riceScores : RICE_STATIC.map(r => ({...r, rice_score: r.score, title: r.name}))).sort((a,b) => b.rice_score-a.rice_score).map((it,i) => (
                       <div key={i} className="tr" style={{gridTemplateColumns:"1fr 32px 32px 32px 32px 80px"}}>
-                        <span style={{fontWeight:500,fontSize:12}}>{it.name}</span>
-                        {[it.r,it.i,it.c,it.e].map((v,j) => <span key={j} className="mono dim" style={{fontSize:11}}>{v}</span>)}
+                        <div>
+                          <span style={{fontWeight:500,fontSize:12}}>{it.title || it.name}</span>
+                          {it.reasoning && <div style={{fontSize:10,color:"var(--mut)",marginTop:2}}>{it.reasoning}</div>}
+                        </div>
+                        {[it.reach ?? it.r, it.impact ?? it.i, it.confidence ?? it.c, it.effort ?? it.e].map((v,j) => <span key={j} className="mono dim" style={{fontSize:11}}>{v}</span>)}
                         <div className="bar-wrap">
-                          <div className="bar-track"><div className="bar-fill" style={{width:`${(it.score/130)*100}%`,background:`hsl(${it.score+80},60%,58%)`}}/></div>
-                          <span className="mono acc" style={{fontSize:11,width:22,textAlign:"right"}}>{it.score}</span>
+                          <div className="bar-track"><div className="bar-fill" style={{width:`${(it.rice_score/130)*100}%`,background:`hsl(${it.rice_score+80},60%,58%)`}}/></div>
+                          <span className="mono acc" style={{fontSize:11,width:22,textAlign:"right"}}>{Math.round(it.rice_score)}</span>
                         </div>
                       </div>
                     ))}
                     <div style={{margin:"12px 16px"}} className="infobox ib-blue">
-                      🤖 <strong className="acc">Agent insight:</strong> <span style={{fontSize:11,color:"var(--mut)"}}>Mobile Onboarding V2 is your highest RICE score and directly aligns with Q2 activation OKR. Ship it first.</span>
+                      🤖 <strong className="acc">Agent insight:</strong> <span style={{fontSize:11,color:"var(--mut)"}}>{riceScores.length > 0 ? `${riceScores[0]?.title} is your highest RICE score item. Run Score Backlog to refresh.` : "Click Score Backlog to run AI-powered RICE analysis on your projects."}</span>
                     </div>
                   </div>
                 </div>
@@ -1740,10 +1928,205 @@ export default function PMDashboard() {
               </div>
             )}
 
+            {/* ══ INTEGRATIONS ════════════════════════════════════════════ */}
+            {page === "integrations" && (
+              <div className="col">
+
+                {/* Connection status cards */}
+                <div className="g4">
+                  {[
+                    { name:"jira", label:"Jira", icon:"🔷", desc:"Issues, sprints, project tracking", syncFn: () => syncJira() },
+                    { name:"webex", label:"Webex", icon:"💬", desc:"Meeting recordings and transcripts", syncFn: syncWebex },
+                    { name:"gmail", label:"Gmail", icon:"📧", desc:"Starred emails as tasks", syncFn: syncGmail },
+                    { name:"google_calendar", label:"Google Calendar", icon:"📅", desc:"Events synced to schedule tab", syncFn: () => syncCalendar() },
+                  ].map(({ name, label, icon, desc, syncFn }) => {
+                    const status = getIntegrationStatus(name);
+                    const isSyncing = syncingIntegration === name;
+                    return (
+                      <div key={name} className="card" style={{padding:16}}>
+                        <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:10}}>
+                          <div style={{fontSize:24}}>{icon}</div>
+                          <span className={`tag ${status.status==="connected"?"tag-grn":status.status==="error"?"tag-red":"tag-dim"}`} style={{fontSize:9}}>
+                            {status.status === "connected" ? "● Connected" : status.status === "error" ? "● Error" : "○ Disconnected"}
+                          </span>
+                        </div>
+                        <div style={{fontFamily:"Syne",fontWeight:700,fontSize:14,marginBottom:3}}>{label}</div>
+                        <div style={{fontSize:11,color:"var(--mut)",marginBottom:10}}>{desc}</div>
+                        {status.last_synced_at && (
+                          <div style={{fontFamily:"DM Mono",fontSize:9,color:"var(--mut)",marginBottom:8}}>
+                            Last sync: {new Date(status.last_synced_at).toLocaleString()}
+                          </div>
+                        )}
+                        <button className="btn btn-primary" style={{width:"100%",fontSize:11}} disabled={isSyncing} onClick={syncFn}>
+                          {isSyncing ? <span style={{display:"flex",alignItems:"center",justifyContent:"center",gap:6}}><span className="spin" style={{width:12,height:12,borderWidth:1.5}}/>Syncing...</span> : `⟳ Sync ${label}`}
+                        </button>
+                      </div>
+                    );
+                  })}
+                </div>
+
+                {/* Jira Issues */}
+                <div className="card">
+                  <div className="ch">
+                    <div className="ct">Jira Issues · Live</div>
+                    <div style={{display:"flex",gap:6}}>
+                      <button className="btn btn-sm" onClick={() => syncJira()} disabled={syncingIntegration==="jira"}>⟳ Sync</button>
+                      <button className="btn btn-sm btn-primary" onClick={() => setShowCreateJira(true)}>+ Create Issue</button>
+                    </div>
+                  </div>
+                  {jiraIssues.length === 0 ? (
+                    <div className="empty">No Jira issues synced yet. Click Sync Jira to pull issues.</div>
+                  ) : (
+                    <>
+                      <div className="th-row" style={{gridTemplateColumns:"80px 1fr 80px 80px 100px"}}>
+                        <span>Key</span><span>Summary</span><span>Status</span><span>Priority</span><span>Assignee</span>
+                      </div>
+                      {jiraIssues.map((issue,i) => (
+                        <div key={issue.id} className="tr" style={{gridTemplateColumns:"80px 1fr 80px 80px 100px"}}>
+                          <a href={`${Deno?.env?.get?.("JIRA_BASE_URL") || "#"}/browse/${issue.jira_key}`} target="_blank" rel="noopener noreferrer"
+                            style={{fontFamily:"DM Mono",fontSize:11,color:"var(--acc)",textDecoration:"none"}}>{issue.jira_key}</a>
+                          <span style={{fontSize:12}}>{issue.summary}</span>
+                          <span className={`tag ${issue.status?.includes("done")||issue.status?.includes("closed")?"tag-grn":issue.status?.includes("progress")?"tag-blu":"tag-dim"}`} style={{fontSize:9}}>{issue.status}</span>
+                          <span className={`tag ${issue.priority==="high"?"tag-red":issue.priority==="low"?"tag-grn":"tag-amb"}`} style={{fontSize:9}}>{issue.priority}</span>
+                          <span style={{fontSize:11,color:"var(--mut)"}}>{issue.assignee || "Unassigned"}</span>
+                        </div>
+                      ))}
+                    </>
+                  )}
+                </div>
+
+                {/* Gmail Threads */}
+                <div className="card">
+                  <div className="ch">
+                    <div className="ct">Gmail · Starred & Important</div>
+                    <button className="btn btn-sm" onClick={syncGmail} disabled={syncingIntegration==="gmail"}>⟳ Sync Gmail</button>
+                  </div>
+                  {gmailThreads.length === 0 ? (
+                    <div className="empty">No Gmail threads synced. Click Sync Gmail to pull starred and important emails.</div>
+                  ) : (
+                    gmailThreads.map((thread,i) => (
+                      <div key={thread.id} style={{display:"flex",alignItems:"flex-start",gap:10,padding:"11px 16px",borderBottom:i<gmailThreads.length-1?"1px solid var(--bdr)":"none"}}>
+                        <div style={{width:6,height:6,borderRadius:"50%",background:thread.is_read?"var(--bdr2)":"var(--acc)",flexShrink:0,marginTop:5}}/>
+                        <div style={{flex:1}}>
+                          <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:3}}>
+                            <span style={{fontSize:13,fontWeight:thread.is_read?400:600}}>{thread.subject}</span>
+                            <span style={{fontFamily:"DM Mono",fontSize:10,color:"var(--mut)"}}>{thread.received_at ? new Date(thread.received_at).toLocaleDateString() : "—"}</span>
+                          </div>
+                          <div style={{fontSize:11,color:"var(--mut)",marginBottom:5}}>{thread.from_email}</div>
+                          <div style={{fontSize:11,color:"var(--mut)",lineHeight:1.5}}>{thread.snippet?.slice(0,120)}</div>
+                        </div>
+                        <div style={{display:"flex",gap:5,flexShrink:0}}>
+                          {!thread.is_read && <button className="btn btn-sm" onClick={() => markGmailRead(thread.thread_id)}>Mark read</button>}
+                          <a href={`https://mail.google.com/mail/u/0/#inbox/${thread.thread_id}`} target="_blank" rel="noopener noreferrer" className="btn btn-sm">Open</a>
+                        </div>
+                      </div>
+                    ))
+                  )}
+                </div>
+
+                {/* Agent Run History */}
+                <div className="card">
+                  <div className="ch"><div className="ct">Agent Run History · Live</div></div>
+                  {agentRuns.length === 0 ? (
+                    <div className="empty">No agent runs yet. Run any agent to see history here.</div>
+                  ) : (
+                    <>
+                      <div className="th-row" style={{gridTemplateColumns:"140px 1fr 1fr 70px 60px"}}>
+                        <span>Agent</span><span>Input</span><span>Output</span><span>Tokens</span><span>When</span>
+                      </div>
+                      {agentRuns.map((run,i) => (
+                        <div key={run.id} className="tr" style={{gridTemplateColumns:"140px 1fr 1fr 70px 60px"}}>
+                          <span className="tag tag-pur" style={{fontSize:9,display:"inline-flex"}}>{run.agent_name}</span>
+                          <span style={{fontSize:11,color:"var(--mut)"}}>{run.input_summary}</span>
+                          <span style={{fontSize:11,color:"var(--mut)"}}>{run.output_summary}</span>
+                          <span className="mono dim" style={{fontSize:10}}>{run.tokens_used}</span>
+                          <span className="mono dim" style={{fontSize:10}}>{run.ran_at ? new Date(run.ran_at).toLocaleDateString() : "—"}</span>
+                        </div>
+                      ))}
+                    </>
+                  )}
+                </div>
+
+              </div>
+            )}
+
           </div>
         </main>
 
-        {/* ── Agent Result Modals ─────────────────────────────────────────── */}
+        {/* ── Create Jira Issue Modal ─────────────────────────────────────── */}
+        {showCreateJira && (
+          <Modal title="Create Jira Issue" onClose={() => setShowCreateJira(false)}>
+            <div className="form-grid">
+              <div className="form-row" style={{gridColumn:"1/-1"}}>
+                <label className="form-label">Summary</label>
+                <input className="input" value={jiraForm.summary} onChange={e => setJiraForm(p=>({...p,summary:e.target.value}))} placeholder="Issue summary..." autoFocus/>
+              </div>
+              <div className="form-row">
+                <label className="form-label">Project Key</label>
+                <input className="input" value={jiraForm.projectKey} onChange={e => setJiraForm(p=>({...p,projectKey:e.target.value}))} placeholder="PM"/>
+              </div>
+              <div className="form-row">
+                <label className="form-label">Issue Type</label>
+                <select className="input select" value={jiraForm.issueType} onChange={e => setJiraForm(p=>({...p,issueType:e.target.value}))}>
+                  <option>Task</option><option>Story</option><option>Bug</option><option>Epic</option>
+                </select>
+              </div>
+              <div className="form-row">
+                <label className="form-label">Priority</label>
+                <select className="input select" value={jiraForm.priority} onChange={e => setJiraForm(p=>({...p,priority:e.target.value}))}>
+                  <option value="high">High</option><option value="med">Medium</option><option value="low">Low</option>
+                </select>
+              </div>
+              <div className="form-row" style={{gridColumn:"1/-1"}}>
+                <label className="form-label">Description (optional)</label>
+                <textarea className="input" value={jiraForm.description} onChange={e => setJiraForm(p=>({...p,description:e.target.value}))} style={{minHeight:80,resize:"vertical"}} placeholder="Describe the issue..."/>
+              </div>
+            </div>
+            <div className="form-actions">
+              <button className="btn" onClick={() => setShowCreateJira(false)}>Cancel</button>
+              <button className="btn btn-primary" onClick={createJiraIssue} disabled={syncingIntegration==="jira-create"}>
+                {syncingIntegration==="jira-create" ? "Creating..." : "Create in Jira"}
+              </button>
+            </div>
+          </Modal>
+        )}
+
+        {/* ── Add Calendar Event Modal ────────────────────────────────────── */}
+        {showAddCalEvent && (
+          <Modal title="Add Calendar Event" onClose={() => setShowAddCalEvent(false)}>
+            <div className="form-grid">
+              <div className="form-row" style={{gridColumn:"1/-1"}}>
+                <label className="form-label">Event Title</label>
+                <input className="input" value={calForm.title} onChange={e => setCalForm(p=>({...p,title:e.target.value}))} placeholder="Sprint Planning — Mobile Team" autoFocus/>
+              </div>
+              <div className="form-row">
+                <label className="form-label">Start Time</label>
+                <input className="input" type="time" value={calForm.startTime} onChange={e => setCalForm(p=>({...p,startTime:e.target.value}))}/>
+              </div>
+              <div className="form-row">
+                <label className="form-label">End Time</label>
+                <input className="input" type="time" value={calForm.endTime} onChange={e => setCalForm(p=>({...p,endTime:e.target.value}))}/>
+              </div>
+              <div className="form-row" style={{gridColumn:"1/-1"}}>
+                <label className="form-label">Attendees (comma-separated emails)</label>
+                <input className="input" value={calForm.attendees} onChange={e => setCalForm(p=>({...p,attendees:e.target.value}))} placeholder="ana@company.com, chen@company.com"/>
+              </div>
+              <div className="form-row" style={{gridColumn:"1/-1"}}>
+                <label className="form-label">Description (optional)</label>
+                <input className="input" value={calForm.description} onChange={e => setCalForm(p=>({...p,description:e.target.value}))} placeholder="Agenda or context..."/>
+              </div>
+            </div>
+            <div style={{fontSize:11,color:"var(--mut)"}}>
+              A Google Meet link will be auto-generated and added to the event.
+            </div>
+            <div className="form-actions">
+              <button className="btn" onClick={() => setShowAddCalEvent(false)}>Cancel</button>
+              <button className="btn btn-primary" onClick={createCalendarEvent} disabled={syncingIntegration==="cal-create"}>
+                {syncingIntegration==="cal-create" ? "Creating..." : "Create Event + Meet Link"}
+              </button>
+            </div>
+          </Modal>
+        )}
 
         {/* Error modal */}
         {agentResultType === "error" && (
