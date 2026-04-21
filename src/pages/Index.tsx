@@ -224,13 +224,52 @@ const S = `
     .sb{width:52px;}.sb-item span:not(.sb-item-ic){display:none;}.sb-grp-lbl,.sb-logo-name,.sb-context{display:none;}
     .main{margin-left:52px;}.g2,.g3,.g4{grid-template-columns:1fr;}.pb{padding:14px;}.form-grid{grid-template-columns:1fr;}
   }
+  /* Super Agent */
+  .sa-hero{background:linear-gradient(135deg,rgba(124,58,237,0.12),rgba(0,212,255,0.08));border:1px solid rgba(124,58,237,0.25);border-radius:14px;padding:24px 28px;}
+  .sa-hero-title{font-family:'Syne',sans-serif;font-size:22px;font-weight:800;margin-bottom:6px;}
+  .sa-hero-sub{font-size:13px;color:var(--mut);line-height:1.6;max-width:600px;}
+  .sa-pipeline{display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-top:14px;}
+  .sa-step{font-family:'DM Mono',monospace;font-size:9px;padding:4px 10px;border-radius:100px;border:1px solid;white-space:nowrap;}
+  .sa-arrow{color:var(--mut);font-size:11px;}
+  .sa-out-sec{background:var(--surf2);border:1px solid var(--bdr);border-radius:10px;overflow:hidden;}
+  .sa-out-hd{padding:11px 16px;border-bottom:1px solid var(--bdr);display:flex;align-items:center;justify-content:space-between;cursor:pointer;}
+  .sa-out-hd:hover{background:rgba(255,255,255,0.02);}
+  .sa-out-body{padding:14px 16px;}
+  .sa-field{margin-bottom:10px;}
+  .sa-field:last-child{margin-bottom:0;}
+  .sa-lbl{font-family:'DM Mono',monospace;font-size:9px;text-transform:uppercase;letter-spacing:0.1em;color:var(--mut);margin-bottom:5px;}
+  .sa-val{font-size:12px;line-height:1.7;}
+  .sa-list{display:flex;flex-direction:column;gap:5px;}
+  .sa-list-item{display:flex;gap:8px;font-size:12px;padding:"3px 0";}
+  .sa-rank-card{background:var(--surf);border:1px solid var(--bdr);border-radius:8px;padding:12px;margin-bottom:8px;}
+  .sa-rank-card:last-child{margin-bottom:0;}
+  .sa-risk-card{border-radius:8px;padding:10px 12px;margin-bottom:7px;display:flex;gap:10px;}
+  .sa-risk-card:last-child{margin-bottom:0;}
+  .sa-crit{background:rgba(239,68,68,0.07);border:1px solid rgba(239,68,68,0.2);}
+  .sa-high{background:rgba(245,158,11,0.07);border:1px solid rgba(245,158,11,0.2);}
+  .sa-med{background:rgba(0,212,255,0.05);border:1px solid rgba(0,212,255,0.12);}
+  .sa-low{background:rgba(16,185,129,0.05);border:1px solid rgba(16,185,129,0.12);}
+  .confidence-high{color:var(--grn);background:rgba(16,185,129,0.1);border:1px solid rgba(16,185,129,0.2);padding:3px 10px;border-radius:100px;font-family:'DM Mono',monospace;font-size:10px;font-weight:600;}
+  .confidence-medium{color:var(--amb);background:rgba(245,158,11,0.1);border:1px solid rgba(245,158,11,0.2);padding:3px 10px;border-radius:100px;font-family:'DM Mono',monospace;font-size:10px;font-weight:600;}
+  .confidence-low{color:var(--red);background:rgba(239,68,68,0.1);border:1px solid rgba(239,68,68,0.2);padding:3px 10px;border-radius:100px;font-family:'DM Mono',monospace;font-size:10px;font-weight:600;}
+  .sa-run-btn{width:100%;padding:14px;background:linear-gradient(90deg,var(--pur),var(--acc));border:none;border-radius:10px;font-family:'Syne',sans-serif;font-weight:800;font-size:15px;color:#000;cursor:pointer;transition:opacity 0.15s;display:flex;align-items:center;justify-content:center;gap:10px;}
+  .sa-run-btn:hover{opacity:0.85;}
+  .sa-run-btn:disabled{opacity:0.5;cursor:not-allowed;}
+  .sa-thinking{background:var(--surf2);border:1px solid var(--bdr);border-radius:10px;padding:20px;display:flex;flex-direction:column;gap:12px;}
+  .sa-think-step{display:flex;align-items:center;gap:10px;font-size:12px;}
+  .sa-think-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0;}
+  .sa-think-done{background:var(--grn);}
+  .sa-think-active{background:var(--acc);animation:pulse 1s ease-in-out infinite;}
+  .sa-think-wait{background:var(--bdr2);}
+  @keyframes pulse{0%,100%{opacity:0.4;}50%{opacity:1;}}
+
 `;
 
 const NAV = [
   {grp:"Today",items:[{id:"schedule",ic:"🕐",lbl:"Daily Schedule"},{id:"todos",ic:"☑",lbl:"To-Do List"}]},
   {grp:"Execution",items:[{id:"tracker",ic:"◎",lbl:"Projects"},{id:"meetings",ic:"✦",lbl:"Meeting Intel"}]},
   {grp:"Strategy",items:[{id:"priority",ic:"◈",lbl:"Prioritization"},{id:"roadmap",ic:"🗺",lbl:"Roadmap"},{id:"okr",ic:"◎",lbl:"OKR Tracker"}]},
-  {grp:"Intelligence",items:[{id:"agents",ic:"⬡",lbl:"AI Agents"},{id:"prd",ic:"📄",lbl:"PRD Agent"}]},
+  {grp:"Intelligence",items:[{id:"super",ic:"🔮",lbl:"Super Agent"},{id:"agents",ic:"⬡",lbl:"AI Agents"},{id:"prd",ic:"📄",lbl:"PRD Agent"}]},
   {grp:"People",items:[{id:"stakeholders",ic:"◉",lbl:"Stakeholders"}]},
   {grp:"Operations",items:[{id:"metrics",ic:"◎",lbl:"Pilot Metrics"},{id:"privacy",ic:"◈",lbl:"Privacy"},{id:"integrations",ic:"⚡",lbl:"Integrations"}]},
 ];
@@ -243,6 +282,7 @@ const PAGE_INFO: Record<string,{title:string;sub:string}> = {
   priority:{title:"Prioritization",sub:"Choose a framework and project — AI scores your backlog"},
   roadmap:{title:"Roadmap",sub:"Quarterly initiative planning across all projects"},
   okr:{title:"OKR Tracker",sub:"Key results with AI-generated weekly and quarterly insights"},
+  super:{title:"Super Agent",sub:"PM Orchestrator — multi-agent reasoning · real data grounding · self-evaluation loop"},
   agents:{title:"AI Agents",sub:"6 agents running — click any to invoke now"},
   prd:{title:"PRD Agent",sub:"Focus group data in → structured PRD out in seconds"},
   stakeholders:{title:"Stakeholders",sub:"Influence map with last-contact tracking"},
@@ -471,6 +511,15 @@ export default function PMDashboard(){
 
   // Calendar date for todos
   const [selectedTodoDate,setSelectedTodoDate]=useState(new Date());
+
+  // Super Agent
+  const [superRequest,setSuperRequest]=useState("");
+  const [superFocus,setSuperFocus]=useState("all");
+  const [superRunning,setSuperRunning]=useState(false);
+  const [superResult,setSuperResult]=useState<any>(null);
+  const [superError,setSuperError]=useState<string|null>(null);
+  const [superExpanded,setSuperExpanded]=useState<Record<string,boolean>>({exec:true,prd:true,risks:true,prio:true,sources:false,eval:false});
+  const [thinkStep,setThinkStep]=useState(0);
 
   /* ── Auth ── */
   useEffect(()=>{
@@ -723,6 +772,34 @@ export default function PMDashboard(){
   /* ── Roadmap ── */
   const saveRm=async()=>{if(!rmForm.title.trim())return;await supabase.from("roadmap_items").insert({...rmForm,year:rmYear,user_id:user?.id}).catch(()=>{});setShowAddRoadmap(false);setRmForm({title:"",project:"",startQ:0,endQ:1,color:"#00d4ff"});loadRoadmap();};
   const deleteRm=async(id:string)=>{await supabase.from("roadmap_items").delete().eq("id",id).catch(()=>{});loadRoadmap();};
+
+  /* ── Super Agent ── */
+  const THINK_STEPS = [
+    "Fetching Jira issues and project signals…",
+    "Analyzing meeting intelligence and action items…",
+    "Loading OKRs, RICE scores and stakeholder context…",
+    "Computing program health across all projects…",
+    "Running decision engine — synthesizing insights…",
+    "Self-evaluation loop — checking for hallucination…",
+    "Generating structured output…",
+  ];
+  const runSuperAgent=async()=>{
+    setSuperRunning(true);setSuperResult(null);setSuperError(null);setThinkStep(0);
+    const interval=setInterval(()=>setThinkStep(s=>Math.min(s+1,THINK_STEPS.length-1)),900);
+    try{
+      const{data,error}=await supabase.functions.invoke("super-agent",{body:{userRequest:superRequest||undefined,focusArea:superFocus!=="all"?superFocus:undefined}});
+      if(error)throw new Error(error.message);
+      if(data?.error)throw new Error(data.error);
+      setSuperResult(data);
+      setSuperExpanded({exec:true,prd:true,risks:true,prio:true,sources:false,eval:false});
+    }catch(e:any){setSuperError(e.message);}
+    finally{clearInterval(interval);setThinkStep(THINK_STEPS.length-1);setSuperRunning(false);}
+    loadAgentRuns();
+  };
+  const toggleSuperSec=(key:string)=>setSuperExpanded(p=>({...p,[key]:!p[key]}));
+  const saRiskClass=(sev:string)=>sev==="Critical"?"sa-crit":sev==="High"?"sa-high":sev==="Medium"?"sa-med":"sa-low";
+  const saRiskColor=(sev:string)=>sev==="Critical"?"var(--red)":sev==="High"?"var(--amb)":sev==="Medium"?"var(--acc)":"var(--grn)";
+  const confClass=(c:string)=>c==="High"?"confidence-high":c==="Medium"?"confidence-medium":"confidence-low";
 
   /* ── Derived ── */
   const shProjects=["All",...Array.from(new Set(stakeholders.flatMap((s:any)=>s.proj)))];
@@ -1167,6 +1244,249 @@ export default function PMDashboard(){
                     </div>
                   ))}
                 </div>
+              </div>
+            )}
+
+
+            {/* SUPER AGENT */}
+            {page==="super"&&(
+              <div className="col">
+
+                {/* Hero */}
+                <div className="sa-hero">
+                  <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",flexWrap:"wrap",gap:12}}>
+                    <div>
+                      <div className="sa-hero-title">🔮 PM Orchestrator Super Agent</div>
+                      <div className="sa-hero-sub">Multi-agent reasoning engine. Fetches real data from Jira, meetings, OKRs and RICE scores. Runs a self-evaluation loop. Returns structured PRD + Risks + Prioritization + Exec Summary.</div>
+                    </div>
+                    {superResult&&<span className={confClass(superResult.confidence_score||"Low")}>Confidence: {superResult.confidence_score}</span>}
+                  </div>
+                  <div className="sa-pipeline">
+                    {[{l:"Jira Agent",c:"rgba(124,58,237,0.15)",bc:"var(--pur)"},{l:"Meeting Intel",c:"rgba(0,212,255,0.1)",bc:"var(--acc)"},{l:"OKR Agent",c:"rgba(16,185,129,0.1)",bc:"var(--grn)"},{l:"RICE Scores",c:"rgba(245,158,11,0.1)",bc:"var(--amb)"},{l:"Decision Engine",c:"rgba(239,68,68,0.1)",bc:"var(--red)"},{l:"Self-Eval Loop",c:"rgba(124,58,237,0.15)",bc:"var(--pur)"},{l:"Structured Output",c:"rgba(0,212,255,0.1)",bc:"var(--acc)"}].map((s,i,a)=>(
+                      <span key={i} style={{display:"flex",alignItems:"center",gap:6}}>
+                        <span className="sa-step" style={{background:s.c,borderColor:s.bc,color:"var(--txt)"}}>{s.l}</span>
+                        {i<a.length-1&&<span className="sa-arrow">→</span>}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Input */}
+                <div className="card">
+                  <div className="ch"><div className="ct">Your Request (optional)</div></div>
+                  <div className="cb">
+                    <div className="col" style={{gap:10}}>
+                      <textarea className="input" value={superRequest} onChange={e=>setSuperRequest(e.target.value)} placeholder={"Leave blank for a full portfolio brief, or ask something specific:\n\n• What are the biggest risks this sprint?\n• Prioritize my backlog for Q2 against OKRs\n• Generate a PRD for the top-scored initiative\n• What decisions need exec attention this week?"} style={{minHeight:100,resize:"vertical" as any}}/>
+                      <div style={{display:"flex",gap:10,alignItems:"center",flexWrap:"wrap"}}>
+                        <div className="form-row" style={{flex:"none"}}>
+                          <label className="form-label" style={{marginBottom:4}}>Focus Area</label>
+                          <select className="input select" style={{width:200}} value={superFocus} onChange={e=>setSuperFocus(e.target.value)}>
+                            <option value="all">Full Portfolio</option>
+                            <option value="delivery">Delivery & Risks</option>
+                            <option value="prioritization">Backlog Prioritization</option>
+                            <option value="stakeholders">Stakeholder Updates</option>
+                            <option value="okrs">OKR Progress</option>
+                            {projects.map(p=><option key={p.id} value={p.name}>{p.name}</option>)}
+                          </select>
+                        </div>
+                        <div style={{flex:1}}/>
+                        <div style={{fontSize:11,color:"var(--mut)",fontFamily:"DM Mono"}}>
+                          Context: {projects.length} projects · {jiraIssues.length} Jira issues · {meetings.length} meetings · {riceScores.length} RICE scores
+                        </div>
+                      </div>
+                      <button className="sa-run-btn" onClick={runSuperAgent} disabled={superRunning}>
+                        {superRunning?<><span className="spin" style={{width:18,height:18,borderWidth:2,borderTopColor:"#000",borderColor:"rgba(0,0,0,0.2)"}}/>Running…</>:"🔮 Run Super Agent"}
+                      </button>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Thinking steps */}
+                {superRunning&&(
+                  <div className="sa-thinking">
+                    <div style={{fontFamily:"Syne",fontWeight:700,fontSize:13,marginBottom:4}}>Orchestrating agents…</div>
+                    {THINK_STEPS.map((step,i)=>(
+                      <div key={i} className="sa-think-step">
+                        <div className={`sa-think-dot ${i<thinkStep?"sa-think-done":i===thinkStep?"sa-think-active":"sa-think-wait"}`}/>
+                        <span style={{color:i<thinkStep?"var(--grn)":i===thinkStep?"var(--acc)":"var(--mut)"}}>{step}</span>
+                        {i<thinkStep&&<span style={{marginLeft:"auto",fontFamily:"DM Mono",fontSize:9,color:"var(--grn)"}}>✓</span>}
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                {/* Error */}
+                {superError&&!superRunning&&(
+                  <div className="infobox ib-red" style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+                    <span>⚠️ {superError}</span>
+                    <button className="btn btn-sm" onClick={()=>setSuperError(null)}>✕</button>
+                  </div>
+                )}
+
+                {/* Results */}
+                {superResult&&!superRunning&&(
+                  <div className="col">
+
+                    {/* Exec Summary */}
+                    <div className="sa-out-sec">
+                      <div className="sa-out-hd" onClick={()=>toggleSuperSec("exec")}>
+                        <div style={{display:"flex",alignItems:"center",gap:10}}><span style={{fontSize:16}}>📋</span><span style={{fontFamily:"Syne",fontWeight:700,fontSize:14}}>Executive Summary</span></div>
+                        <span style={{fontSize:13,color:"var(--mut)"}}>{superExpanded.exec?"▾":"▸"}</span>
+                      </div>
+                      {superExpanded.exec&&(
+                        <div className="sa-out-body">
+                          <p style={{fontSize:13,lineHeight:1.8,color:"var(--txt)"}}>{superResult.exec_summary}</p>
+                          <div style={{display:"flex",gap:6,marginTop:12,flexWrap:"wrap"}}>
+                            <button className="btn btn-sm" onClick={()=>navigator.clipboard.writeText(superResult.exec_summary||"").then(()=>alert("Copied!"))}>Copy Summary</button>
+                            <button className="btn btn-sm" onClick={()=>{runSHUpdate("Leadership","CPO");}}>Send Stakeholder Update</button>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Prioritization */}
+                    <div className="sa-out-sec">
+                      <div className="sa-out-hd" onClick={()=>toggleSuperSec("prio")}>
+                        <div style={{display:"flex",alignItems:"center",gap:10}}><span style={{fontSize:16}}>◈</span><span style={{fontFamily:"Syne",fontWeight:700,fontSize:14}}>Prioritization</span><span className="tag tag-blu" style={{fontSize:9}}>{superResult.prioritization?.length||0} items</span></div>
+                        <span style={{fontSize:13,color:"var(--mut)"}}>{superExpanded.prio?"▾":"▸"}</span>
+                      </div>
+                      {superExpanded.prio&&superResult.prioritization?.length>0&&(
+                        <div className="sa-out-body">
+                          {superResult.prioritization.map((item:any,i:number)=>(
+                            <div key={i} className="sa-rank-card">
+                              <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:6}}>
+                                <div style={{display:"flex",gap:8,alignItems:"center"}}>
+                                  <div style={{width:24,height:24,borderRadius:"50%",background:"rgba(0,212,255,0.12)",border:"1px solid rgba(0,212,255,0.2)",display:"flex",alignItems:"center",justifyContent:"center",fontFamily:"DM Mono",fontWeight:700,fontSize:11,color:"var(--acc)",flexShrink:0}}>#{item.priority_rank}</div>
+                                  <span style={{fontFamily:"Syne",fontWeight:700,fontSize:13}}>{item.feature}</span>
+                                </div>
+                                <div style={{display:"flex",gap:4,flexWrap:"wrap"}}>
+                                  {item.scores_used?.rice&&<span className="tag tag-blu" style={{fontSize:9}}>RICE {item.scores_used.rice}</span>}
+                                  {item.scores_used?.risk&&<span className={`tag ${item.scores_used.risk==="high"?"tag-red":item.scores_used.risk==="low"?"tag-grn":"tag-amb"}`} style={{fontSize:9}}>Risk {item.scores_used.risk}</span>}
+                                  {item.scores_used?.impact&&<span className="tag tag-pur" style={{fontSize:9}}>Impact {item.scores_used.impact}</span>}
+                                </div>
+                              </div>
+                              <div style={{fontSize:12,color:"var(--mut)",lineHeight:1.6}}>{item.justification}</div>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+
+                    {/* PRD */}
+                    <div className="sa-out-sec">
+                      <div className="sa-out-hd" onClick={()=>toggleSuperSec("prd")}>
+                        <div style={{display:"flex",alignItems:"center",gap:10}}><span style={{fontSize:16}}>📄</span><span style={{fontFamily:"Syne",fontWeight:700,fontSize:14}}>Product Requirements</span></div>
+                        <div style={{display:"flex",gap:6}}><button className="btn btn-sm" onClick={e=>{e.stopPropagation();const prd=superResult.prd;if(prd)navigator.clipboard.writeText(`# PRD\n\n## Problem\n${prd.problem}\n\n## Goals\n${prd.goals}\n\n## Users\n${prd.users}\n\n## Requirements\n${(prd.requirements||[]).map((r:string)=>`- ${r}`).join("\n")}\n\n## Metrics\n${(prd.metrics||[]).map((m:string)=>`- ${m}`).join("\n")}\n\n## Constraints\n${(prd.constraints||[]).map((c:string)=>`- ${c}`).join("\n")}\n\n## Open Questions\n${(prd.open_questions||[]).map((q:string)=>`- ${q}`).join("\n")}`).then(()=>alert("Copied!"));}}>Copy MD</button><span style={{fontSize:13,color:"var(--mut)",lineHeight:"24px"}}>{superExpanded.prd?"▾":"▸"}</span></div>
+                      </div>
+                      {superExpanded.prd&&superResult.prd&&(
+                        <div className="sa-out-body">
+                          <div className="g2" style={{gap:14}}>
+                            {[{k:"problem",l:"Problem Statement"},{k:"goals",l:"Goals"},{k:"users",l:"User Segments"}].map(({k,l})=>(
+                              <div key={k} className="sa-field">
+                                <div className="sa-lbl">{l}</div>
+                                <div className="sa-val">{(superResult.prd as any)[k]||<span style={{color:"var(--mut)"}}>—</span>}</div>
+                              </div>
+                            ))}
+                          </div>
+                          <div className="g2" style={{gap:14,marginTop:12}}>
+                            {[{k:"requirements",l:"Requirements"},{k:"metrics",l:"Success Metrics"},{k:"constraints",l:"Constraints"},{k:"open_questions",l:"Open Questions"}].map(({k,l})=>{
+                              const items=(superResult.prd as any)[k]||[];
+                              return(
+                                <div key={k} className="sa-field">
+                                  <div className="sa-lbl">{l}</div>
+                                  {Array.isArray(items)?<div className="sa-list">{items.map((it:string,j:number)=><div key={j} style={{display:"flex",gap:8,fontSize:12,padding:"3px 0",borderBottom:"1px solid var(--bdr)",color:"var(--txt)"}}><span style={{color:k==="open_questions"?"var(--amb)":k==="constraints"?"var(--red)":"var(--grn)",flexShrink:0}}>{k==="open_questions"?"?":k==="constraints"?"⚠":"✓"}</span>{it}</div>)}</div>:<div className="sa-val">{items}</div>}
+                                </div>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Risks */}
+                    <div className="sa-out-sec">
+                      <div className="sa-out-hd" onClick={()=>toggleSuperSec("risks")}>
+                        <div style={{display:"flex",alignItems:"center",gap:10}}><span style={{fontSize:16}}>🔔</span><span style={{fontFamily:"Syne",fontWeight:700,fontSize:14}}>Risks</span><span className="tag tag-red" style={{fontSize:9}}>{superResult.risks?.filter((r:any)=>r.severity==="Critical"||r.severity==="High").length||0} critical/high</span></div>
+                        <span style={{fontSize:13,color:"var(--mut)"}}>{superExpanded.risks?"▾":"▸"}</span>
+                      </div>
+                      {superExpanded.risks&&superResult.risks?.length>0&&(
+                        <div className="sa-out-body">
+                          {[...superResult.risks].sort((a:any,b:any)=>{const ord:any={Critical:0,High:1,Medium:2,Low:3};return(ord[a.severity]??4)-(ord[b.severity]??4);}).map((risk:any,i:number)=>(
+                            <div key={i} className={`sa-risk-card ${saRiskClass(risk.severity)}`}>
+                              <div style={{flexShrink:0,marginTop:2}}>
+                                <span style={{fontFamily:"DM Mono",fontSize:9,color:saRiskColor(risk.severity),background:`${saRiskColor(risk.severity)}15`,border:`1px solid ${saRiskColor(risk.severity)}30`,padding:"2px 7px",borderRadius:100}}>{risk.severity}</span>
+                              </div>
+                              <div style={{flex:1}}>
+                                <div style={{display:"flex",gap:6,alignItems:"center",marginBottom:4}}>
+                                  <span style={{fontFamily:"Syne",fontWeight:700,fontSize:12}}>{risk.description}</span>
+                                  <span className="tag tag-dim" style={{fontSize:9}}>{risk.type}</span>
+                                </div>
+                                <div style={{fontSize:11,color:"var(--acc)"}}>→ {risk.mitigation}</div>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Data Sources */}
+                    <div className="sa-out-sec">
+                      <div className="sa-out-hd" onClick={()=>toggleSuperSec("sources")}>
+                        <div style={{display:"flex",alignItems:"center",gap:10}}><span style={{fontSize:14}}>⚡</span><span style={{fontFamily:"Syne",fontWeight:700,fontSize:13}}>Data Sources</span><span className="tag tag-grn" style={{fontSize:9}}>{superResult.data_sources?.length||0} agents</span>{superResult.data_gaps?.length>0&&<span className="tag tag-amb" style={{fontSize:9}}>{superResult.data_gaps.length} gaps</span>}</div>
+                        <span style={{fontSize:13,color:"var(--mut)"}}>{superExpanded.sources?"▾":"▸"}</span>
+                      </div>
+                      {superExpanded.sources&&(
+                        <div className="sa-out-body">
+                          {superResult.data_sources?.map((ds:any,i:number)=>(
+                            <div key={i} style={{display:"flex",gap:10,padding:"7px 0",borderBottom:"1px solid var(--bdr)",fontSize:12}}>
+                              <span className="tag tag-pur" style={{fontSize:9,flexShrink:0,alignSelf:"flex-start",marginTop:2}}>{ds.agent}</span>
+                              <span style={{color:"var(--mut)"}}>{ds.summary}</span>
+                            </div>
+                          ))}
+                          {superResult.data_gaps?.length>0&&(
+                            <div style={{marginTop:12}}>
+                              <div className="section-lbl" style={{marginBottom:6}}>Data Gaps</div>
+                              {superResult.data_gaps.map((gap:string,i:number)=>(
+                                <div key={i} style={{display:"flex",gap:7,fontSize:11,padding:"4px 0",color:"var(--amb)"}}><span>⚠</span>{gap}</div>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Self Evaluation */}
+                    {superResult.self_evaluation&&(
+                      <div className="sa-out-sec">
+                        <div className="sa-out-hd" onClick={()=>toggleSuperSec("eval")}>
+                          <div style={{display:"flex",alignItems:"center",gap:10}}><span style={{fontSize:14}}>🔍</span><span style={{fontFamily:"Syne",fontWeight:700,fontSize:13}}>Self-Evaluation</span><span className={superResult.self_evaluation.hallucination_check==="passed"?"tag tag-grn":"tag tag-red"} style={{fontSize:9}}>Hallucination: {superResult.self_evaluation.hallucination_check}</span></div>
+                          <span style={{fontSize:13,color:"var(--mut)"}}>{superExpanded.eval?"▾":"▸"}</span>
+                        </div>
+                        {superExpanded.eval&&(
+                          <div className="sa-out-body">
+                            {[["Data grounding",superResult.self_evaluation.data_grounding],["Hallucination check",superResult.self_evaluation.hallucination_check],["Improvements made",superResult.self_evaluation.improvements_made]].map(([l,v])=>(
+                              <div key={l} style={{display:"flex",justifyContent:"space-between",padding:"7px 0",borderBottom:"1px solid var(--bdr)",fontSize:12}}>
+                                <span className="dim">{l}</span>
+                                <span style={{color:"var(--acc)",fontFamily:"DM Mono",fontSize:11,maxWidth:300,textAlign:"right"}}>{v}</span>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    )}
+
+                  </div>
+                )}
+
+                {/* Empty state */}
+                {!superResult&&!superRunning&&!superError&&(
+                  <div className="card" style={{padding:32,textAlign:"center",opacity:0.5}}>
+                    <div style={{fontSize:48,marginBottom:12}}>🔮</div>
+                    <div style={{fontFamily:"Syne",fontWeight:700,fontSize:16,marginBottom:6}}>Structured output appears here</div>
+                    <div style={{fontSize:12,color:"var(--mut)",maxWidth:380,margin:"0 auto"}}>Enter a request above or leave blank for a full portfolio brief. The agent will fetch real data from all sources and return PRD + Risks + Prioritization + Exec Summary.</div>
+                  </div>
+                )}
+
               </div>
             )}
 
