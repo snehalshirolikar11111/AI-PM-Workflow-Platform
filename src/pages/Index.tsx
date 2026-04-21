@@ -606,7 +606,7 @@ export default function PMDashboard() {
   }, [loadIntegrations, loadJiraIssues, loadGmailThreads, loadCalendarEvents, loadAgentRuns, loadRiceScores]);
 
   /* ── Integration sync functions ───────────────────────────────────────── */
-  const syncJira = async (projectKey) => {
+  const syncJira = async (projectKey?: string) => {
     setSyncing("jira");
     const { data, error } = await supabase.functions.invoke("jira-sync", { body: { action: "pull", projectKey } });
     setSyncing(null);
@@ -647,7 +647,7 @@ export default function PMDashboard() {
     alert(`Gmail sync complete — ${data?.synced || 0} threads synced`);
   };
 
-  const syncCalendar = async (date) => {
+  const syncCalendar = async (date?: string) => {
     setSyncing("calendar");
     const { data, error } = await supabase.functions.invoke("calendar-sync", { body: { date } });
     setSyncing(null);
@@ -725,7 +725,7 @@ export default function PMDashboard() {
 
   const saveProject = async () => {
     if (!projForm.name.trim()) return;
-    const payload = { name: projForm.name.trim(), owner: projForm.owner, status: projForm.status, progress: parseInt(projForm.progress)||0, due_date: projForm.due_date||null };
+    const payload = { name: projForm.name.trim(), owner: projForm.owner, status: projForm.status, progress: Number(projForm.progress)||0, due_date: projForm.due_date||null };
     if (editProj) {
       await supabase.from("projects").update(payload).eq("id", editProj.id);
     } else {
@@ -801,7 +801,7 @@ export default function PMDashboard() {
 
   const saveSh = async () => {
     if (!shForm.name.trim()) return;
-    const payload = { name: shForm.name.trim(), role: shForm.role, email: shForm.email, type: shForm.type, influence: parseInt(shForm.influence), color: shForm.color, initials: initials(shForm.name) };
+    const payload = { name: shForm.name.trim(), role: shForm.role, email: shForm.email, type: shForm.type, influence: Number(shForm.influence), color: shForm.color, initials: initials(shForm.name) };
     if (editSh) {
       await supabase.from("stakeholders").update(payload).eq("id", editSh.id);
     } else {
