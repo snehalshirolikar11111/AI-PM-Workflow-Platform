@@ -351,12 +351,12 @@ const AGE_TAG      = { recent:"tag-grn", old:"tag-amb", stale:"tag-red" };
 const initials = name => name.split(' ').map(n=>n[0]).join('').toUpperCase().slice(0,2);
 const contactAge = dt => {
   if (!dt) return "stale";
-  const days = (Date.now() - new Date(dt)) / 86400000;
+  const days = (Date.now() - new Date(dt).getTime()) / 86400000;
   return days < 7 ? "recent" : days < 14 ? "old" : "stale";
 };
 const contactLabel = dt => {
   if (!dt) return "Never";
-  const days = Math.floor((Date.now() - new Date(dt)) / 86400000);
+  const days = Math.floor((Date.now() - new Date(dt).getTime()) / 86400000);
   if (days === 0) return "Today";
   if (days === 1) return "1d ago";
   return `${days}d ago`;
@@ -456,47 +456,6 @@ export default function PMDashboard() {
     return () => subscription.unsubscribe();
   }, []);
 
-  /* ── Auto-sync all integrations on mount + tab focus ─────────────────── */
-const autoSyncAll = useCallback(async () => {
-  // Run all syncs in parallel, silently — no alerts
-  await Promise.allSettled([
-    supabase.functions.invoke("jira-sync",      { body: { action: "pull" } }),
-    supabase.functions.invoke("webex-sync",     { body: { action: "pull" } }),
-    supabase.functions.invoke("gmail-sync",     { body: { action: "pull" } }),
-    supabase.functions.invoke("calendar-sync",  { body: {} }),
-  ]);
-  // Refresh all data
-  await Promise.allSettled([
-    loadIntegrations(),
-    loadJiraIssues(),
-    loadGmailThreads(),
-    loadCalendarEvents(),
-    loadTasks(),
-    loadMeetings(),
-  ]);
-}, [loadIntegrations, loadJiraIssues, loadGmailThreads, loadCalendarEvents, loadTasks, loadMeetings]);
-
-// Auto-sync on first load
-useEffect(() => {
-  autoSyncAll();
-}, [autoSyncAll]);
-
-// Auto-sync when user switches back to this tab
-useEffect(() => {
-  const onFocus = () => autoSyncAll();
-  window.addEventListener("focus", onFocus);
-  document.addEventListener("visibilitychange", () => {
-    if (document.visibilityState === "visible") autoSyncAll();
-  });
-  return () => window.removeEventListener("focus", onFocus);
-}, [autoSyncAll]);
-
-// Poll every 5 minutes
-useEffect(() => {
-  const interval = setInterval(autoSyncAll, 5 * 60 * 1000);
-  return () => clearInterval(interval);
-}, [autoSyncAll]);
-
   /* ── Fetch tasks ──────────────────────────────────────────────────────── */
   const loadTasks = useCallback(async () => {
     setTodosLoading(true);
@@ -516,7 +475,7 @@ useEffect(() => {
       .on("postgres_changes", { event: "DELETE", schema: "public", table: "tasks" },
         payload => setTodos(p => p.filter(t => t.id !== payload.old.id)))
       .subscribe();
-    return () => supabase.removeChannel(ch);
+    return () => { void supabase.removeChannel(ch); };
   }, []);
 
   /* ── Fetch projects ───────────────────────────────────────────────────── */
@@ -533,7 +492,7 @@ useEffect(() => {
     const ch = supabase.channel("projects-live")
       .on("postgres_changes", { event: "*", schema: "public", table: "projects" }, () => loadProjects())
       .subscribe();
-    return () => supabase.removeChannel(ch);
+    return () => { void supabase.removeChannel(ch); };
   }, [loadProjects]);
 
   /* ── Fetch meetings ───────────────────────────────────────────────────── */
@@ -643,11 +602,11 @@ useEffect(() => {
       .on("postgres_changes", { event: "*", schema: "public", table: "agent_runs" }, () => loadAgentRuns())
       .on("postgres_changes", { event: "*", schema: "public", table: "rice_scores" }, () => loadRiceScores())
       .subscribe();
-    return () => supabase.removeChannel(ch);
+    return () => { void supabase.removeChannel(ch); };
   }, [loadIntegrations, loadJiraIssues, loadGmailThreads, loadCalendarEvents, loadAgentRuns, loadRiceScores]);
 
   /* ── Integration sync functions ───────────────────────────────────────── */
-  const syncJira = async (projectKey) => {
+  const syncJira = async (projectKey?: string) => {
     setSyncing("jira");
     const { data, error } = await supabase.functions.invoke("jira-sync", { body: { action: "pull", projectKey } });
     setSyncing(null);
@@ -688,7 +647,7 @@ useEffect(() => {
     alert(`Gmail sync complete — ${data?.synced || 0} threads synced`);
   };
 
-  const syncCalendar = async (date) => {
+  const syncCalendar = async (date?: string) => {
     setSyncing("calendar");
     const { data, error } = await supabase.functions.invoke("calendar-sync", { body: { date } });
     setSyncing(null);
@@ -766,7 +725,7 @@ useEffect(() => {
 
   const saveProject = async () => {
     if (!projForm.name.trim()) return;
-    const payload = { name: projForm.name.trim(), owner: projForm.owner, status: projForm.status, progress: parseInt(projForm.progress)||0, due_date: projForm.due_date||null };
+    const payload = { name: projForm.name.trim(), owner: projForm.owner, status: projForm.status, progress: Number(projForm.progress)||0, due_date: projForm.due_date||null };
     if (editProj) {
       await supabase.from("projects").update(payload).eq("id", editProj.id);
     } else {
@@ -842,7 +801,7 @@ useEffect(() => {
 
   const saveSh = async () => {
     if (!shForm.name.trim()) return;
-    const payload = { name: shForm.name.trim(), role: shForm.role, email: shForm.email, type: shForm.type, influence: parseInt(shForm.influence), color: shForm.color, initials: initials(shForm.name) };
+    const payload = { name: shForm.name.trim(), role: shForm.role, email: shForm.email, type: shForm.type, influence: Number(shForm.influence), color: shForm.color, initials: initials(shForm.name) };
     if (editSh) {
       await supabase.from("stakeholders").update(payload).eq("id", editSh.id);
     } else {
@@ -1806,7 +1765,7 @@ useEffect(() => {
                           </div>
                         </div>
                         <span style={{fontSize:11,color:"var(--mut)"}}>{s.type}</span>
-                        <a href={`mailto:${s.email}`} style={{fontFamily:"DM Mono",fontSize:11,color:"var(--acc)",textDecoration:"none"}} onMouseOver={e=>e.target.style.textDecoration="underline"} onMouseOut={e=>e.target.style.textDecoration="none"}>{s.email}</a>
+                        <a href={`mailto:${s.email}`} style={{fontFamily:"DM Mono",fontSize:11,color:"var(--acc)",textDecoration:"none"}} onMouseOver={e=>{ e.currentTarget.style.textDecoration="underline"; }} onMouseOut={e=>{ e.currentTarget.style.textDecoration="none"; }}>{s.email}</a>
                         <div style={{display:"flex",flexWrap:"wrap",gap:3}}>
                           {(s.proj||[]).map((p,j) => <span key={j} style={{fontSize:10,padding:"1px 6px",borderRadius:4,background:"var(--surf2)",border:"1px solid var(--bdr)",color:"var(--mut)"}}>{p}</span>)}
                         </div>
@@ -2024,7 +1983,7 @@ useEffect(() => {
                       </div>
                       {jiraIssues.map((issue,i) => (
                         <div key={issue.id} className="tr" style={{gridTemplateColumns:"80px 1fr 80px 80px 100px"}}>
-                          <a href={`${Deno?.env?.get?.("JIRA_BASE_URL") || "#"}/browse/${issue.jira_key}`} target="_blank" rel="noopener noreferrer"
+                          <a href={`#/browse/${issue.jira_key}`} target="_blank" rel="noopener noreferrer"
                             style={{fontFamily:"DM Mono",fontSize:11,color:"var(--acc)",textDecoration:"none"}}>{issue.jira_key}</a>
                           <span style={{fontSize:12}}>{issue.summary}</span>
                           <span className={`tag ${issue.status?.includes("done")||issue.status?.includes("closed")?"tag-grn":issue.status?.includes("progress")?"tag-blu":"tag-dim"}`} style={{fontSize:9}}>{issue.status}</span>
@@ -2343,7 +2302,7 @@ useEffect(() => {
               </div>
               <div className="form-row">
                 <label className="form-label">Progress (%)</label>
-                <input className="input" type="number" min="0" max="100" value={projForm.progress} onChange={e => setProjForm(p=>({...p,progress:e.target.value}))}/>
+                <input className="input" type="number" min="0" max="100" value={projForm.progress} onChange={e => setProjForm(p=>({...p,progress:Number(e.target.value)}))}/>
               </div>
               <div className="form-row">
                 <label className="form-label">Due Date</label>
