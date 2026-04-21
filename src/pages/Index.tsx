@@ -475,7 +475,7 @@ export default function PMDashboard() {
       .on("postgres_changes", { event: "DELETE", schema: "public", table: "tasks" },
         payload => setTodos(p => p.filter(t => t.id !== payload.old.id)))
       .subscribe();
-    return () => supabase.removeChannel(ch);
+    return () => { void supabase.removeChannel(ch); };
   }, []);
 
   /* ── Fetch projects ───────────────────────────────────────────────────── */
@@ -492,7 +492,7 @@ export default function PMDashboard() {
     const ch = supabase.channel("projects-live")
       .on("postgres_changes", { event: "*", schema: "public", table: "projects" }, () => loadProjects())
       .subscribe();
-    return () => supabase.removeChannel(ch);
+    return () => { void supabase.removeChannel(ch); };
   }, [loadProjects]);
 
   /* ── Fetch meetings ───────────────────────────────────────────────────── */
@@ -602,7 +602,7 @@ export default function PMDashboard() {
       .on("postgres_changes", { event: "*", schema: "public", table: "agent_runs" }, () => loadAgentRuns())
       .on("postgres_changes", { event: "*", schema: "public", table: "rice_scores" }, () => loadRiceScores())
       .subscribe();
-    return () => supabase.removeChannel(ch);
+    return () => { void supabase.removeChannel(ch); };
   }, [loadIntegrations, loadJiraIssues, loadGmailThreads, loadCalendarEvents, loadAgentRuns, loadRiceScores]);
 
   /* ── Integration sync functions ───────────────────────────────────────── */
