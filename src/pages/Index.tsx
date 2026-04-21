@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { supabase } from "@/integrations/supabase/client";
 
 /* ─ Styles ─────────────────────────────────────────────────────────────── */
@@ -93,9 +93,14 @@ const S = `
   .spin { width: 18px; height: 18px; border: 2px solid var(--bdr2); border-top-color: var(--acc); border-radius: 50%; animation: rot 0.8s linear infinite; flex-shrink: 0; }
   @keyframes rot { to { transform: rotate(360deg); } }
 
+  /* Sync indicator */
+  .sync-bar { position: fixed; top: 0; left: 208px; right: 0; height: 2px; background: linear-gradient(90deg, var(--acc), var(--pur)); z-index: 999; animation: syncpulse 1.5s ease-in-out infinite; }
+  @keyframes syncpulse { 0%,100% { opacity: 0.4; } 50% { opacity: 1; } }
+
   /* Buttons */
   .btn { font-family: 'DM Mono', monospace; font-size: 11px; padding: 6px 13px; border-radius: var(--r-sm); cursor: pointer; border: 1px solid var(--bdr); background: var(--surf2); color: var(--txt); transition: all 0.13s; white-space: nowrap; }
   .btn:hover { border-color: var(--acc); color: var(--acc); }
+  .btn:disabled { opacity: 0.5; cursor: not-allowed; }
   .btn-primary { background: var(--acc); color: #000; border-color: var(--acc); font-weight: 500; }
   .btn-primary:hover { opacity: 0.85; color: #000; }
   .btn-danger { border-color: rgba(239,68,68,0.3); color: var(--red); background: rgba(239,68,68,0.05); }
@@ -114,9 +119,9 @@ const S = `
   .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
   .form-actions { display: flex; gap: 8px; justify-content: flex-end; padding-top: 4px; }
 
-  /* Modal overlay */
+  /* Modal */
   .modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.6); z-index: 100; display: flex; align-items: center; justify-content: center; padding: 20px; }
-  .modal { background: var(--surf); border: 1px solid var(--bdr); border-radius: 14px; padding: 22px; width: 100%; max-width: 480px; display: flex; flex-direction: column; gap: 14px; }
+  .modal { background: var(--surf); border: 1px solid var(--bdr); border-radius: 14px; padding: 22px; width: 100%; max-width: 480px; display: flex; flex-direction: column; gap: 14px; max-height: 90vh; overflow-y: auto; }
   .modal-title { font-family: 'Syne', sans-serif; font-size: 16px; font-weight: 800; }
 
   /* Inline add row */
@@ -240,8 +245,7 @@ const S = `
   .sh-av    { width: 28px; height: 28px; border-radius: 7px; display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 700; flex-shrink: 0; font-family: 'Syne', sans-serif; }
 
   /* Todo */
-  .todo-item { display: flex; align-items: center; gap: 9px; padding: 9px 11px; border-radius: var(--r-sm); background: var(--surf2); border: 1px solid var(--bdr); transition: border-color 0.13s; }
-  .todo-item:hover { border-color: var(--bdr2); }
+  .todo-item { display: flex; align-items: center; gap: 9px; padding: 9px 11px; border-radius: var(--r-sm); background: var(--surf2); border: 1px solid var(--bdr); }
   .todo-chk  { width: 15px; height: 15px; border-radius: 4px; border: 1px solid var(--bdr2); display: flex; align-items: center; justify-content: center; font-size: 9px; transition: all 0.13s; flex-shrink: 0; cursor: pointer; }
   .todo-chk.dn { background: var(--grn); border-color: var(--grn); color: #000; }
   .todo-txt  { flex: 1; font-size: 13px; }
@@ -271,7 +275,7 @@ const S = `
   }
 `;
 
-/* ─ Static data (unchanged from v2) ────────────────────────────────────── */
+/* ─ Static data ─────────────────────────────────────────────────────────── */
 const NAV = [
   { grp:"Today",        items:[{ id:"schedule",ic:"🕐",lbl:"Daily Schedule"},{ id:"todos",ic:"☑",lbl:"To-Do List"}]},
   { grp:"Execution",    items:[{ id:"tracker", ic:"◎",lbl:"Projects"},      { id:"meetings",ic:"✦",lbl:"Meetings"}]},
@@ -283,18 +287,18 @@ const NAV = [
 
 const PAGE_INFO = {
   overview:    { title:"All Workflows",        sub:"Every core PM task mapped by AI automation potential" },
-  schedule:    { title:"Daily Schedule",       sub:"AI-optimised time blocks — deep work protected, meetings batched" },
-  todos:       { title:"Today's Focus List",   sub:"Agent-curated priorities synthesised from all your tools" },
+  schedule:    { title:"Daily Schedule",       sub:"Live Google Calendar events — auto-synced" },
+  todos:       { title:"Today's Focus List",   sub:"Agent-curated priorities from Jira, Gmail and meetings" },
   tracker:     { title:"Project Tracker",      sub:"Live project health — AI monitors status and flags risk automatically" },
   meetings:    { title:"Meeting Intelligence", sub:"Agent transcribes, extracts decisions, creates tasks — zero manual notes" },
   priority:    { title:"Prioritization",       sub:"RICE scoring aligned to vision, OKRs and quarterly strategy" },
   okr:         { title:"OKR Tracker",          sub:"Q2 · April–June 2025 · Week 3 of 13 · AI monitors KR drift weekly" },
-  agents:      { title:"AI Agent Stack",       sub:"6 agents handling the repetitive, cognitive-load-heavy work" },
+  agents:      { title:"AI Agent Stack",       sub:"6 agents handling repetitive work — click any to run now" },
   prd:         { title:"PRD Agent",            sub:"Paste focus group data — agent clusters themes and writes a structured PRD in seconds" },
   stakeholders:{ title:"Stakeholders",         sub:"Everyone who matters — filterable by project, with influence and last contact" },
   metrics:     { title:"Pilot Metrics",        sub:"Adoption funnel, time saved, agent usage and threshold alerts" },
   privacy:     { title:"Privacy & Data Controls", sub:"What the system remembers, where data goes, and your right to delete" },
-  integrations:{ title:"Integrations",            sub:"Live connections to Jira, Webex, Gmail and Google Calendar — bidirectional sync" },
+  integrations:{ title:"Integrations",         sub:"Live connections to Jira, Webex, Gmail and Google Calendar — auto-synced on load" },
 };
 
 const WORKFLOWS = [
@@ -309,30 +313,13 @@ const WORKFLOWS = [
   { title:"Competitive Intelligence", cat:"Discovery",    ai:"full",    desc:"Monitor competitors, scrape release notes and news, summarize weekly landscape changes.",                       tasks:[{ic:"🤖",lbl:"Scrape competitor blogs & notes",ai:true},{ic:"🤖",lbl:"Weekly landscape digest",ai:true}]},
 ];
 
-const AGENTS = [
-  { ic:"🧠",col:"ic-blu",name:"Prioritization Agent",   trig:"Every sprint planning session",desc:"Takes your backlog, applies RICE scoring based on business impact, reach, confidence and effort. Cross-references quarterly OKRs to surface the top 10 items.",inputs:["Backlog (Jira/Linear)","OKR doc","Vision doc","Capacity data"]},
-  { ic:"🎙️",col:"ic-pur",name:"Meeting Scribe Agent",   trig:"After every meeting ends",     desc:"Listens to meeting recordings, produces a structured summary with key decisions, action items with owner and due date, and auto-pushes tasks to your project tracker.",inputs:["Meeting recording","Calendar context","Project tracker API"]},
-  { ic:"📊",col:"ic-grn",name:"Weekly Digest Agent",    trig:"Every Monday 8am",             desc:"Aggregates data from Jira, Amplitude, Slack and CRM. Generates an executive-ready briefing: what shipped, what's at risk, key metrics, top 3 decisions needed.",inputs:["Jira","Amplitude","Slack","Salesforce"]},
-  { ic:"🔔",col:"ic-amb",name:"Risk & Blocker Agent",   trig:"Continuous monitoring",        desc:"Watches for sprint velocity drops, overdue milestones, unassigned critical tickets, and silent stakeholders. Sends smart Slack alerts with suggested actions.",inputs:["Jira / Linear","Slack","Calendar","Project roadmap"]},
-  { ic:"📝",col:"ic-blu",name:"Stakeholder Update Agent",trig:"Every Friday 3pm",            desc:"Pulls project status data, compares against last week's targets, writes a polished status email for each stakeholder group tailored to their level of detail.",inputs:["Project tracker","OKR targets","Stakeholder map","Last week's update"]},
-  { ic:"🔭",col:"ic-pur",name:"Competitive Intel Agent", trig:"Daily / on-demand",           desc:"Monitors competitor websites, product blogs, App Store reviews and tech news. Surfaces relevant changes as a clean weekly digest with implications for your roadmap.",inputs:["Competitor URLs","G2/Capterra","App Store","Tech news feeds"]},
-];
-
-const SCHEDULE = [
+const SCHEDULE_FALLBACK = [
   { t:"08:00",type:"deep", title:"🧠 Deep Work Block",         desc:"Strategy doc / roadmap writing",         dur:"90 min",ai:"AI-blocked"},
   { t:"09:30",type:"admin",title:"📬 Inbox Triage",             desc:"Emails, Slack, agent digests",           dur:"30 min",ai:"Agent-sorted"},
   { t:"10:00",type:"meet", title:"Sprint Planning — Mobile",    desc:"Ana, Raj, Marcus · Zoom",                dur:"60 min",ai:"Scribe active"},
-  { t:"11:00",type:"buf",  title:"☕ Buffer + Follow-ups",       desc:"Action items from sprint planning",      dur:"30 min",ai:null},
-  { t:"11:30",type:"deep", title:"🔬 User Research Synthesis",  desc:"Review interview notes, cluster themes", dur:"60 min",ai:"Agent queued"},
   { t:"12:30",type:"break",title:"🍱 Lunch",                    desc:"Protected — no meetings",                dur:"60 min",ai:null},
-  { t:"13:30",type:"meet", title:"1:1 with Engineering Lead",   desc:"Chen · Payments blocker + capacity",     dur:"30 min",ai:"Scribe active"},
-  { t:"14:00",type:"admin",title:"📊 Metrics Review",           desc:"Weekly digest · Amplitude + Jira",       dur:"30 min",ai:"Agent-compiled"},
   { t:"14:30",type:"deep", title:"📝 PRD Writing",              desc:"AI Recommendations — no interruptions",  dur:"90 min",ai:null},
-  { t:"16:00",type:"meet", title:"Exec Roadmap Review Prep",    desc:"Slides review with design lead",         dur:"30 min",ai:null},
-  { t:"16:30",type:"admin",title:"📤 EOD Stakeholder Update",   desc:"AI-drafted email — review and send",     dur:"30 min",ai:"AI-drafted"},
-  { t:"17:00",type:"buf",  title:"🌅 Wind Down / Plan Tomorrow",desc:"Review to-dos, set next day priorities", dur:"30 min",ai:"Agent-suggested"},
 ];
-const EV_CLS = { deep:"ev-deep",meet:"ev-meet",admin:"ev-admin",buf:"ev-buf",break:"ev-break" };
 
 const RICE_STATIC = [
   { name:"Mobile Onboarding V2",r:85,i:8,c:90,e:5, score:122},
@@ -348,13 +335,13 @@ const KR_TAG       = {"on-track":"tag-grn","at-risk":"tag-amb","planning":"tag-p
 const AGE_TAG      = { recent:"tag-grn", old:"tag-amb", stale:"tag-red" };
 
 /* ─ Helpers ─────────────────────────────────────────────────────────────── */
-const initials = name => name.split(' ').map(n=>n[0]).join('').toUpperCase().slice(0,2);
-const contactAge = dt => {
+const initials = (name: string) => name.split(' ').map(n=>n[0]).join('').toUpperCase().slice(0,2);
+const contactAge = (dt: string) => {
   if (!dt) return "stale";
   const days = (Date.now() - new Date(dt).getTime()) / 86400000;
   return days < 7 ? "recent" : days < 14 ? "old" : "stale";
 };
-const contactLabel = dt => {
+const contactLabel = (dt: string) => {
   if (!dt) return "Never";
   const days = Math.floor((Date.now() - new Date(dt).getTime()) / 86400000);
   if (days === 0) return "Today";
@@ -362,10 +349,10 @@ const contactLabel = dt => {
   return `${days}d ago`;
 };
 
-/* ─ Reusable Modal ───────────────────────────────────────────────────────── */
-function Modal({ title, onClose, children }) {
+/* ─ Modal ────────────────────────────────────────────────────────────────── */
+function Modal({ title, onClose, children }: any) {
   return (
-    <div className="modal-overlay" onClick={e => e.target===e.currentTarget && onClose()}>
+    <div className="modal-overlay" onClick={(e: any) => e.target===e.currentTarget && onClose()}>
       <div className="modal">
         <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
           <div className="modal-title">{title}</div>
@@ -380,72 +367,74 @@ function Modal({ title, onClose, children }) {
 /* ─ Main Component ───────────────────────────────────────────────────────── */
 export default function PMDashboard() {
   const [page, setPage]               = useState("overview");
-  const [user, setUser]               = useState(null);
+  const [user, setUser]               = useState<any>(null);
+  const [isSyncing, setIsSyncing]     = useState(false); // global sync indicator
 
   /* Tasks */
-  const [todos, setTodos]             = useState([]);
+  const [todos, setTodos]             = useState<any[]>([]);
   const [todosLoading, setTodosLoading] = useState(true);
   const [showAddTask, setShowAddTask] = useState(false);
   const [newTask, setNewTask]         = useState({ title:"", priority:"med" });
 
   /* Projects */
-  const [projects, setProjects]       = useState([]);
+  const [projects, setProjects]       = useState<any[]>([]);
   const [projLoading, setProjLoading] = useState(true);
   const [showAddProj, setShowAddProj] = useState(false);
-  const [editProj, setEditProj]       = useState(null);
+  const [editProj, setEditProj]       = useState<any>(null);
   const [projForm, setProjForm]       = useState({ name:"", owner:"", status:"planning", progress:0, due_date:"" });
 
   /* Meetings */
-  const [meetings, setMeetings]       = useState([]);
+  const [meetings, setMeetings]       = useState<any[]>([]);
   const [meetLoading, setMeetLoading] = useState(true);
   const [showAddMeet, setShowAddMeet] = useState(false);
   const [meetForm, setMeetForm]       = useState({ title:"", meeting_time:"", raw_transcript:"" });
   const [meetProcessing, setMeetProcessing] = useState(false);
 
   /* OKRs */
-  const [okrs, setOkrs]               = useState([]);
+  const [okrs, setOkrs]               = useState<any[]>([]);
   const [okrsLoading, setOkrsLoading] = useState(true);
-  const [expandedOkr, setExpandedOkr] = useState([]);
-  const [editingKR, setEditingKR]     = useState(null);
+  const [expandedOkr, setExpandedOkr] = useState<number[]>([]);
+  const [editingKR, setEditingKR]     = useState<string|null>(null);
   const [krEditVal, setKrEditVal]     = useState("");
 
   /* Stakeholders */
-  const [stakeholders, setStakeholders] = useState([]);
+  const [stakeholders, setStakeholders] = useState<any[]>([]);
   const [shLoading, setShLoading]     = useState(true);
   const [shFilter, setShFilter]       = useState("All");
   const [showAddSh, setShowAddSh]     = useState(false);
-  const [editSh, setEditSh]           = useState(null);
+  const [editSh, setEditSh]           = useState<any>(null);
   const [shForm, setShForm]           = useState({ name:"", role:"", email:"", type:"Internal — Engineering", influence:3, color:"#00d4ff" });
 
   /* Privacy */
-  const [memLog, setMemLog]           = useState([]);
+  const [memLog, setMemLog]           = useState<any[]>([]);
   const [privTogs, setPrivTogs]       = useState({ persist:true, learn:true, session:false, audit:true });
 
   /* PRD */
   const [prdInput, setPrdInput]       = useState("");
   const [prdStatus, setPrdStatus]     = useState("idle");
-  const [prdResult, setPrdResult]     = useState(null);
+  const [prdResult, setPrdResult]     = useState<any>(null);
 
-  /* Agent runner state */
-  const [agentRunning, setAgentRunning]   = useState(null); // which agent is running
-  const [agentResult, setAgentResult]     = useState(null); // result to show in modal
-  const [agentResultType, setAgentResultType] = useState(null); // which modal to show
-  const [agentError, setAgentError]       = useState(null);
-  const [digestInput, setDigestInput]     = useState({ show: false });
-  const [updateInput, setUpdateInput]     = useState({ show: false, name: "", role: "" });
+  /* Agent runners */
+  const [agentRunning, setAgentRunning]       = useState<string|null>(null);
+  const [agentResult, setAgentResult]         = useState<any>(null);
+  const [agentResultType, setAgentResultType] = useState<string|null>(null);
+  const [agentError, setAgentError]           = useState<string|null>(null);
+  const [updateInput, setUpdateInput]         = useState({ show: false, name: "", role: "" });
 
   /* Integrations */
-  const [integrations, setIntegrations]   = useState([]);
-  const [jiraIssues, setJiraIssues]       = useState([]);
-  const [gmailThreads, setGmailThreads]   = useState([]);
-  const [calendarEvents, setCalEvents]    = useState([]);
-  const [syncingIntegration, setSyncing]  = useState(null);
+  const [integrations, setIntegrations]     = useState<any[]>([]);
+  const [jiraIssues, setJiraIssues]         = useState<any[]>([]);
+  const [gmailThreads, setGmailThreads]     = useState<any[]>([]);
+  const [calendarEvents, setCalEvents]      = useState<any[]>([]);
+  const [syncingIntegration, setSyncing]    = useState<string|null>(null);
   const [showCreateJira, setShowCreateJira] = useState(false);
-  const [jiraForm, setJiraForm]           = useState({ summary:"", description:"", projectKey:"PM", priority:"med", issueType:"Task" });
+  const [jiraForm, setJiraForm]             = useState({ summary:"", description:"", projectKey:"PM", priority:"med", issueType:"Task" });
   const [showAddCalEvent, setShowAddCalEvent] = useState(false);
-  const [calForm, setCalForm]             = useState({ title:"", startTime:"", endTime:"", attendees:"", description:"" });
-  const [agentRuns, setAgentRuns]         = useState([]);
-  const [riceScores, setRiceScores]       = useState([]);
+  const [calForm, setCalForm]               = useState({ title:"", startTime:"", endTime:"", attendees:"", description:"" });
+  const [agentRuns, setAgentRuns]           = useState<any[]>([]);
+  const [riceScores, setRiceScores]         = useState<any[]>([]);
+
+  const syncRunning = useRef(false);
 
   /* ── Auth ─────────────────────────────────────────────────────────────── */
   useEffect(() => {
@@ -456,7 +445,7 @@ export default function PMDashboard() {
     return () => subscription.unsubscribe();
   }, []);
 
-  /* ── Fetch tasks ──────────────────────────────────────────────────────── */
+  /* ── Load functions ───────────────────────────────────────────────────── */
   const loadTasks = useCallback(async () => {
     setTodosLoading(true);
     const { data } = await supabase.from("tasks").select("*").order("created_at", { ascending: false });
@@ -464,21 +453,6 @@ export default function PMDashboard() {
     setTodosLoading(false);
   }, []);
 
-  useEffect(() => { loadTasks(); }, [loadTasks]);
-
-  useEffect(() => {
-    const ch = supabase.channel("tasks-live")
-      .on("postgres_changes", { event: "INSERT", schema: "public", table: "tasks" },
-        payload => setTodos(p => [payload.new, ...p]))
-      .on("postgres_changes", { event: "UPDATE", schema: "public", table: "tasks" },
-        payload => setTodos(p => p.map(t => t.id === payload.new.id ? payload.new : t)))
-      .on("postgres_changes", { event: "DELETE", schema: "public", table: "tasks" },
-        payload => setTodos(p => p.filter(t => t.id !== payload.old.id)))
-      .subscribe();
-    return () => { void supabase.removeChannel(ch); };
-  }, []);
-
-  /* ── Fetch projects ───────────────────────────────────────────────────── */
   const loadProjects = useCallback(async () => {
     setProjLoading(true);
     const { data } = await supabase.from("projects").select("*").order("created_at");
@@ -486,16 +460,6 @@ export default function PMDashboard() {
     setProjLoading(false);
   }, []);
 
-  useEffect(() => { loadProjects(); }, [loadProjects]);
-
-  useEffect(() => {
-    const ch = supabase.channel("projects-live")
-      .on("postgres_changes", { event: "*", schema: "public", table: "projects" }, () => loadProjects())
-      .subscribe();
-    return () => { void supabase.removeChannel(ch); };
-  }, [loadProjects]);
-
-  /* ── Fetch meetings ───────────────────────────────────────────────────── */
   const loadMeetings = useCallback(async () => {
     setMeetLoading(true);
     const { data } = await supabase.from("meetings").select("*").order("meeting_time", { ascending: false });
@@ -503,9 +467,6 @@ export default function PMDashboard() {
     setMeetLoading(false);
   }, []);
 
-  useEffect(() => { loadMeetings(); }, [loadMeetings]);
-
-  /* ── Fetch OKRs ───────────────────────────────────────────────────────── */
   const loadOkrs = useCallback(async () => {
     setOkrsLoading(true);
     const { data: okrData } = await supabase.from("okrs").select("*").order("sort_order");
@@ -520,39 +481,21 @@ export default function PMDashboard() {
     setOkrsLoading(false);
   }, []);
 
-  useEffect(() => { loadOkrs(); }, [loadOkrs]);
-
-  /* ── Fetch stakeholders ───────────────────────────────────────────────── */
   const loadStakeholders = useCallback(async () => {
     setShLoading(true);
     const { data } = await supabase.from("stakeholders").select("*, stakeholder_projects(project_id, projects(name))").order("name");
-    if (data) setStakeholders(data.map(s => ({
+    if (data) setStakeholders(data.map((s: any) => ({
       ...s,
-      proj: s.stakeholder_projects?.map(sp => sp.projects?.name).filter(Boolean) || [],
+      proj: s.stakeholder_projects?.map((sp: any) => sp.projects?.name).filter(Boolean) || [],
     })));
     setShLoading(false);
   }, []);
 
-  useEffect(() => { loadStakeholders(); }, [loadStakeholders]);
-
-  /* ── Fetch memory log ─────────────────────────────────────────────────── */
   const loadMemory = useCallback(async () => {
     const { data } = await supabase.from("memory_log").select("*").order("created_at", { ascending: false });
     if (data) setMemLog(data);
   }, []);
 
-  useEffect(() => { loadMemory(); }, [loadMemory]);
-
-  /* ── Fetch user settings ──────────────────────────────────────────────── */
-  useEffect(() => {
-    if (!user) return;
-    supabase.from("user_settings").select("*").eq("user_id", user.id).single()
-      .then(({ data }) => {
-        if (data) setPrivTogs({ persist: data.persistent_memory, learn: data.agent_learning, session: data.session_only, audit: data.audit_log });
-      });
-  }, [user]);
-
-  /* ── Fetch integrations ───────────────────────────────────────────────── */
   const loadIntegrations = useCallback(async () => {
     const { data } = await supabase.from("integrations").select("*");
     if (data) setIntegrations(data);
@@ -583,57 +526,128 @@ export default function PMDashboard() {
     if (data) setRiceScores(data);
   }, []);
 
+  /* ── Initial data loads ───────────────────────────────────────────────── */
   useEffect(() => {
+    loadTasks();
+    loadProjects();
+    loadMeetings();
+    loadOkrs();
+    loadStakeholders();
+    loadMemory();
     loadIntegrations();
     loadJiraIssues();
     loadGmailThreads();
     loadCalendarEvents();
     loadAgentRuns();
     loadRiceScores();
-  }, [loadIntegrations, loadJiraIssues, loadGmailThreads, loadCalendarEvents, loadAgentRuns, loadRiceScores]);
+  }, [loadTasks, loadProjects, loadMeetings, loadOkrs, loadStakeholders, loadMemory,
+      loadIntegrations, loadJiraIssues, loadGmailThreads, loadCalendarEvents, loadAgentRuns, loadRiceScores]);
 
-  // Realtime for integrations
+  /* ── User settings ────────────────────────────────────────────────────── */
+  useEffect(() => {
+    if (!user) return;
+    supabase.from("user_settings").select("*").eq("user_id", user.id).single()
+      .then(({ data }) => {
+        if (data) setPrivTogs({ persist: data.persistent_memory, learn: data.agent_learning, session: data.session_only, audit: data.audit_log });
+      });
+  }, [user]);
+
+  /* ── Realtime subscriptions ───────────────────────────────────────────── */
+  useEffect(() => {
+    const ch = supabase.channel("tasks-live")
+      .on("postgres_changes", { event: "INSERT", schema: "public", table: "tasks" },
+        payload => setTodos(p => [payload.new, ...p]))
+      .on("postgres_changes", { event: "UPDATE", schema: "public", table: "tasks" },
+        payload => setTodos(p => p.map((t: any) => t.id === payload.new.id ? payload.new : t)))
+      .on("postgres_changes", { event: "DELETE", schema: "public", table: "tasks" },
+        payload => setTodos(p => p.filter((t: any) => t.id !== payload.old.id)))
+      .subscribe();
+    return () => supabase.removeChannel(ch);
+  }, []);
+
+  useEffect(() => {
+    const ch = supabase.channel("projects-live")
+      .on("postgres_changes", { event: "*", schema: "public", table: "projects" }, () => loadProjects())
+      .subscribe();
+    return () => supabase.removeChannel(ch);
+  }, [loadProjects]);
+
   useEffect(() => {
     const ch = supabase.channel("integrations-live")
       .on("postgres_changes", { event: "*", schema: "public", table: "integrations" }, () => loadIntegrations())
-      .on("postgres_changes", { event: "*", schema: "public", table: "jira_issues" }, () => loadJiraIssues())
+      .on("postgres_changes", { event: "*", schema: "public", table: "jira_issues" }, () => { loadJiraIssues(); loadTasks(); })
       .on("postgres_changes", { event: "*", schema: "public", table: "gmail_threads" }, () => loadGmailThreads())
       .on("postgres_changes", { event: "*", schema: "public", table: "schedule_blocks" }, () => loadCalendarEvents())
       .on("postgres_changes", { event: "*", schema: "public", table: "agent_runs" }, () => loadAgentRuns())
       .on("postgres_changes", { event: "*", schema: "public", table: "rice_scores" }, () => loadRiceScores())
       .subscribe();
-    return () => { void supabase.removeChannel(ch); };
-  }, [loadIntegrations, loadJiraIssues, loadGmailThreads, loadCalendarEvents, loadAgentRuns, loadRiceScores]);
+    return () => supabase.removeChannel(ch);
+  }, [loadIntegrations, loadJiraIssues, loadGmailThreads, loadCalendarEvents, loadAgentRuns, loadRiceScores, loadTasks]);
 
-  /* ── Integration sync functions ───────────────────────────────────────── */
+  /* ── AUTO-SYNC — runs silently on load, focus and every 5 min ─────────── */
+  const autoSyncAll = useCallback(async () => {
+    if (syncRunning.current) return; // prevent overlapping syncs
+    syncRunning.current = true;
+    setIsSyncing(true);
+    try {
+      await Promise.allSettled([
+        supabase.functions.invoke("jira-sync",     { body: { action: "pull" } }),
+        supabase.functions.invoke("webex-sync",    { body: { action: "pull" } }),
+        supabase.functions.invoke("gmail-sync",    { body: { action: "pull" } }),
+        supabase.functions.invoke("calendar-sync", { body: {} }),
+      ]);
+      await Promise.allSettled([
+        loadIntegrations(),
+        loadJiraIssues(),
+        loadGmailThreads(),
+        loadCalendarEvents(),
+        loadTasks(),
+        loadMeetings(),
+        loadProjects(),
+      ]);
+    } finally {
+      syncRunning.current = false;
+      setIsSyncing(false);
+    }
+  }, [loadIntegrations, loadJiraIssues, loadGmailThreads, loadCalendarEvents, loadTasks, loadMeetings, loadProjects]);
+
+  // Sync on first load
+  useEffect(() => { autoSyncAll(); }, [autoSyncAll]);
+
+  // Sync when user switches back to tab
+  useEffect(() => {
+    const onVisible = () => {
+      if (document.visibilityState === "visible") autoSyncAll();
+    };
+    document.addEventListener("visibilitychange", onVisible);
+    window.addEventListener("focus", onVisible);
+    return () => {
+      document.removeEventListener("visibilitychange", onVisible);
+      window.removeEventListener("focus", onVisible);
+    };
+  }, [autoSyncAll]);
+
+  // Poll every 5 minutes
+  useEffect(() => {
+    const interval = setInterval(autoSyncAll, 5 * 60 * 1000);
+    return () => clearInterval(interval);
+  }, [autoSyncAll]);
+
+  /* ── Manual sync functions (with feedback) ────────────────────────────── */
   const syncJira = async (projectKey?: string) => {
     setSyncing("jira");
     const { data, error } = await supabase.functions.invoke("jira-sync", { body: { action: "pull", projectKey } });
     setSyncing(null);
-    if (error) return alert("Jira sync failed: " + error.message);
+    if (error) { alert("Jira sync failed: " + error.message); return; }
     await Promise.all([loadJiraIssues(), loadTasks(), loadProjects(), loadIntegrations()]);
     alert(`Jira sync complete — ${data?.synced || 0} issues synced`);
-  };
-
-  const createJiraIssue = async () => {
-    if (!jiraForm.summary.trim()) return;
-    setSyncing("jira-create");
-    const { data, error } = await supabase.functions.invoke("jira-sync", {
-      body: { action: "create_issue", issueData: jiraForm },
-    });
-    setSyncing(null);
-    if (error) return alert("Failed to create Jira issue: " + error.message);
-    setShowCreateJira(false);
-    setJiraForm({ summary:"", description:"", projectKey:"PM", priority:"med", issueType:"Task" });
-    await Promise.all([loadJiraIssues(), loadTasks()]);
-    alert(`Created ${data?.jira_key}`);
   };
 
   const syncWebex = async () => {
     setSyncing("webex");
     const { data, error } = await supabase.functions.invoke("webex-sync", { body: { action: "pull" } });
     setSyncing(null);
-    if (error) return alert("Webex sync failed: " + error.message);
+    if (error) { alert("Webex sync failed: " + error.message); return; }
     await Promise.all([loadMeetings(), loadTasks(), loadIntegrations()]);
     alert(`Webex sync complete — ${data?.synced || 0} meetings synced`);
   };
@@ -642,7 +656,7 @@ export default function PMDashboard() {
     setSyncing("gmail");
     const { data, error } = await supabase.functions.invoke("gmail-sync", { body: { action: "pull" } });
     setSyncing(null);
-    if (error) return alert("Gmail sync failed: " + error.message);
+    if (error) { alert("Gmail sync failed: " + error.message); return; }
     await Promise.all([loadGmailThreads(), loadTasks(), loadIntegrations()]);
     alert(`Gmail sync complete — ${data?.synced || 0} threads synced`);
   };
@@ -651,9 +665,21 @@ export default function PMDashboard() {
     setSyncing("calendar");
     const { data, error } = await supabase.functions.invoke("calendar-sync", { body: { date } });
     setSyncing(null);
-    if (error) return alert("Calendar sync failed: " + error.message);
+    if (error) { alert("Calendar sync failed: " + error.message); return []; }
     await Promise.all([loadCalendarEvents(), loadIntegrations()]);
     return data?.events || [];
+  };
+
+  const createJiraIssue = async () => {
+    if (!jiraForm.summary.trim()) return;
+    setSyncing("jira-create");
+    const { data, error } = await supabase.functions.invoke("jira-sync", { body: { action: "create_issue", issueData: jiraForm } });
+    setSyncing(null);
+    if (error) { alert("Failed to create Jira issue: " + error.message); return; }
+    setShowCreateJira(false);
+    setJiraForm({ summary:"", description:"", projectKey:"PM", priority:"med", issueType:"Task" });
+    await Promise.all([loadJiraIssues(), loadTasks()]);
+    alert(`Created ${data?.jira_key}`);
   };
 
   const createCalendarEvent = async () => {
@@ -666,76 +692,81 @@ export default function PMDashboard() {
         title: calForm.title,
         startTime: `${date}T${calForm.startTime}:00`,
         endTime: `${date}T${calForm.endTime || calForm.startTime}:00`,
-        attendees: calForm.attendees.split(",").map(e => e.trim()).filter(Boolean),
+        attendees: calForm.attendees.split(",").map((e: string) => e.trim()).filter(Boolean),
         description: calForm.description,
       },
     });
     setSyncing(null);
-    if (error) return alert("Failed to create event: " + error.message);
+    if (error) { alert("Failed to create event: " + error.message); return; }
     setShowAddCalEvent(false);
     setCalForm({ title:"", startTime:"", endTime:"", attendees:"", description:"" });
     await loadCalendarEvents();
     alert(`Event created! Meet link: ${data?.meet_link || "none"}`);
   };
 
-  const markGmailRead = async (threadId) => {
+  const markGmailRead = async (threadId: string) => {
     await supabase.functions.invoke("gmail-sync", { body: { action: "mark_read", threadId } });
-    setGmailThreads(p => p.map(t => t.thread_id === threadId ? { ...t, is_read: true } : t));
+    setGmailThreads(p => p.map((t: any) => t.thread_id === threadId ? { ...t, is_read: true } : t));
   };
 
-  const getIntegrationStatus = (name) => integrations.find(i => i.name === name) || { status: "disconnected" };
+  const getIntegrationStatus = (name: string) => integrations.find(i => i.name === name) || { status: "disconnected" };
 
   /* ── Task CRUD ────────────────────────────────────────────────────────── */
-  const toggleTodo = async (task) => {
+  const toggleTodo = async (task: any) => {
     const newStatus = task.status === "done" ? "open" : "done";
-    setTodos(p => p.map(t => t.id === task.id ? { ...t, status: newStatus } : t));
+    setTodos(p => p.map((t: any) => t.id === task.id ? { ...t, status: newStatus } : t));
     await supabase.from("tasks").update({ status: newStatus }).eq("id", task.id);
+    // If Jira-sourced task, sync back to Jira
+    if (task.jira_key) {
+      supabase.functions.invoke("jira-sync", {
+        body: { action: "transition_issue", issueData: { jiraKey: task.jira_key, transitionName: newStatus === "done" ? "done" : "in progress" } }
+      }).catch(() => {});
+    }
   };
 
   const addTask = async () => {
     if (!newTask.title.trim()) return;
-    await supabase.from("tasks").insert({
-      title: newTask.title.trim(),
-      priority: newTask.priority,
-      status: "open",
-      source: "manual",
-      user_id: user?.id,
-    });
+    await supabase.from("tasks").insert({ title: newTask.title.trim(), priority: newTask.priority, status: "open", source: "manual", user_id: user?.id });
     setNewTask({ title:"", priority:"med" });
     setShowAddTask(false);
   };
 
-  const deleteTask = async (id) => {
-    setTodos(p => p.filter(t => t.id !== id));
+  const deleteTask = async (id: string) => {
+    setTodos(p => p.filter((t: any) => t.id !== id));
     await supabase.from("tasks").delete().eq("id", id);
   };
 
-  /* ── Project CRUD ─────────────────────────────────────────────────────── */
-  const openAddProj = () => {
-    setProjForm({ name:"", owner:"", status:"planning", progress:0, due_date:"" });
-    setEditProj(null);
-    setShowAddProj(true);
-  };
-
-  const openEditProj = (p) => {
-    setProjForm({ name: p.name, owner: p.owner||"", status: p.status, progress: p.progress, due_date: p.due_date||"" });
-    setEditProj(p);
-    setShowAddProj(true);
-  };
+  /* ── Project CRUD — pushes to Jira on create ──────────────────────────── */
+  const openAddProj = () => { setProjForm({ name:"", owner:"", status:"planning", progress:0, due_date:"" }); setEditProj(null); setShowAddProj(true); };
+  const openEditProj = (p: any) => { setProjForm({ name:p.name, owner:p.owner||"", status:p.status, progress:p.progress, due_date:p.due_date||"" }); setEditProj(p); setShowAddProj(true); };
 
   const saveProject = async () => {
     if (!projForm.name.trim()) return;
-    const payload = { name: projForm.name.trim(), owner: projForm.owner, status: projForm.status, progress: Number(projForm.progress)||0, due_date: projForm.due_date||null };
+    const payload = { name: projForm.name.trim(), owner: projForm.owner, status: projForm.status, progress: parseInt(String(projForm.progress))||0, due_date: projForm.due_date||null };
+
     if (editProj) {
       await supabase.from("projects").update(payload).eq("id", editProj.id);
+      // Update Jira if linked
+      if (editProj.jira_key) {
+        supabase.functions.invoke("jira-sync", {
+          body: { action: "update_issue", issueData: { jiraKey: editProj.jira_key, fields: { summary: payload.name } } }
+        }).catch(() => {});
+      }
     } else {
-      await supabase.from("projects").insert({ ...payload, user_id: user?.id });
+      const { data: newProject } = await supabase.from("projects").insert({ ...payload, user_id: user?.id }).select().single();
+      // Push to Jira as Epic
+      const { data: jiraData } = await supabase.functions.invoke("jira-sync", {
+        body: { action: "create_issue", issueData: { summary: payload.name, description: `Owner: ${payload.owner || "TBD"} | Due: ${payload.due_date || "TBD"}`, projectKey: "PM", priority: "med", issueType: "Epic" } }
+      }).catch(() => ({ data: null }));
+      if (jiraData?.jira_key && newProject?.id) {
+        await supabase.from("projects").update({ jira_key: jiraData.jira_key }).eq("id", newProject.id);
+      }
     }
     setShowAddProj(false);
     loadProjects();
   };
 
-  const deleteProject = async (id) => {
+  const deleteProject = async (id: string) => {
     if (!window.confirm("Delete this project?")) return;
     await supabase.from("projects").delete().eq("id", id);
     loadProjects();
@@ -745,103 +776,55 @@ export default function PMDashboard() {
   const saveMeeting = async () => {
     if (!meetForm.title.trim()) return;
     setMeetProcessing(true);
-    const { data } = await supabase.from("meetings").insert({
-      title: meetForm.title.trim(),
-      meeting_time: meetForm.meeting_time || new Date().toISOString(),
-      raw_transcript: meetForm.raw_transcript,
-      user_id: user?.id,
-    }).select().single();
-
+    const { data } = await supabase.from("meetings").insert({ title: meetForm.title.trim(), meeting_time: meetForm.meeting_time || new Date().toISOString(), raw_transcript: meetForm.raw_transcript, user_id: user?.id }).select().single();
     if (data && meetForm.raw_transcript.trim()) {
-      const { data: result } = await supabase.functions.invoke("meeting-scribe", {
-        body: { transcript: meetForm.raw_transcript, title: meetForm.title, meetingId: data.id },
-      });
-      if (result) await loadMeetings();
+      await supabase.functions.invoke("meeting-scribe", { body: { transcript: meetForm.raw_transcript, title: meetForm.title, meetingId: data.id } });
     }
-
     setMeetProcessing(false);
     setShowAddMeet(false);
     setMeetForm({ title:"", meeting_time:"", raw_transcript:"" });
     loadMeetings();
   };
 
-  const deleteMeeting = async (id) => {
+  const deleteMeeting = async (id: string) => {
     await supabase.from("meetings").delete().eq("id", id);
     loadMeetings();
   };
 
   /* ── OKR CRUD ─────────────────────────────────────────────────────────── */
-  const startEditKR = (kr) => {
-    setEditingKR(kr.id);
-    setKrEditVal(String(kr.current_val ?? 0));
-  };
-
-  const saveKR = async (kr) => {
+  const startEditKR = (kr: any) => { setEditingKR(kr.id); setKrEditVal(String(kr.current_val ?? 0)); };
+  const saveKR = async (kr: any) => {
     const newVal = parseFloat(krEditVal);
     if (isNaN(newVal)) { setEditingKR(null); return; }
     await supabase.from("key_results").update({ current_val: newVal }).eq("id", kr.id);
     setEditingKR(null);
     loadOkrs();
   };
-
-  const toggleOkr = i => setExpandedOkr(p => p.includes(i) ? p.filter(x=>x!==i) : [...p,i]);
+  const toggleOkr = (i: number) => setExpandedOkr(p => p.includes(i) ? p.filter(x=>x!==i) : [...p,i]);
 
   /* ── Stakeholder CRUD ─────────────────────────────────────────────────── */
-  const openAddSh = () => {
-    setShForm({ name:"", role:"", email:"", type:"Internal — Engineering", influence:3, color:"#00d4ff" });
-    setEditSh(null);
-    setShowAddSh(true);
-  };
-
-  const openEditSh = (s) => {
-    setShForm({ name: s.name, role: s.role||"", email: s.email||"", type: s.type||"", influence: s.influence||3, color: s.color||"#00d4ff" });
-    setEditSh(s);
-    setShowAddSh(true);
-  };
+  const openAddSh = () => { setShForm({ name:"", role:"", email:"", type:"Internal — Engineering", influence:3, color:"#00d4ff" }); setEditSh(null); setShowAddSh(true); };
+  const openEditSh = (s: any) => { setShForm({ name:s.name, role:s.role||"", email:s.email||"", type:s.type||"", influence:s.influence||3, color:s.color||"#00d4ff" }); setEditSh(s); setShowAddSh(true); };
 
   const saveSh = async () => {
     if (!shForm.name.trim()) return;
-    const payload = { name: shForm.name.trim(), role: shForm.role, email: shForm.email, type: shForm.type, influence: Number(shForm.influence), color: shForm.color, initials: initials(shForm.name) };
-    if (editSh) {
-      await supabase.from("stakeholders").update(payload).eq("id", editSh.id);
-    } else {
-      await supabase.from("stakeholders").insert({ ...payload, user_id: user?.id });
-    }
+    const payload = { name: shForm.name.trim(), role: shForm.role, email: shForm.email, type: shForm.type, influence: parseInt(String(shForm.influence)), color: shForm.color, initials: initials(shForm.name) };
+    if (editSh) { await supabase.from("stakeholders").update(payload).eq("id", editSh.id); }
+    else { await supabase.from("stakeholders").insert({ ...payload, user_id: user?.id }); }
     setShowAddSh(false);
     loadStakeholders();
   };
 
-  const deleteSh = async (id) => {
-    await supabase.from("stakeholders").delete().eq("id", id);
-    loadStakeholders();
-  };
-
-  const markContacted = async (id) => {
-    await supabase.from("stakeholders").update({ last_contacted_at: new Date().toISOString() }).eq("id", id);
-    loadStakeholders();
-  };
+  const deleteSh = async (id: string) => { await supabase.from("stakeholders").delete().eq("id", id); loadStakeholders(); };
+  const markContacted = async (id: string) => { await supabase.from("stakeholders").update({ last_contacted_at: new Date().toISOString() }).eq("id", id); loadStakeholders(); };
 
   /* ── Privacy CRUD ─────────────────────────────────────────────────────── */
-  const forgetMem = async (id) => {
-    setMemLog(m => m.filter(x => x.id !== id));
-    await supabase.from("memory_log").delete().eq("id", id);
-  };
-
-  const forgetAll = async () => {
-    setMemLog([]);
-    await supabase.from("memory_log").delete().eq("user_id", user?.id);
-  };
-
-  const togglePriv = async (key) => {
-    const next = { ...privTogs, [key]: !privTogs[key] };
+  const forgetMem = async (id: string) => { setMemLog(m => m.filter((x: any) => x.id !== id)); await supabase.from("memory_log").delete().eq("id", id); };
+  const forgetAll = async () => { setMemLog([]); await supabase.from("memory_log").delete().eq("user_id", user?.id); };
+  const togglePriv = async (key: string) => {
+    const next = { ...privTogs, [key]: !(privTogs as any)[key] };
     setPrivTogs(next);
-    await supabase.from("user_settings").upsert({
-      user_id: user?.id,
-      persistent_memory: next.persist,
-      agent_learning: next.learn,
-      session_only: next.session,
-      audit_log: next.audit,
-    });
+    await supabase.from("user_settings").upsert({ user_id: user?.id, persistent_memory: next.persist, agent_learning: next.learn, session_only: next.session, audit_log: next.audit });
   };
 
   /* ── PRD Agent ────────────────────────────────────────────────────────── */
@@ -852,75 +835,51 @@ export default function PMDashboard() {
       const { data } = await supabase.functions.invoke("prd-agent", { body: { text: prdInput } });
       if (data) {
         setPrdResult({
-          themes: data.themes?.map(t => ({ lbl: t.label, n: t.frequency })) || [],
+          themes: data.themes?.map((t: any) => ({ lbl: t.label, n: t.frequency })) || [],
           problem: data.problem_statement || "",
-          stories: data.user_stories?.map(s => `As a ${s.role}, I want ${s.goal} so that ${s.outcome}.`) || [],
+          stories: data.user_stories?.map((s: any) => `As a ${s.role}, I want ${s.goal} so that ${s.outcome}.`) || [],
           criteria: data.acceptance_criteria || [],
-          metrics: data.success_metrics?.map(m => `${m.metric}: ${m.baseline} → ${m.target}`) || [],
+          metrics: data.success_metrics?.map((m: any) => `${m.metric}: ${m.baseline} → ${m.target}`) || [],
           questions: data.open_questions || [],
         });
         setPrdStatus("done");
       }
-    } catch {
-      setPrdStatus("idle");
-      alert("PRD Agent failed. Check your Supabase edge function and API key.");
-    }
+    } catch { setPrdStatus("idle"); alert("PRD Agent failed. Check edge function and API key."); }
   };
 
-  /* ── Agent Runners ───────────────────────────────────────────────────── */
-  const runAgent = async (agentName, body) => {
-    setAgentRunning(agentName);
-    setAgentError(null);
-    setAgentResult(null);
+  /* ── Agent runners ────────────────────────────────────────────────────── */
+  const runAgent = async (agentName: string, body: any) => {
+    setAgentRunning(agentName); setAgentError(null); setAgentResult(null);
     try {
       const { data, error } = await supabase.functions.invoke(agentName, { body });
       if (error) throw new Error(error.message);
       if (data?.error) throw new Error(data.error);
-      setAgentResult(data);
-      setAgentResultType(agentName);
-    } catch (err) {
-      setAgentError(err.message);
-      setAgentResultType("error");
-    } finally {
-      setAgentRunning(null);
-    }
+      setAgentResult(data); setAgentResultType(agentName);
+    } catch (err: any) { setAgentError(err.message); setAgentResultType("error"); }
+    finally { setAgentRunning(null); }
   };
 
   const runPrioritization = async () => {
     const items = projects.map(p => ({ title: p.name, description: `Status: ${p.status}, Progress: ${p.progress}%` }));
     if (!items.length) { setAgentError("No projects found. Add projects first."); setAgentResultType("error"); return; }
     await runAgent("prioritization", { items });
-    loadProjects();
+    loadRiceScores();
   };
+  const runWeeklyDigest   = () => runAgent("weekly-digest", {});
+  const runRiskMonitor    = async () => { await runAgent("risk-monitor", {}); loadProjects(); loadTasks(); };
+  const runStakeholderUpdate = (name: string, role: string) => { setUpdateInput({ show:false, name:"", role:"" }); runAgent("stakeholder-update", { recipientName:name||undefined, recipientRole:role||undefined }); };
+  const closeAgentResult  = () => { setAgentResult(null); setAgentResultType(null); setAgentError(null); };
 
-  const runWeeklyDigest = () => runAgent("weekly-digest", {});
-
-  const runRiskMonitor = async () => {
-    await runAgent("risk-monitor", {});
-    loadProjects();
-    loadTasks();
-  };
-
-  const runStakeholderUpdate = (name, role) => {
-    setUpdateInput({ show: false, name: "", role: "" });
-    runAgent("stakeholder-update", { recipientName: name || undefined, recipientRole: role || undefined });
-  };
-
-  const closeAgentResult = () => {
-    setAgentResult(null);
-    setAgentResultType(null);
-    setAgentError(null);
-  };
-
-  /* ── Derived data ─────────────────────────────────────────────────────── */
-  const shProjects = ["All", ...Array.from(new Set(stakeholders.flatMap(s => s.proj)))];
-  const filteredSh = shFilter === "All" ? stakeholders : stakeholders.filter(s => s.proj.includes(shFilter));
-  const info = PAGE_INFO[page] || { title: page, sub: "" };
+  /* ── Derived ──────────────────────────────────────────────────────────── */
+  const shProjects = ["All", ...Array.from(new Set(stakeholders.flatMap((s: any) => s.proj)))];
+  const filteredSh = shFilter === "All" ? stakeholders : stakeholders.filter((s: any) => s.proj.includes(shFilter));
+  const info = PAGE_INFO[page as keyof typeof PAGE_INFO] || { title: page, sub: "" };
 
   /* ════════════════════════════════════════════════════════════════════════ */
   return (
     <>
       <style>{S}</style>
+      {isSyncing && <div className="sync-bar"/>}
       <div className="app">
 
         {/* ── Sidebar ─────────────────────────────────────────────────── */}
@@ -946,9 +905,12 @@ export default function PMDashboard() {
             ))}
           </nav>
           <div className="sb-foot">
-            <div className="sb-stat"><div className="sdot" style={{background:"var(--grn)",boxShadow:"0 0 4px var(--grn)"}}/><span>6 agents active</span></div>
+            <div className="sb-stat">
+              <div className="sdot" style={{background:isSyncing?"var(--acc)":"var(--grn)",boxShadow:`0 0 4px ${isSyncing?"var(--acc)":"var(--grn)"}`}}/>
+              <span>{isSyncing ? "Syncing..." : "6 agents active"}</span>
+            </div>
             <div className="sb-stat"><div className="sdot" style={{background:"var(--acc)"}}/><span>{projects.length} projects</span></div>
-            <div className="sb-stat"><div className="sdot" style={{background:"var(--amb)"}}/><span>{projects.filter(p=>p.status==="at-risk").length} at risk</span></div>
+            <div className="sb-stat"><div className="sdot" style={{background:"var(--amb)"}}/><span>{projects.filter((p: any)=>p.status==="at-risk").length} at risk</span></div>
             <div className="sb-stat"><div className="sdot" style={{background:"var(--pur)"}}/><span>Q2 · Wk 3/13</span></div>
           </div>
         </aside>
@@ -960,7 +922,10 @@ export default function PMDashboard() {
               <div className="ph-title">{info.title}</div>
               <div className="ph-sub">{info.sub}</div>
             </div>
-            {user && <span className="mono dim" style={{fontSize:11}}>{user.email}</span>}
+            <div style={{display:"flex",alignItems:"center",gap:10}}>
+              {isSyncing && <span style={{fontFamily:"DM Mono",fontSize:10,color:"var(--acc)"}}>⟳ syncing…</span>}
+              {user && <span className="mono dim" style={{fontSize:11}}>{user.email}</span>}
+            </div>
           </div>
 
           <div className="pb">
@@ -970,8 +935,8 @@ export default function PMDashboard() {
               <div className="col">
                 <div style={{display:"flex",gap:16,flexWrap:"wrap",marginBottom:4}}>
                   {[["var(--grn)","Fully automatable"],["var(--amb)","AI-assisted"],["var(--bdr2)","Human-led"]].map(([c,l]) => (
-                    <div key={l} style={{display:"flex",alignItems:"center",gap:6,fontSize:12,color:"var(--mut)"}}>
-                      <div style={{width:8,height:8,borderRadius:"50%",background:c}}/>{l}
+                    <div key={l as string} style={{display:"flex",alignItems:"center",gap:6,fontSize:12,color:"var(--mut)"}}>
+                      <div style={{width:8,height:8,borderRadius:"50%",background:c as string}}/>{l}
                     </div>
                   ))}
                 </div>
@@ -1008,65 +973,51 @@ export default function PMDashboard() {
                     <div className="ct">Today · {new Date().toLocaleDateString("en-US",{weekday:"long",month:"short",day:"numeric"})}</div>
                     <div style={{display:"flex",gap:6}}>
                       <button className="btn btn-sm" onClick={() => syncCalendar()} disabled={syncingIntegration==="calendar"}>
-                        {syncingIntegration==="calendar" ? <span className="spin" style={{width:12,height:12,borderWidth:1.5,display:"inline-block"}}/> : "⟳ Sync Calendar"}
+                        {syncingIntegration==="calendar" ? <span className="spin" style={{width:12,height:12,borderWidth:1.5,display:"inline-block"}}/> : "⟳ Sync"}
                       </button>
                       <button className="btn btn-sm" onClick={() => setShowAddCalEvent(true)}>+ Add Event</button>
                     </div>
                   </div>
                   <div className="cb" style={{padding:"14px 16px 14px 14px"}}>
-                    {calendarEvents.length === 0 && (
-                      <div className="empty" style={{textAlign:"left"}}>
-                        No events loaded. Click "Sync Calendar" to pull today's events from Google Calendar.
+                    {calendarEvents.length === 0 ? (
+                      <div>
+                        <div style={{fontSize:12,color:"var(--mut)",marginBottom:12}}>No Google Calendar events loaded yet. Syncing automatically...</div>
+                        <div className="tl-wrap">
+                          {SCHEDULE_FALLBACK.map((ev,i) => (
+                            <div key={i} className="tl-slot" style={{opacity:0.5}}>
+                              <div className="tl-time">{ev.t}</div>
+                              <div><div className={`tl-ev ev-${ev.type}`}>
+                                <div className="ev-title">{ev.title}</div>
+                                <div className="ev-meta"><span>{ev.desc}</span><span className="mono dim" style={{fontSize:10}}>{ev.dur}</span>{ev.ai && <span className="ev-ai-tag">🤖 {ev.ai}</span>}</div>
+                              </div></div>
+                            </div>
+                          ))}
+                        </div>
                       </div>
-                    )}
-                    <div className="tl-wrap">
-                      {[...calendarEvents]
-                        .sort((a,b) => (a.start_time||"").localeCompare(b.start_time||""))
-                        .map((ev,i) => (
-                        <div key={ev.id} className="tl-slot">
-                          <div className="tl-time">{ev.start_time || "—"}</div>
-                          <div>
-                            <div className={`tl-ev ev-${ev.block_type || "meet"}`}>
-                              <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start"}}>
-                                <div className="ev-title">{ev.calendar_event_title || ev.label}</div>
-                                <div style={{display:"flex",gap:5,alignItems:"center"}}>
-                                  {ev.meet_link && (
-                                    <a href={ev.meet_link} target="_blank" rel="noopener noreferrer"
-                                      style={{fontFamily:"DM Mono",fontSize:9,color:"var(--acc)",textDecoration:"none",padding:"1px 5px",border:"1px solid rgba(0,212,255,0.2)",borderRadius:3}}>
-                                      Join
-                                    </a>
-                                  )}
-                                  {ev.calendar_event_id && (
-                                    <button className="btn btn-icon btn-danger" style={{width:18,height:18,fontSize:9,opacity:0.5}} title="Delete event"
-                                      onClick={async () => {
-                                        if (!window.confirm("Delete this calendar event?")) return;
-                                        await supabase.functions.invoke("calendar-sync", { body: { action: "delete_event", eventId: ev.calendar_event_id } });
-                                        await loadCalendarEvents();
-                                      }}>✕</button>
-                                  )}
+                    ) : (
+                      <div className="tl-wrap">
+                        {[...calendarEvents].sort((a: any,b: any) => (a.start_time||"").localeCompare(b.start_time||"")).map((ev: any) => (
+                          <div key={ev.id} className="tl-slot">
+                            <div className="tl-time">{ev.start_time || "—"}</div>
+                            <div>
+                              <div className={`tl-ev ev-${ev.block_type || "meet"}`}>
+                                <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start"}}>
+                                  <div className="ev-title">{ev.calendar_event_title || ev.label}</div>
+                                  <div style={{display:"flex",gap:5,alignItems:"center"}}>
+                                    {ev.meet_link && <a href={ev.meet_link} target="_blank" rel="noopener noreferrer" style={{fontFamily:"DM Mono",fontSize:9,color:"var(--acc)",textDecoration:"none",padding:"1px 5px",border:"1px solid rgba(0,212,255,0.2)",borderRadius:3}}>Join</a>}
+                                    {ev.calendar_event_id && <button className="btn btn-icon btn-danger" style={{width:18,height:18,fontSize:9,opacity:0.5}} onClick={async () => { if (!window.confirm("Delete?")) return; await supabase.functions.invoke("calendar-sync",{body:{action:"delete_event",eventId:ev.calendar_event_id}}); loadCalendarEvents(); }}>✕</button>}
+                                  </div>
                                 </div>
-                              </div>
-                              <div className="ev-meta">
-                                <span>{ev.start_time} – {ev.end_time}</span>
-                                {ev.attendees?.length > 0 && <span className="dim" style={{fontSize:10}}>{ev.attendees.slice(0,2).join(", ")}{ev.attendees.length > 2 ? ` +${ev.attendees.length-2}` : ""}</span>}
+                                <div className="ev-meta">
+                                  <span>{ev.start_time} – {ev.end_time}</span>
+                                  {ev.attendees?.length > 0 && <span className="dim" style={{fontSize:10}}>{ev.attendees.slice(0,2).join(", ")}{ev.attendees.length > 2 ? ` +${ev.attendees.length-2}` : ""}</span>}
+                                </div>
                               </div>
                             </div>
                           </div>
-                        </div>
-                      ))}
-                      {/* Static protection blocks */}
-                      {calendarEvents.filter(e => e.block_type === "deep").length === 0 && (
-                        SCHEDULE.filter(s => s.type === "deep").map((ev,i) => (
-                          <div key={`static-${i}`} className="tl-slot" style={{opacity:0.5}}>
-                            <div className="tl-time">{ev.t}</div>
-                            <div><div className="tl-ev ev-deep">
-                              <div className="ev-title">{ev.title}</div>
-                              <div className="ev-meta"><span>{ev.desc}</span><span className="ev-ai-tag">🤖 {ev.ai}</span></div>
-                            </div></div>
-                          </div>
-                        ))
-                      )}
-                    </div>
+                        ))}
+                      </div>
+                    )}
                   </div>
                 </div>
                 <div className="col">
@@ -1075,22 +1026,22 @@ export default function PMDashboard() {
                     <div className="cb">
                       <div className="g2" style={{gap:8,marginBottom:14}}>
                         {[
-                          [calendarEvents.filter(e=>e.block_type==="meet").length.toString(),"Meetings"],
-                          [calendarEvents.filter(e=>e.block_type==="deep").length + "h","Deep Work"],
+                          [calendarEvents.filter((e: any)=>e.block_type==="meet").length.toString(),"Meetings"],
                           [calendarEvents.length.toString(),"Total Events"],
-                          [calendarEvents.filter(e=>e.meet_link).length.toString(),"Have Meet Link"],
+                          [calendarEvents.filter((e: any)=>e.meet_link).length.toString(),"With Meet Link"],
+                          [calendarEvents.filter((e: any)=>e.block_type==="deep").length.toString(),"Focus Blocks"],
                         ].map(([v,l]) => (
-                          <div key={l} style={{background:"var(--surf2)",border:"1px solid var(--bdr)",borderRadius:7,padding:"9px 11px"}}>
+                          <div key={l as string} style={{background:"var(--surf2)",border:"1px solid var(--bdr)",borderRadius:7,padding:"9px 11px"}}>
                             <div style={{fontFamily:"Syne",fontWeight:800,fontSize:20,color:"var(--acc)",lineHeight:1}}>{v}</div>
                             <div style={{fontSize:10,color:"var(--mut)",marginTop:3}}>{l}</div>
                           </div>
                         ))}
                       </div>
-                      <div className="section-lbl">Calendar Status</div>
-                      <div style={{fontSize:12,color:"var(--mut)"}}>
+                      <div className="section-lbl">Sync Status</div>
+                      <div style={{fontSize:11,color:"var(--mut)"}}>
                         {getIntegrationStatus("google_calendar").status === "connected"
-                          ? `Last synced: ${new Date(getIntegrationStatus("google_calendar").last_synced_at).toLocaleTimeString()}`
-                          : "Not synced. Click ⟳ to connect Google Calendar."}
+                          ? `✓ Last synced: ${new Date(getIntegrationStatus("google_calendar").last_synced_at).toLocaleTimeString()}`
+                          : isSyncing ? "Syncing Google Calendar..." : "Auto-sync will run on load"}
                       </div>
                     </div>
                   </div>
@@ -1124,9 +1075,7 @@ export default function PMDashboard() {
                     <div className="add-row">
                       <input className="input input-sm" style={{flex:1}} placeholder="Task title..." value={newTask.title} onChange={e => setNewTask(p => ({...p,title:e.target.value}))} onKeyDown={e => e.key==="Enter" && addTask()} autoFocus/>
                       <select className="input input-sm select" style={{width:80}} value={newTask.priority} onChange={e => setNewTask(p => ({...p,priority:e.target.value}))}>
-                        <option value="high">High</option>
-                        <option value="med">Med</option>
-                        <option value="low">Low</option>
+                        <option value="high">High</option><option value="med">Med</option><option value="low">Low</option>
                       </select>
                       <button className="btn btn-primary btn-sm" onClick={addTask}>Add</button>
                       <button className="btn btn-sm" onClick={() => setShowAddTask(false)}>✕</button>
@@ -1134,15 +1083,14 @@ export default function PMDashboard() {
                   )}
                   <div className="cb">
                     {todosLoading && <div className="loading"><div className="spin"/>Loading tasks...</div>}
-                    {!todosLoading && todos.length === 0 && <div className="empty">No tasks yet. Click + Add Task to get started.</div>}
+                    {!todosLoading && todos.length === 0 && <div className="empty">No tasks yet. Add one or sync Jira to import issues.</div>}
                     {!todosLoading && (
                       <div className="col" style={{gap:6}}>
-                        {todos.map(t => (
+                        {todos.map((t: any) => (
                           <div key={t.id} className="todo-item">
-                            <div className={`todo-chk${t.status==="done"?" dn":""}`} onClick={() => toggleTodo(t)}>
-                              {t.status==="done" ? "✓" : ""}
-                            </div>
+                            <div className={`todo-chk${t.status==="done"?" dn":""}`} onClick={() => toggleTodo(t)}>{t.status==="done" ? "✓" : ""}</div>
                             <span className={`todo-txt${t.status==="done"?" dn":""}`}>{t.title}</span>
+                            {t.jira_key && <a href={t.jira_url || "#"} target="_blank" rel="noopener noreferrer" style={{fontFamily:"DM Mono",fontSize:9,color:"var(--pur)",textDecoration:"none"}}>{t.jira_key}</a>}
                             {t.ai_note && <span className="ai-note">🤖 {t.ai_note}</span>}
                             <span className={`tag ${t.priority==="high"?"tag-red":t.priority==="med"?"tag-amb":"tag-grn"}`}>{t.priority}</span>
                             <button className="btn btn-icon btn-danger btn-sm" onClick={() => deleteTask(t.id)} title="Delete">✕</button>
@@ -1154,23 +1102,18 @@ export default function PMDashboard() {
                 </div>
                 <div className="col">
                   <div className="card">
-                    <div className="ch"><div className="ct">AI Suggestion</div></div>
-                    <div className="cb">
-                      <p style={{fontSize:12,color:"var(--mut)",lineHeight:1.7}}>
-                        Based on your calendar and project risks, top priority today is the <strong style={{color:"var(--txt)"}}>Q2 prioritization doc</strong> — exec review is Thursday and Mobile Onboarding is your highest-RICE item.
-                      </p>
-                    </div>
-                  </div>
-                  <div className="card">
                     <div className="ch"><div className="ct">Summary</div></div>
                     <div className="cb">
                       {[
-                        ["Total tasks", todos.length],
-                        ["Open",        todos.filter(t => t.status==="open").length],
-                        ["Done",        todos.filter(t => t.status==="done").length],
-                        ["High priority",todos.filter(t => t.priority==="high" && t.status==="open").length],
+                        ["Total",todos.length],
+                        ["Open",todos.filter((t: any)=>t.status==="open").length],
+                        ["Done",todos.filter((t: any)=>t.status==="done").length],
+                        ["High priority",todos.filter((t: any)=>t.priority==="high"&&t.status==="open").length],
+                        ["From Jira",todos.filter((t: any)=>t.source==="jira").length],
+                        ["From Meetings",todos.filter((t: any)=>t.source==="meeting-scribe").length],
+                        ["From Gmail",todos.filter((t: any)=>t.source==="gmail").length],
                       ].map(([l,v]) => (
-                        <div key={l} style={{display:"flex",justifyContent:"space-between",padding:"7px 0",borderBottom:"1px solid var(--bdr)",fontSize:12}}>
+                        <div key={l as string} style={{display:"flex",justifyContent:"space-between",padding:"7px 0",borderBottom:"1px solid var(--bdr)",fontSize:12}}>
                           <span style={{color:"var(--mut)"}}>{l}</span>
                           <span className="mono acc" style={{fontSize:11}}>{v}</span>
                         </div>
@@ -1187,21 +1130,29 @@ export default function PMDashboard() {
                 <div className="card">
                   <div className="ch">
                     <div className="ct">Active Projects · Q2 2025</div>
-                    <button className="btn btn-sm" onClick={openAddProj}>+ Add Project</button>
+                    <div style={{display:"flex",gap:6}}>
+                      <button className="btn btn-sm" onClick={() => syncJira()} disabled={syncingIntegration==="jira"}>
+                        {syncingIntegration==="jira" ? <span className="spin" style={{width:12,height:12,borderWidth:1.5,display:"inline-block"}}/> : "⟳ Sync Jira"}
+                      </button>
+                      <button className="btn btn-sm" onClick={openAddProj}>+ Add Project</button>
+                    </div>
                   </div>
                   <div className="th-row" style={{gridTemplateColumns:"1fr 1fr 90px 130px 60px 80px"}}>
                     <span>Project</span><span>Progress</span><span>Status</span><span>Owner</span><span>Due</span><span></span>
                   </div>
                   {projLoading && <div className="loading"><div className="spin"/>Loading...</div>}
-                  {!projLoading && projects.length === 0 && <div className="empty">No projects yet. Click + Add Project.</div>}
-                  {projects.map((p,i) => (
+                  {!projLoading && projects.length === 0 && <div className="empty">No projects yet.</div>}
+                  {projects.map((p: any) => (
                     <div key={p.id} className="tr" style={{gridTemplateColumns:"1fr 1fr 90px 130px 60px 80px"}}>
-                      <span style={{fontWeight:500,cursor:"pointer"}} onClick={() => openEditProj(p)}>{p.name}</span>
+                      <div>
+                        <span style={{fontWeight:500,cursor:"pointer"}} onClick={() => openEditProj(p)}>{p.name}</span>
+                        {p.jira_key && <span style={{fontFamily:"DM Mono",fontSize:9,color:"var(--pur)",marginLeft:6}}>{p.jira_key}</span>}
+                      </div>
                       <div className="bar-wrap">
-                        <div className="bar-track"><div className="bar-fill" style={{width:`${p.progress}%`,background:BAR_COLOR[p.status]}}/></div>
+                        <div className="bar-track"><div className="bar-fill" style={{width:`${p.progress}%`,background:BAR_COLOR[p.status as keyof typeof BAR_COLOR]}}/></div>
                         <span className="bar-pct">{p.progress}%</span>
                       </div>
-                      <span className={`tag ${STATUS_COLOR[p.status]}`}>{p.status?.replace("-"," ")}</span>
+                      <span className={`tag ${STATUS_COLOR[p.status as keyof typeof STATUS_COLOR]}`}>{p.status?.replace("-"," ")}</span>
                       <span className="dim" style={{fontSize:12}}>{p.owner}</span>
                       <span className="mono dim" style={{fontSize:11}}>{p.due_date ? new Date(p.due_date).toLocaleDateString("en-GB",{day:"numeric",month:"short"}) : "—"}</span>
                       <div style={{display:"flex",gap:4}}>
@@ -1211,13 +1162,13 @@ export default function PMDashboard() {
                     </div>
                   ))}
                 </div>
-                {projects.filter(p=>p.status==="delayed"||p.status==="at-risk").length > 0 && (
+                {projects.filter((p: any)=>p.status==="delayed"||p.status==="at-risk").length > 0 && (
                   <div className="infobox ib-red" style={{display:"flex",gap:12,alignItems:"flex-start"}}>
                     <span style={{fontSize:18}}>🔔</span>
                     <div>
                       <div style={{fontFamily:"Syne",fontWeight:700,fontSize:13,color:"var(--red)",marginBottom:3}}>Risk Agent Alert</div>
                       <div style={{fontSize:12,color:"var(--mut)",lineHeight:1.6}}>
-                        {projects.filter(p=>p.status==="delayed"||p.status==="at-risk").map(p=>p.name).join(", ")} {projects.filter(p=>p.status==="delayed").length > 0 ? "is delayed." : "is at risk."} Review and replan sprint priorities.
+                        {projects.filter((p: any)=>p.status==="delayed"||p.status==="at-risk").map((p: any)=>p.name).join(", ")} {projects.filter((p: any)=>p.status==="delayed").length > 0 ? "is delayed." : "is at risk."} Review and replan sprint priorities.
                       </div>
                     </div>
                   </div>
@@ -1232,39 +1183,34 @@ export default function PMDashboard() {
                   <div className="card">
                     <div className="ch">
                       <div className="ct">Meetings</div>
-                      <button className="btn btn-sm" onClick={() => setShowAddMeet(true)}>+ New Meeting</button>
+                      <div style={{display:"flex",gap:6}}>
+                        <button className="btn btn-sm" onClick={syncWebex} disabled={syncingIntegration==="webex"}>
+                          {syncingIntegration==="webex" ? <span className="spin" style={{width:12,height:12,borderWidth:1.5,display:"inline-block"}}/> : "⟳ Sync Webex"}
+                        </button>
+                        <button className="btn btn-sm" onClick={() => setShowAddMeet(true)}>+ New Meeting</button>
+                      </div>
                     </div>
                     <div className="cb0">
                       {meetLoading && <div className="loading"><div className="spin"/>Loading...</div>}
-                      {!meetLoading && meetings.length === 0 && <div className="empty">No meetings yet. Add one to get started.</div>}
-                      {meetings.map((m,i) => (
+                      {!meetLoading && meetings.length === 0 && <div className="empty">No meetings yet.</div>}
+                      {meetings.map((m: any,i: number) => (
                         <div key={m.id} style={{padding:"14px 16px",borderBottom:i<meetings.length-1?"1px solid var(--bdr)":"none"}}>
                           <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:8}}>
                             <span style={{fontFamily:"Syne",fontWeight:700,fontSize:13}}>{m.title}</span>
                             <div style={{display:"flex",gap:6,alignItems:"center"}}>
+                              {m.webex_meeting_id && <span className="tag tag-pur" style={{fontSize:9}}>Webex</span>}
                               <span className="mono dim" style={{fontSize:11}}>{m.meeting_time ? new Date(m.meeting_time).toLocaleDateString() : "—"}</span>
-                              <button className="btn btn-icon btn-danger btn-sm" onClick={() => deleteMeeting(m.id)} title="Delete">✕</button>
+                              <button className="btn btn-icon btn-danger btn-sm" onClick={() => deleteMeeting(m.id)}>✕</button>
                             </div>
                           </div>
-                          {m.summary && (
-                            <>
-                              <div className="section-lbl" style={{marginBottom:6}}>Summary</div>
-                              <p style={{fontSize:12,color:"var(--mut)",lineHeight:1.6,marginBottom:8}}>{m.summary}</p>
-                            </>
+                          {m.summary && <><div className="section-lbl" style={{marginBottom:6}}>Summary</div><p style={{fontSize:12,color:"var(--mut)",lineHeight:1.6,marginBottom:8}}>{m.summary}</p></>}
+                          {m.action_items?.length > 0 && (
+                            <><div className="section-lbl" style={{marginBottom:6}}>Action Items</div>
+                            <div style={{display:"flex",flexWrap:"wrap",gap:5}}>
+                              {m.action_items.map((a: any,j: number) => <span key={j} className="tag tag-blu">{typeof a === "string" ? a : a.text}</span>)}
+                            </div></>
                           )}
-                          {m.action_items && m.action_items.length > 0 && (
-                            <>
-                              <div className="section-lbl" style={{marginBottom:6}}>Action Items</div>
-                              <div style={{display:"flex",flexWrap:"wrap",gap:5}}>
-                                {m.action_items.map((a,j) => (
-                                  <span key={j} className="tag tag-blu">{typeof a === "string" ? a : a.text}</span>
-                                ))}
-                              </div>
-                            </>
-                          )}
-                          {!m.summary && !m.action_items && (
-                            <div style={{fontSize:12,color:"var(--mut)"}}>Transcript saved. Agent processing pending.</div>
-                          )}
+                          {!m.summary && !m.action_items && <div style={{fontSize:12,color:"var(--mut)"}}>Transcript saved. Agent processing pending.</div>}
                         </div>
                       ))}
                     </div>
@@ -1273,13 +1219,10 @@ export default function PMDashboard() {
                 <div className="card">
                   <div className="ch"><div className="ct">Agent Meeting Flow</div></div>
                   <div className="cb0">
-                    {[["Record","Meeting auto-recorded via Zoom/Webex integration"],["Transcribe","Whisper converts audio to text in real-time"],["Summarize","Claude generates structured summary in ~30 seconds"],["Extract","Decisions, action items, open questions pulled out"],["Assign","Each action item gets owner, due date, priority"],["Sync","Jira/Linear updated. Slack summary sent to team"]].map(([t,d],i,a) => (
+                    {[["Record","Meeting auto-recorded via Webex integration"],["Transcribe","Whisper converts audio to text"],["Summarize","Claude generates structured summary"],["Extract","Decisions, action items, open questions"],["Assign","Each item gets owner, due date, priority"],["Sync","Tasks created in dashboard automatically"]].map(([t,d],i,a) => (
                       <div key={i} style={{display:"flex",gap:12,padding:"12px 16px",borderBottom:i<a.length-1?"1px solid var(--bdr)":"none",alignItems:"flex-start"}}>
                         <div style={{width:20,height:20,borderRadius:"50%",background:"rgba(0,212,255,0.1)",border:"1px solid rgba(0,212,255,0.2)",display:"flex",alignItems:"center",justifyContent:"center",fontFamily:"DM Mono",fontSize:10,color:"var(--acc)",flexShrink:0}}>{i+1}</div>
-                        <div>
-                          <div style={{fontFamily:"Syne",fontWeight:700,fontSize:12,marginBottom:2}}>{t}</div>
-                          <div style={{fontSize:11,color:"var(--mut)"}}>{d}</div>
-                        </div>
+                        <div><div style={{fontFamily:"Syne",fontWeight:700,fontSize:12,marginBottom:2}}>{t}</div><div style={{fontSize:11,color:"var(--mut)"}}>{d}</div></div>
                       </div>
                     ))}
                   </div>
@@ -1294,9 +1237,7 @@ export default function PMDashboard() {
                   <div className="card">
                     <div className="ch"><div className="ct">Impact vs Effort Matrix</div></div>
                     <div className="cb">
-                      <div style={{display:"flex",justifyContent:"space-between",fontSize:9,fontFamily:"DM Mono",color:"var(--mut)",marginBottom:6}}>
-                        <span>← Low Effort</span><span>High Effort →</span>
-                      </div>
+                      <div style={{display:"flex",justifyContent:"space-between",fontSize:9,fontFamily:"DM Mono",color:"var(--mut)",marginBottom:6}}><span>← Low Effort</span><span>High Effort →</span></div>
                       <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gridTemplateRows:"1fr 1fr",gap:8,height:240}}>
                         {[
                           {c:"rgba(16,185,129,0.08)",bc:"rgba(16,185,129,0.2)",label:"🚀 Quick Wins",sub:"High impact, low effort",items:["Mobile Onboarding","Search Improvement"]},
@@ -1307,9 +1248,7 @@ export default function PMDashboard() {
                           <div key={i} style={{background:q.c,border:`1px solid ${q.bc}`,borderRadius:8,padding:12,display:"flex",flexDirection:"column",gap:4}}>
                             <div style={{fontFamily:"Syne",fontSize:11,fontWeight:700}}>{q.label}</div>
                             <div style={{fontSize:10,color:"var(--mut)"}}>{q.sub}</div>
-                            <div style={{marginTop:"auto"}}>
-                              {q.items.map((it,j) => <div key={j} style={{fontSize:10,color:"var(--mut)",display:"flex",gap:4}}><span style={{opacity:0.4}}>—</span>{it}</div>)}
-                            </div>
+                            <div style={{marginTop:"auto"}}>{q.items.map((it,j) => <div key={j} style={{fontSize:10,color:"var(--mut)",display:"flex",gap:4}}><span style={{opacity:0.4}}>—</span>{it}</div>)}</div>
                           </div>
                         ))}
                       </div>
@@ -1318,23 +1257,20 @@ export default function PMDashboard() {
                   <div className="card">
                     <div className="ch">
                       <div className="ct">RICE Score · AI-Calculated</div>
-                      <button className="btn btn-sm" onClick={async () => {
-                        const items = projects.map(p => ({ title: p.name, description: `Status: ${p.status}, Progress: ${p.progress}%` }));
-                        const { data } = await supabase.functions.invoke("prioritization", { body: { items } });
-                        await loadRiceScores();
-                        alert(data?.summary || "Scoring complete.");
-                      }}>⚡ Score Backlog</button>
+                      <button className="btn btn-sm" onClick={runPrioritization} disabled={agentRunning==="prioritization"}>
+                        {agentRunning==="prioritization" ? <span style={{display:"flex",alignItems:"center",gap:6}}><span className="spin" style={{width:12,height:12,borderWidth:1.5}}/>Scoring...</span> : "⚡ Score Backlog"}
+                      </button>
                     </div>
                     <div className="th-row" style={{gridTemplateColumns:"1fr 32px 32px 32px 32px 80px"}}>
                       <span>Feature</span><span>R</span><span>I</span><span>C</span><span>E</span><span>Score</span>
                     </div>
-                    {(riceScores.length > 0 ? riceScores : RICE_STATIC.map(r => ({...r, rice_score: r.score, title: r.name}))).sort((a,b) => b.rice_score-a.rice_score).map((it,i) => (
+                    {(riceScores.length > 0 ? riceScores : RICE_STATIC.map(r => ({...r, rice_score:r.score, title:r.name}))).sort((a: any,b: any) => b.rice_score-a.rice_score).map((it: any,i: number) => (
                       <div key={i} className="tr" style={{gridTemplateColumns:"1fr 32px 32px 32px 32px 80px"}}>
                         <div>
                           <span style={{fontWeight:500,fontSize:12}}>{it.title || it.name}</span>
                           {it.reasoning && <div style={{fontSize:10,color:"var(--mut)",marginTop:2}}>{it.reasoning}</div>}
                         </div>
-                        {[it.reach ?? it.r, it.impact ?? it.i, it.confidence ?? it.c, it.effort ?? it.e].map((v,j) => <span key={j} className="mono dim" style={{fontSize:11}}>{v}</span>)}
+                        {[it.reach??it.r, it.impact??it.i, it.confidence??it.c, it.effort??it.e].map((v: any,j: number) => <span key={j} className="mono dim" style={{fontSize:11}}>{v}</span>)}
                         <div className="bar-wrap">
                           <div className="bar-track"><div className="bar-fill" style={{width:`${(it.rice_score/130)*100}%`,background:`hsl(${it.rice_score+80},60%,58%)`}}/></div>
                           <span className="mono acc" style={{fontSize:11,width:22,textAlign:"right"}}>{Math.round(it.rice_score)}</span>
@@ -1342,7 +1278,7 @@ export default function PMDashboard() {
                       </div>
                     ))}
                     <div style={{margin:"12px 16px"}} className="infobox ib-blue">
-                      🤖 <strong className="acc">Agent insight:</strong> <span style={{fontSize:11,color:"var(--mut)"}}>{riceScores.length > 0 ? `${riceScores[0]?.title} is your highest RICE score item. Run Score Backlog to refresh.` : "Click Score Backlog to run AI-powered RICE analysis on your projects."}</span>
+                      🤖 <strong className="acc">Agent insight:</strong> <span style={{fontSize:11,color:"var(--mut)"}}>{riceScores.length > 0 ? `${riceScores[0]?.title} is your highest RICE score. Last scored: ${riceScores[0]?.scored_at ? new Date(riceScores[0].scored_at).toLocaleDateString() : "today"}.` : "Click Score Backlog to run AI-powered RICE analysis on your projects."}</span>
                     </div>
                   </div>
                 </div>
@@ -1360,9 +1296,9 @@ export default function PMDashboard() {
                         col === null
                           ? <div key={i} style={{background:"var(--bdr)",borderRadius:1}}/>
                           : <div key={i}>
-                              <div style={{fontFamily:"Syne",fontWeight:700,fontSize:12,color:col.col,marginBottom:8}}>{col.label}</div>
+                              <div style={{fontFamily:"Syne",fontWeight:700,fontSize:12,color:(col as any).col,marginBottom:8}}>{(col as any).label}</div>
                               <div className="col" style={{gap:5}}>
-                                {col.items.map((it,j) => <div key={j} style={{fontSize:11,padding:"7px 9px",background:col.bg,border:`1px solid ${col.bdr}`,borderRadius:7}}>{it}</div>)}
+                                {(col as any).items.map((it: string,j: number) => <div key={j} style={{fontSize:11,padding:"7px 9px",background:(col as any).bg,border:`1px solid ${(col as any).bdr}`,borderRadius:7}}>{it}</div>)}
                               </div>
                             </div>
                       )}
@@ -1377,24 +1313,19 @@ export default function PMDashboard() {
               <div className="col">
                 <div className="g4">
                   {[
-                    {v:`${okrs.length > 0 ? Math.round(okrs.reduce((s,o)=>s+o.overall_pct,0)/okrs.length) : 0}%`,l:"Overall Q2 Progress",c:"var(--acc)"},
-                    {v:`${okrs.flatMap(o=>o.krs||[]).filter(kr=>kr.status==="on-track").length}/${okrs.flatMap(o=>o.krs||[]).length}`,l:"KRs On Track",c:"var(--grn)"},
-                    {v:`${okrs.flatMap(o=>o.krs||[]).filter(kr=>kr.status==="at-risk").length}/${okrs.flatMap(o=>o.krs||[]).length}`,l:"KRs At Risk",c:"var(--amb)"},
+                    {v:`${okrs.length > 0 ? Math.round(okrs.reduce((s: number,o: any)=>s+o.overall_pct,0)/okrs.length) : 0}%`,l:"Overall Q2 Progress",c:"var(--acc)"},
+                    {v:`${okrs.flatMap((o: any)=>o.krs||[]).filter((kr: any)=>kr.status==="on-track").length}/${okrs.flatMap((o: any)=>o.krs||[]).length}`,l:"KRs On Track",c:"var(--grn)"},
+                    {v:`${okrs.flatMap((o: any)=>o.krs||[]).filter((kr: any)=>kr.status==="at-risk").length}/${okrs.flatMap((o: any)=>o.krs||[]).length}`,l:"KRs At Risk",c:"var(--amb)"},
                     {v:"10",l:"Weeks Remaining",c:"var(--mut)"},
-                  ].map(({v,l,c}) => (
-                    <div key={l} className="kpi"><div className="kpi-v" style={{color:c}}>{v}</div><div className="kpi-l">{l}</div></div>
-                  ))}
+                  ].map(({v,l,c}) => <div key={l} className="kpi"><div className="kpi-v" style={{color:c}}>{v}</div><div className="kpi-l">{l}</div></div>)}
                 </div>
                 {okrsLoading && <div className="loading"><div className="spin"/>Loading OKRs...</div>}
                 <div className="col">
-                  {okrs.map((obj,oi) => (
+                  {okrs.map((obj: any,oi: number) => (
                     <div key={obj.id} className="okr-blk">
                       <div className="okr-hd" onClick={() => toggleOkr(oi)}>
                         <div className="okr-ico" style={{background:`${obj.color}18`,border:`1px solid ${obj.color}30`}}>{obj.icon}</div>
-                        <div style={{flex:1}}>
-                          <div className="okr-obj">{obj.objective}</div>
-                          <div className="okr-own">{obj.owner}</div>
-                        </div>
+                        <div style={{flex:1}}><div className="okr-obj">{obj.objective}</div><div className="okr-own">{obj.owner}</div></div>
                         <div style={{textAlign:"right",marginLeft:12}}>
                           <div className="okr-pct" style={{color:obj.color}}>{obj.overall_pct}%</div>
                           <div className="okr-plbl">progress</div>
@@ -1402,7 +1333,7 @@ export default function PMDashboard() {
                         <span style={{marginLeft:12,fontSize:14,color:"var(--mut)"}}>{expandedOkr.includes(oi)?"▾":"▸"}</span>
                       </div>
                       <div className="okr-bar"><div className="okr-bf" style={{width:`${obj.overall_pct}%`,background:obj.color}}/></div>
-                      {expandedOkr.includes(oi) && (obj.krs||[]).map(kr => {
+                      {expandedOkr.includes(oi) && (obj.krs||[]).map((kr: any) => {
                         const pct = kr.invert
                           ? Math.max(0,Math.min(100,Math.round(((kr.target_val*2-kr.current_val)/(kr.target_val*2))*100)))
                           : Math.max(0,Math.min(100,Math.round((kr.current_val/kr.target_val)*100)));
@@ -1410,20 +1341,16 @@ export default function PMDashboard() {
                           <div key={kr.id} className="kr-row">
                             <div className="kr-name">{kr.name}</div>
                             <div className="kr-bars">
-                              <div className="kr-bar"><div className="kr-fill" style={{width:`${pct}%`,background:KR_COLOR[kr.status]}}/></div>
+                              <div className="kr-bar"><div className="kr-fill" style={{width:`${pct}%`,background:KR_COLOR[kr.status as keyof typeof KR_COLOR]}}/></div>
                               <div className="kr-nums">
                                 <span>Current: <strong style={{color:"var(--txt)"}}>{kr.current_val}{kr.unit}</strong></span>
                                 <span>Target: {kr.target_val}{kr.unit}</span>
                               </div>
                             </div>
                             <div className="kr-edit-wrap">
-                              <span className={`tag ${KR_TAG[kr.status]}`}>{kr.status?.replace("-"," ")}</span>
+                              <span className={`tag ${KR_TAG[kr.status as keyof typeof KR_TAG]}`}>{kr.status?.replace("-"," ")}</span>
                               {editingKR === kr.id ? (
-                                <>
-                                  <input className="input input-sm kr-edit-input" value={krEditVal} onChange={e => setKrEditVal(e.target.value)} onKeyDown={e => e.key==="Enter" && saveKR(kr)} autoFocus/>
-                                  <button className="btn btn-primary btn-sm" onClick={() => saveKR(kr)}>✓</button>
-                                  <button className="btn btn-sm" onClick={() => setEditingKR(null)}>✕</button>
-                                </>
+                                <><input className="input input-sm kr-edit-input" value={krEditVal} onChange={e => setKrEditVal(e.target.value)} onKeyDown={e => e.key==="Enter" && saveKR(kr)} autoFocus/><button className="btn btn-primary btn-sm" onClick={() => saveKR(kr)}>✓</button><button className="btn btn-sm" onClick={() => setEditingKR(null)}>✕</button></>
                               ) : (
                                 <button className="btn btn-sm" onClick={() => startEditKR(kr)} title="Update current value">✎</button>
                               )}
@@ -1434,11 +1361,9 @@ export default function PMDashboard() {
                     </div>
                   ))}
                 </div>
-                {okrs.length === 0 && !okrsLoading && (
-                  <div className="empty">No OKRs found. Add them via Supabase Table Editor or the seed SQL.</div>
-                )}
+                {okrs.length === 0 && !okrsLoading && <div className="empty">No OKRs found. Run the seed SQL to add sample data.</div>}
                 <div className="infobox ib-blue">
-                  🤖 <strong className="acc">Weekly AI Insight:</strong> At current velocity, D7 activation will reach ~46% by end of Q2 — 4pp short of target. Shipping the onboarding flow by Apr 30 is critical. B2B Dashboard is the highest delivery risk this quarter.
+                  🤖 <strong className="acc">Weekly AI Insight:</strong> At current velocity, D7 activation will reach ~46% by end of Q2 — 4pp short of target. Shipping the onboarding flow by Apr 30 is critical.
                 </div>
               </div>
             )}
@@ -1452,10 +1377,8 @@ export default function PMDashboard() {
                     <button className="btn btn-sm" onClick={() => setAgentError(null)}>✕</button>
                   </div>
                 )}
-
                 <div className="ga">
-
-                  {/* ── Meeting Scribe ── */}
+                  {/* Meeting Scribe */}
                   <div className="agc">
                     <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:10}}>
                       <div className="ag-icon ic-pur">🎙️</div>
@@ -1463,19 +1386,12 @@ export default function PMDashboard() {
                     </div>
                     <div className="ag-name">Meeting Scribe Agent</div>
                     <div className="ag-trig">After every meeting ends</div>
-                    <div className="ag-desc">Transcribes meetings, extracts decisions and action items, auto-creates tasks in your tracker. Saves structured summary to the Meetings tab.</div>
+                    <div className="ag-desc">Transcribes meetings, extracts decisions and action items, auto-creates tasks. Triggered by Webex webhook or manual transcript paste.</div>
                     <div className="chips" style={{marginBottom:12}}>{["Webex transcript","Calendar context","Jira API"].map((inp,j) => <span key={j} className="chip">{inp}</span>)}</div>
-                    <button className="btn btn-primary" style={{width:"100%"}} onClick={() => setPage("meetings")}>
-                      ▶ Go to Meetings tab to run
-                    </button>
-                    {meetings.length > 0 && (
-                      <div style={{marginTop:8,fontSize:11,color:"var(--mut)",fontFamily:"DM Mono"}}>
-                        Last run: {meetings[0]?.processed_at ? new Date(meetings[0].processed_at).toLocaleDateString() : "pending"}
-                      </div>
-                    )}
+                    <button className="btn btn-primary" style={{width:"100%"}} onClick={() => setPage("meetings")}>▶ Go to Meetings tab</button>
+                    {meetings.length > 0 && <div style={{marginTop:8,fontSize:11,color:"var(--mut)",fontFamily:"DM Mono"}}>Last run: {meetings[0]?.processed_at ? new Date(meetings[0].processed_at).toLocaleDateString() : "pending"}</div>}
                   </div>
-
-                  {/* ── Prioritization ── */}
+                  {/* Prioritization */}
                   <div className="agc">
                     <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:10}}>
                       <div className="ag-icon ic-blu">🧠</div>
@@ -1483,21 +1399,13 @@ export default function PMDashboard() {
                     </div>
                     <div className="ag-name">Prioritization Agent</div>
                     <div className="ag-trig">Every sprint planning session</div>
-                    <div className="ag-desc">Scores your entire project backlog using the RICE framework, cross-references Q2 OKRs, and surfaces the top items to work on with one-sentence reasoning for each.</div>
+                    <div className="ag-desc">Scores your entire project backlog using RICE framework, cross-references Q2 OKRs, and surfaces the top items to work on with one-sentence reasoning.</div>
                     <div className="chips" style={{marginBottom:12}}>{["Projects backlog","OKR alignment","Capacity data"].map((inp,j) => <span key={j} className="chip">{inp}</span>)}</div>
-                    <button
-                      className="btn btn-primary"
-                      style={{width:"100%"}}
-                      disabled={agentRunning === "prioritization"}
-                      onClick={runPrioritization}
-                    >
-                      {agentRunning === "prioritization"
-                        ? <span style={{display:"flex",alignItems:"center",justifyContent:"center",gap:8}}><span className="spin" style={{width:13,height:13,borderWidth:1.5}}/>Scoring backlog...</span>
-                        : `⚡ Score Backlog (${projects.length} projects)`}
+                    <button className="btn btn-primary" style={{width:"100%"}} disabled={agentRunning==="prioritization"} onClick={runPrioritization}>
+                      {agentRunning==="prioritization" ? <span style={{display:"flex",alignItems:"center",justifyContent:"center",gap:8}}><span className="spin" style={{width:13,height:13,borderWidth:1.5}}/>Scoring...</span> : `⚡ Score Backlog (${projects.length} projects)`}
                     </button>
                   </div>
-
-                  {/* ── Weekly Digest ── */}
+                  {/* Weekly Digest */}
                   <div className="agc">
                     <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:10}}>
                       <div className="ag-icon ic-grn">📊</div>
@@ -1505,21 +1413,13 @@ export default function PMDashboard() {
                     </div>
                     <div className="ag-name">Weekly Digest Agent</div>
                     <div className="ag-trig">Every Monday 8am</div>
-                    <div className="ag-desc">Aggregates live project data, open tasks, and recent meeting summaries into an executive-ready Monday morning briefing with top 3 priorities and decisions needed.</div>
+                    <div className="ag-desc">Aggregates live project data, open tasks, and recent meeting summaries into an executive-ready Monday briefing with top 3 priorities and decisions needed.</div>
                     <div className="chips" style={{marginBottom:12}}>{["Projects","Open tasks","Recent meetings"].map((inp,j) => <span key={j} className="chip">{inp}</span>)}</div>
-                    <button
-                      className="btn btn-primary"
-                      style={{width:"100%"}}
-                      disabled={agentRunning === "weekly-digest"}
-                      onClick={runWeeklyDigest}
-                    >
-                      {agentRunning === "weekly-digest"
-                        ? <span style={{display:"flex",alignItems:"center",justifyContent:"center",gap:8}}><span className="spin" style={{width:13,height:13,borderWidth:1.5}}/>Generating digest...</span>
-                        : "⚡ Generate Weekly Digest"}
+                    <button className="btn btn-primary" style={{width:"100%"}} disabled={agentRunning==="weekly-digest"} onClick={runWeeklyDigest}>
+                      {agentRunning==="weekly-digest" ? <span style={{display:"flex",alignItems:"center",justifyContent:"center",gap:8}}><span className="spin" style={{width:13,height:13,borderWidth:1.5}}/>Generating...</span> : "⚡ Generate Weekly Digest"}
                     </button>
                   </div>
-
-                  {/* ── Risk Monitor ── */}
+                  {/* Risk Monitor */}
                   <div className="agc">
                     <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:10}}>
                       <div className="ag-icon ic-amb">🔔</div>
@@ -1527,21 +1427,13 @@ export default function PMDashboard() {
                     </div>
                     <div className="ag-name">Risk & Blocker Agent</div>
                     <div className="ag-trig">Continuous monitoring</div>
-                    <div className="ag-desc">Scans all active projects and overdue tasks for risk signals. Flags at-risk items, auto-updates project status, and creates high-priority alert tasks for immediate blockers.</div>
+                    <div className="ag-desc">Scans all active projects and overdue tasks for risk signals. Flags at-risk items, auto-updates project status, creates high-priority alert tasks for blockers.</div>
                     <div className="chips" style={{marginBottom:12}}>{["Projects","Overdue tasks","Sprint velocity"].map((inp,j) => <span key={j} className="chip">{inp}</span>)}</div>
-                    <button
-                      className="btn btn-primary"
-                      style={{width:"100%"}}
-                      disabled={agentRunning === "risk-monitor"}
-                      onClick={runRiskMonitor}
-                    >
-                      {agentRunning === "risk-monitor"
-                        ? <span style={{display:"flex",alignItems:"center",justifyContent:"center",gap:8}}><span className="spin" style={{width:13,height:13,borderWidth:1.5}}/>Scanning projects...</span>
-                        : "⚡ Run Risk Scan"}
+                    <button className="btn btn-primary" style={{width:"100%"}} disabled={agentRunning==="risk-monitor"} onClick={runRiskMonitor}>
+                      {agentRunning==="risk-monitor" ? <span style={{display:"flex",alignItems:"center",justifyContent:"center",gap:8}}><span className="spin" style={{width:13,height:13,borderWidth:1.5}}/>Scanning...</span> : "⚡ Run Risk Scan"}
                     </button>
                   </div>
-
-                  {/* ── Stakeholder Update ── */}
+                  {/* Stakeholder Update */}
                   <div className="agc">
                     <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:10}}>
                       <div className="ag-icon ic-blu">📝</div>
@@ -1552,29 +1444,18 @@ export default function PMDashboard() {
                     <div className="ag-desc">Pulls live project status, completed tasks, and high-priority open items to write a polished stakeholder update email tailored to the recipient's level of detail.</div>
                     <div className="chips" style={{marginBottom:12}}>{["Projects","Completed tasks","High priority items"].map((inp,j) => <span key={j} className="chip">{inp}</span>)}</div>
                     {!updateInput.show ? (
-                      <button
-                        className="btn btn-primary"
-                        style={{width:"100%"}}
-                        disabled={agentRunning === "stakeholder-update"}
-                        onClick={() => setUpdateInput(p => ({...p, show: true}))}
-                      >
-                        {agentRunning === "stakeholder-update"
-                          ? <span style={{display:"flex",alignItems:"center",justifyContent:"center",gap:8}}><span className="spin" style={{width:13,height:13,borderWidth:1.5}}/>Drafting email...</span>
-                          : "⚡ Draft Stakeholder Update"}
+                      <button className="btn btn-primary" style={{width:"100%"}} disabled={agentRunning==="stakeholder-update"} onClick={() => setUpdateInput(p => ({...p,show:true}))}>
+                        {agentRunning==="stakeholder-update" ? <span style={{display:"flex",alignItems:"center",justifyContent:"center",gap:8}}><span className="spin" style={{width:13,height:13,borderWidth:1.5}}/>Drafting...</span> : "⚡ Draft Stakeholder Update"}
                       </button>
                     ) : (
                       <div style={{display:"flex",flexDirection:"column",gap:6}}>
                         <input className="input input-sm" placeholder="Recipient name (optional)" value={updateInput.name} onChange={e => setUpdateInput(p=>({...p,name:e.target.value}))}/>
                         <input className="input input-sm" placeholder="Recipient role (optional)" value={updateInput.role} onChange={e => setUpdateInput(p=>({...p,role:e.target.value}))}/>
-                        <div style={{display:"flex",gap:6}}>
-                          <button className="btn btn-primary" style={{flex:1}} onClick={() => runStakeholderUpdate(updateInput.name, updateInput.role)}>Generate</button>
-                          <button className="btn" onClick={() => setUpdateInput({show:false,name:"",role:""})}>Cancel</button>
-                        </div>
+                        <div style={{display:"flex",gap:6}}><button className="btn btn-primary" style={{flex:1}} onClick={() => runStakeholderUpdate(updateInput.name,updateInput.role)}>Generate</button><button className="btn" onClick={() => setUpdateInput({show:false,name:"",role:""})}>Cancel</button></div>
                       </div>
                     )}
                   </div>
-
-                  {/* ── PRD Agent ── */}
+                  {/* PRD Agent */}
                   <div className="agc">
                     <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:10}}>
                       <div className="ag-icon ic-pur">📄</div>
@@ -1582,21 +1463,16 @@ export default function PMDashboard() {
                     </div>
                     <div className="ag-name">PRD Agent</div>
                     <div className="ag-trig">On demand — focus group data</div>
-                    <div className="ag-desc">Takes raw focus group transcripts and survey exports, clusters themes by frequency, extracts pain points, and writes a structured PRD with user stories, acceptance criteria, and success metrics.</div>
+                    <div className="ag-desc">Takes raw focus group transcripts and survey exports, clusters themes by frequency, extracts pain points, and writes a structured PRD with user stories and success metrics.</div>
                     <div className="chips" style={{marginBottom:12}}>{["Transcripts","Survey exports","Feedback CSVs"].map((inp,j) => <span key={j} className="chip">{inp}</span>)}</div>
-                    <button className="btn btn-primary" style={{width:"100%"}} onClick={() => setPage("prd")}>
-                      ▶ Go to PRD Agent tab
-                    </button>
+                    <button className="btn btn-primary" style={{width:"100%"}} onClick={() => setPage("prd")}>▶ Go to PRD Agent tab</button>
                   </div>
-
                 </div>
-
-                {/* Tech Stack */}
                 <div className="card">
-                  <div className="ch"><div className="ct">Recommended Tech Stack</div></div>
+                  <div className="ch"><div className="ct">Tech Stack</div></div>
                   <div className="cb">
                     <div className="g3" style={{gap:8}}>
-                      {[["LLM","Claude API (Sonnet)"],["Orchestration","Supabase Edge Functions"],["Database","Supabase Postgres"],["Auth","Supabase Auth"],["Storage","Supabase Storage"],["Realtime","Supabase Realtime"]].map(([l,v]) => (
+                      {[["LLM","Claude API (Sonnet)"],["Orchestration","Supabase Edge Functions"],["Database","Supabase Postgres"],["Auth","Supabase Auth"],["Realtime","Supabase Realtime"],["Integrations","Jira · Webex · Gmail · GCal"]].map(([l,v]) => (
                         <div key={l} style={{background:"var(--surf2)",border:"1px solid var(--bdr)",borderRadius:8,padding:"10px 12px"}}>
                           <div className="section-lbl" style={{marginBottom:3}}>{l}</div>
                           <div className="acc" style={{fontWeight:500,fontSize:12}}>{v}</div>
@@ -1617,49 +1493,26 @@ export default function PMDashboard() {
                     <div className="cb">
                       {prdStatus !== "done" ? (
                         <>
-                          <div className="upload-z" style={{marginBottom:12}} onClick={() => document.getElementById('pf').click()}>
+                          <div className="upload-z" style={{marginBottom:12}} onClick={() => document.getElementById('pf')?.click()}>
                             <div style={{fontSize:28,marginBottom:8}}>📎</div>
                             <div style={{fontFamily:"Syne",fontWeight:700,fontSize:13,marginBottom:3}}>Drop files or click to upload</div>
                             <div style={{fontSize:12,color:"var(--mut)"}}>Supports .txt .csv .docx .pdf</div>
-                            <input id="pf" type="file" style={{display:"none"}} onChange={async e => {
-                              const file = e.target.files[0];
-                              if (file) { const text = await file.text(); setPrdInput(text); }
-                            }}/>
+                            <input id="pf" type="file" style={{display:"none"}} onChange={async (e: any) => { const file = e.target.files[0]; if (file) { const text = await file.text(); setPrdInput(text); } }}/>
                           </div>
                           <div className="section-lbl">Or paste raw text</div>
-                          <textarea className="input" value={prdInput} onChange={e => setPrdInput(e.target.value)}
-                            placeholder={`Paste focus group transcript or survey responses...\n\nExample:\n"Participant 3: Onboarding took 45 minutes..."\n"Survey: 18 of 32 said onboarding was #1 pain point..."`}
-                            style={{minHeight:180,resize:"vertical",marginBottom:10}}/>
-                          <button onClick={runPRD} disabled={!prdInput.trim() || prdStatus==="processing"}
-                            style={{width:"100%",padding:"10px 0",background:prdInput.trim()?"var(--acc)":"var(--bdr)",color:prdInput.trim()?"#000":"var(--mut)",border:"none",borderRadius:8,fontFamily:"Syne",fontWeight:700,fontSize:13,cursor:prdInput.trim()?"pointer":"default",transition:"all 0.2s"}}>
+                          <textarea className="input" value={prdInput} onChange={e => setPrdInput(e.target.value)} placeholder={`Paste focus group transcript or survey responses...\n\nExample:\n"Participant 3: Onboarding took 45 minutes..."\n"Survey: 18 of 32 said onboarding was #1 pain point..."`} style={{minHeight:180,resize:"vertical" as any,marginBottom:10}}/>
+                          <button onClick={runPRD} disabled={!prdInput.trim()||prdStatus==="processing"} style={{width:"100%",padding:"10px 0",background:prdInput.trim()?"var(--acc)":"var(--bdr)",color:prdInput.trim()?"#000":"var(--mut)",border:"none",borderRadius:8,fontFamily:"Syne",fontWeight:700,fontSize:13,cursor:prdInput.trim()?"pointer":"default",transition:"all 0.2s"}}>
                             {prdStatus==="processing" ? "Analysing..." : "⚡ Generate PRD"}
                           </button>
-                          {prdStatus==="processing" && (
-                            <div style={{display:"flex",alignItems:"center",gap:10,marginTop:12,fontSize:12,color:"var(--mut)"}}>
-                              <div className="spin"/>Clustering themes, extracting pain points, writing PRD...
-                            </div>
-                          )}
+                          {prdStatus==="processing" && <div style={{display:"flex",alignItems:"center",gap:10,marginTop:12,fontSize:12,color:"var(--mut)"}}><div className="spin"/>Clustering themes, extracting pain points, writing PRD...</div>}
                         </>
                       ) : (
                         <div>
                           <div style={{fontSize:12,color:"var(--grn)",marginBottom:10,fontFamily:"DM Mono"}}>✓ Processed {prdInput.split(' ').length} words</div>
                           <div style={{display:"flex",flexWrap:"wrap",gap:5,marginBottom:14}}>
-                            {prdResult.themes.map((t,i) => <span key={i} className="tag tag-blu">{t.lbl} <span style={{opacity:0.6}}>×{t.n}</span></span>)}
+                            {prdResult.themes.map((t: any,i: number) => <span key={i} className="tag tag-blu">{t.lbl} <span style={{opacity:0.6}}>×{t.n}</span></span>)}
                           </div>
-                          <div className="section-lbl" style={{marginBottom:8}}>Theme Frequency</div>
-                          {prdResult.themes.map((t,i) => (
-                            <div key={i} style={{display:"flex",alignItems:"center",gap:10,padding:"5px 0",borderBottom:i<prdResult.themes.length-1?"1px solid var(--bdr)":"none"}}>
-                              <span style={{fontSize:12,flex:1}}>{t.lbl}</span>
-                              <div style={{width:70,height:3,background:"var(--bdr2)",borderRadius:2,overflow:"hidden"}}>
-                                <div style={{height:"100%",width:`${(t.n/18)*100}%`,background:"var(--acc)",borderRadius:2}}/>
-                              </div>
-                              <span className="mono dim" style={{fontSize:11,width:18,textAlign:"right"}}>{t.n}</span>
-                            </div>
-                          ))}
-                          <button onClick={() => { setPrdStatus("idle"); setPrdInput(""); setPrdResult(null); }}
-                            style={{marginTop:12,fontSize:11,fontFamily:"DM Mono",padding:"4px 10px",border:"1px solid var(--bdr)",borderRadius:6,background:"transparent",color:"var(--mut)",cursor:"pointer"}}>
-                            ↺ New input
-                          </button>
+                          <button onClick={() => { setPrdStatus("idle"); setPrdInput(""); setPrdResult(null); }} style={{fontSize:11,fontFamily:"DM Mono",padding:"4px 10px",border:"1px solid var(--bdr)",borderRadius:6,background:"transparent",color:"var(--mut)",cursor:"pointer"}}>↺ New input</button>
                         </div>
                       )}
                     </div>
@@ -1683,44 +1536,23 @@ export default function PMDashboard() {
                   {prdResult && (
                     <div className="card">
                       <div className="ch" style={{background:"rgba(255,255,255,0.015)"}}>
-                        <div>
-                          <div style={{fontFamily:"Syne",fontWeight:800,fontSize:14}}>Product Requirements Document</div>
-                          <div className="mono dim" style={{fontSize:10}}>AI-generated · {new Date().toLocaleDateString()} · Review before sharing</div>
-                        </div>
+                        <div><div style={{fontFamily:"Syne",fontWeight:800,fontSize:14}}>Product Requirements Document</div><div className="mono dim" style={{fontSize:10}}>AI-generated · {new Date().toLocaleDateString()} · Review before sharing</div></div>
                         <span className="tag tag-grn">Draft</span>
                       </div>
                       <div>
                         <div className="prd-sec"><div className="prd-lbl">Problem Statement</div><p style={{fontSize:12,lineHeight:1.7}}>{prdResult.problem}</p></div>
-                        <div className="prd-sec"><div className="prd-lbl">User Stories</div>{prdResult.stories.map((s,i) => <div key={i} className="story">{s}</div>)}</div>
-                        <div className="prd-sec"><div className="prd-lbl">Acceptance Criteria</div>
-                          {prdResult.criteria.map((c,i) => (
-                            <div key={i} style={{display:"flex",gap:7,fontSize:12,marginBottom:4,alignItems:"flex-start"}}>
-                              <span style={{color:"var(--grn)",flexShrink:0,marginTop:1}}>✓</span>{c}
-                            </div>
-                          ))}
-                        </div>
-                        <div className="prd-sec"><div className="prd-lbl">Success Metrics</div>
-                          {prdResult.metrics.map((m,i) => (
-                            <div key={i} style={{fontSize:12,padding:"3px 0",borderBottom:i<prdResult.metrics.length-1?"1px solid rgba(28,43,64,0.3)":"none",display:"flex",gap:7,alignItems:"center"}}>
-                              <div style={{width:3,height:3,borderRadius:"50%",background:"var(--acc)",flexShrink:0}}/>{m}
-                            </div>
-                          ))}
-                        </div>
-                        <div className="prd-sec"><div className="prd-lbl">Open Questions</div>
-                          {prdResult.questions.map((q,i) => (
-                            <div key={i} style={{fontSize:12,padding:"3px 0",color:"var(--amb)",display:"flex",gap:6}}>
-                              <span style={{flexShrink:0}}>?</span>{q}
-                            </div>
-                          ))}
-                        </div>
+                        <div className="prd-sec"><div className="prd-lbl">User Stories</div>{prdResult.stories.map((s: string,i: number) => <div key={i} className="story">{s}</div>)}</div>
+                        <div className="prd-sec"><div className="prd-lbl">Acceptance Criteria</div>{prdResult.criteria.map((c: string,i: number) => <div key={i} style={{display:"flex",gap:7,fontSize:12,marginBottom:4,alignItems:"flex-start"}}><span style={{color:"var(--grn)",flexShrink:0,marginTop:1}}>✓</span>{c}</div>)}</div>
+                        <div className="prd-sec"><div className="prd-lbl">Success Metrics</div>{prdResult.metrics.map((m: string,i: number) => <div key={i} style={{fontSize:12,padding:"3px 0",borderBottom:i<prdResult.metrics.length-1?"1px solid rgba(28,43,64,0.3)":"none",display:"flex",gap:7,alignItems:"center"}}><div style={{width:3,height:3,borderRadius:"50%",background:"var(--acc)",flexShrink:0}}/>{m}</div>)}</div>
+                        <div className="prd-sec"><div className="prd-lbl">Open Questions</div>{(prdResult.questions||[]).map((q: string,i: number) => <div key={i} style={{fontSize:12,padding:"3px 0",color:"var(--amb)",display:"flex",gap:6}}><span style={{flexShrink:0}}>?</span>{q}</div>)}</div>
                       </div>
                       <div style={{padding:"11px 16px",borderTop:"1px solid var(--bdr)"}}>
                         <div className="section-lbl" style={{marginBottom:7}}>Export</div>
                         <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
                           {["Confluence","Notion","Markdown","Copy"].map((f,i) => (
                             <button key={i} className="xbtn" onClick={() => {
-                              if (f === "Copy" || f === "Markdown") {
-                                const md = `# ${prdResult.problem}\n\n## User Stories\n${prdResult.stories.map(s=>`- ${s}`).join("\n")}\n\n## Acceptance Criteria\n${prdResult.criteria.map(c=>`- [ ] ${c}`).join("\n")}\n\n## Success Metrics\n${prdResult.metrics.map(m=>`- ${m}`).join("\n")}`;
+                              if (f==="Copy"||f==="Markdown") {
+                                const md = `# ${prdResult.problem}\n\n## User Stories\n${prdResult.stories.map((s: string)=>`- ${s}`).join("\n")}\n\n## Acceptance Criteria\n${prdResult.criteria.map((c: string)=>`- [ ] ${c}`).join("\n")}\n\n## Success Metrics\n${prdResult.metrics.map((m: string)=>`- ${m}`).join("\n")}`;
                                 navigator.clipboard.writeText(md).then(() => alert("Copied to clipboard!"));
                               }
                             }}>{f}</button>
@@ -1738,10 +1570,10 @@ export default function PMDashboard() {
               <div className="col">
                 <div style={{display:"flex",gap:8,flexWrap:"wrap",alignItems:"center"}}>
                   {shProjects.map(p => (
-                    <button key={p} onClick={() => setShFilter(p)} style={{fontFamily:"DM Mono",fontSize:10,padding:"4px 12px",borderRadius:100,cursor:"pointer",border:`1px solid ${shFilter===p?"var(--acc)":"var(--bdr)"}`,background:shFilter===p?"rgba(0,212,255,0.07)":"var(--surf)",color:shFilter===p?"var(--acc)":"var(--mut)",transition:"all 0.13s"}}>{p}</button>
+                    <button key={p as string} onClick={() => setShFilter(p as string)} style={{fontFamily:"DM Mono",fontSize:10,padding:"4px 12px",borderRadius:100,cursor:"pointer",border:`1px solid ${shFilter===p?"var(--acc)":"var(--bdr)"}`,background:shFilter===p?"rgba(0,212,255,0.07)":"var(--surf)",color:shFilter===p?"var(--acc)":"var(--mut)",transition:"all 0.13s"}}>{p}</button>
                   ))}
                   <div style={{marginLeft:"auto",display:"flex",gap:8}}>
-                    {[{n:`${filteredSh.length} people`,c:"var(--acc)"},{n:`${filteredSh.filter(s=>contactAge(s.last_contacted_at)==="stale").length} need contact`,c:"var(--red)"},{n:`${filteredSh.filter(s=>s.influence>=4).length} high influence`,c:"var(--pur)"}].map(({n,c}) => (
+                    {[{n:`${filteredSh.length} people`,c:"var(--acc)"},{n:`${filteredSh.filter((s: any)=>contactAge(s.last_contacted_at)==="stale").length} need contact`,c:"var(--red)"},{n:`${filteredSh.filter((s: any)=>s.influence>=4).length} high influence`,c:"var(--pur)"}].map(({n,c}) => (
                       <span key={n} style={{fontFamily:"DM Mono",fontSize:10,padding:"4px 10px",borderRadius:100,background:"var(--surf)",border:"1px solid var(--bdr)",color:c}}>{n}</span>
                     ))}
                     <button className="btn btn-sm" onClick={openAddSh}>+ Add</button>
@@ -1753,26 +1585,21 @@ export default function PMDashboard() {
                   </div>
                   {shLoading && <div className="loading"><div className="spin"/>Loading...</div>}
                   {!shLoading && filteredSh.length === 0 && <div className="empty">No stakeholders found.</div>}
-                  {filteredSh.map((s,i) => {
+                  {filteredSh.map((s: any) => {
                     const age = contactAge(s.last_contacted_at);
                     return (
                       <div key={s.id} className="sh-row" style={{display:"grid",gridTemplateColumns:"200px 110px 190px 1fr 80px 90px 90px",gap:12,alignItems:"center"}}>
                         <div style={{display:"flex",alignItems:"center",gap:9}}>
-                          <div className="sh-av" style={{background:`${s.color||"#00d4ff"}18`,border:`1px solid ${s.color||"#00d4ff"}30`,color:s.color||"#00d4ff"}}>{s.initials || initials(s.name)}</div>
-                          <div>
-                            <div style={{fontSize:13,fontWeight:500}}>{s.name}</div>
-                            <div style={{fontSize:11,color:"var(--mut)"}}>{s.role}</div>
-                          </div>
+                          <div className="sh-av" style={{background:`${s.color||"#00d4ff"}18`,border:`1px solid ${s.color||"#00d4ff"}30`,color:s.color||"#00d4ff"}}>{s.initials||initials(s.name)}</div>
+                          <div><div style={{fontSize:13,fontWeight:500}}>{s.name}</div><div style={{fontSize:11,color:"var(--mut)"}}>{s.role}</div></div>
                         </div>
                         <span style={{fontSize:11,color:"var(--mut)"}}>{s.type}</span>
-                        <a href={`mailto:${s.email}`} style={{fontFamily:"DM Mono",fontSize:11,color:"var(--acc)",textDecoration:"none"}} onMouseOver={e=>{ e.currentTarget.style.textDecoration="underline"; }} onMouseOut={e=>{ e.currentTarget.style.textDecoration="none"; }}>{s.email}</a>
+                        <a href={`mailto:${s.email}`} style={{fontFamily:"DM Mono",fontSize:11,color:"var(--acc)",textDecoration:"none"}}>{s.email}</a>
                         <div style={{display:"flex",flexWrap:"wrap",gap:3}}>
-                          {(s.proj||[]).map((p,j) => <span key={j} style={{fontSize:10,padding:"1px 6px",borderRadius:4,background:"var(--surf2)",border:"1px solid var(--bdr)",color:"var(--mut)"}}>{p}</span>)}
+                          {(s.proj||[]).map((p: string,j: number) => <span key={j} style={{fontSize:10,padding:"1px 6px",borderRadius:4,background:"var(--surf2)",border:"1px solid var(--bdr)",color:"var(--mut)"}}>{p}</span>)}
                         </div>
-                        <div style={{display:"flex",gap:3}}>
-                          {Array.from({length:5},(_,j) => <div key={j} style={{width:8,height:8,borderRadius:2,background:j<(s.influence||0)?"var(--pur)":"var(--bdr2)"}}/>)}
-                        </div>
-                        <span className={`tag ${AGE_TAG[age]}`}>{contactLabel(s.last_contacted_at)}</span>
+                        <div style={{display:"flex",gap:3}}>{Array.from({length:5},(_,j) => <div key={j} style={{width:8,height:8,borderRadius:2,background:j<(s.influence||0)?"var(--pur)":"var(--bdr2)"}}/>)}</div>
+                        <span className={`tag ${AGE_TAG[age as keyof typeof AGE_TAG]}`}>{contactLabel(s.last_contacted_at)}</span>
                         <div style={{display:"flex",gap:4}}>
                           <button className="btn btn-sm" title="Mark contacted" onClick={() => markContacted(s.id)}>✓</button>
                           <button className="btn btn-icon btn-sm" onClick={() => openEditSh(s)} title="Edit">✎</button>
@@ -1789,7 +1616,7 @@ export default function PMDashboard() {
             {page === "metrics" && (
               <div className="col">
                 <div className="g4">
-                  {[{v:"23",l:"DAU",d:"+4 vs last week",up:true},{v:"61%",l:"WAU retention",d:"+8pp vs week 1",up:true},{v:"3.2h",l:"Avg time saved / user / wk",d:"+0.4h",up:true},{v:"47min",l:"Meeting Scribe saved",d:"top agent",up:true}].map(({v,l,d,up}) => (
+                  {[{v:"23",l:"DAU",d:"+4 vs last week",up:true},{v:"61%",l:"WAU retention",d:"+8pp vs week 1",up:true},{v:"3.2h",l:"Avg time saved / user / wk",d:"+0.4h",up:true},{v:`${agentRuns.length}`,l:"Agent Runs (lifetime)",d:"live",up:true}].map(({v,l,d,up}) => (
                     <div key={l} className="kpi"><div className="kpi-v" style={{color:"var(--acc)"}}>{v}</div><div className="kpi-l">{l}</div><div className={`kpi-d ${up?"d-up":"d-dn"}`}>{up?"▲":"▼"} {d}</div></div>
                   ))}
                 </div>
@@ -1808,14 +1635,30 @@ export default function PMDashboard() {
                     </div>
                   </div>
                   <div className="card">
-                    <div className="ch"><div className="ct">Agent Usage Ranking</div></div>
+                    <div className="ch"><div className="ct">Agent Usage · Live</div></div>
                     <div className="cb0" style={{padding:"4px 16px 4px"}}>
-                      {[{n:"Meeting Scribe",r:47,c:"var(--acc)"},{n:"Weekly Digest",r:23,c:"var(--grn)"},{n:"Stakeholder Update",r:19,c:"var(--pur)"},{n:"Prioritization",r:14,c:"var(--amb)"},{n:"PRD Agent",r:8,c:"var(--acc)"},{n:"Risk Monitor",r:6,c:"var(--red)"}].map(({n,r,c}) => (
-                        <div key={n} className="use-row">
-                          <div className="use-name">{n}</div>
-                          <div className="use-bw"><div className="use-bar"><div className="use-fill" style={{width:`${(r/47)*100}%`,background:c}}/></div><div className="use-n">{r}</div></div>
-                        </div>
-                      ))}
+                      {agentRuns.length > 0 ? (
+                        // Group by agent name and count
+                        Object.entries(agentRuns.reduce((acc: any, run: any) => {
+                          acc[run.agent_name] = (acc[run.agent_name] || 0) + 1;
+                          return acc;
+                        }, {})).sort((a: any,b: any) => b[1]-a[1]).map(([name, count]: any) => (
+                          <div key={name} className="use-row">
+                            <div className="use-name">{name}</div>
+                            <div className="use-bw">
+                              <div className="use-bar"><div className="use-fill" style={{width:`${(count/Math.max(...Object.values(agentRuns.reduce((acc: any, run: any) => { acc[run.agent_name] = (acc[run.agent_name] || 0) + 1; return acc; }, {})) as number[]))*100}%`,background:"var(--acc)"}}/></div>
+                              <div className="use-n">{count}</div>
+                            </div>
+                          </div>
+                        ))
+                      ) : (
+                        [["Meeting Scribe",47],["Weekly Digest",23],["Stakeholder Update",19],["Prioritization",14],["PRD Agent",8],["Risk Monitor",6]].map(([n,r]) => (
+                          <div key={n as string} className="use-row">
+                            <div className="use-name">{n}</div>
+                            <div className="use-bw"><div className="use-bar"><div className="use-fill" style={{width:`${(r as number/47)*100}%`,background:"var(--acc)"}}/></div><div className="use-n">{r}</div></div>
+                          </div>
+                        ))
+                      )}
                     </div>
                   </div>
                 </div>
@@ -1835,7 +1678,6 @@ export default function PMDashboard() {
                   <div className="col">
                     <div className="alert-b al-warn"><span style={{fontSize:16}}>⚠️</span><div><div className="al-ttl" style={{color:"var(--amb)"}}>Prioritization Agent usage dropped 30%</div><div className="al-body">Usage fell from 20 to 14 runs/week. <span className="acc">Investigate with top users.</span></div></div></div>
                     <div className="alert-b al-good"><span style={{fontSize:16}}>✅</span><div><div className="al-ttl" style={{color:"var(--grn)"}}>PRD Agent retention high</div><div className="al-body">All 8 users who tried PRD Agent returned within 48 hours.</div></div></div>
-                    <div className="alert-b al-warn"><span style={{fontSize:16}}>👥</span><div><div className="al-ttl" style={{color:"var(--amb)"}}>D7 retention below target</div><div className="al-body">64% vs 75% target. <span className="acc">Schedule 2 more onboarding sessions.</span></div></div></div>
                     <div style={{padding:"12px 14px",background:"var(--surf)",border:"1px solid var(--bdr)",borderRadius:10}}>
                       <div className="section-lbl" style={{marginBottom:5}}>NPS · Week 3 Survey</div>
                       <div style={{display:"flex",alignItems:"baseline",gap:8}}>
@@ -1872,19 +1714,13 @@ export default function PMDashboard() {
                       <button className="btn btn-danger btn-sm" onClick={forgetAll}>Forget All</button>
                     </div>
                     <div className="cb">
-                      {memLog.length===0
-                        ? <div className="empty">Memory cleared</div>
-                        : memLog.map(m => (
-                          <div key={m.id} className="mem-row">
-                            <div className="mdot" style={{background:m.type==="project"?"var(--acc)":m.type==="agent"?"var(--pur)":m.type==="meeting"?"var(--amb)":"var(--grn)"}}/>
-                            <div style={{flex:1}}>
-                              <div className="mem-text">{m.content || m.text}</div>
-                              <div className="mem-src">{m.source || m.src}</div>
-                            </div>
-                            <button className="btn btn-danger btn-sm" onClick={() => forgetMem(m.id)}>Forget</button>
-                          </div>
-                        ))
-                      }
+                      {memLog.length===0 ? <div className="empty">Memory cleared</div> : memLog.map((m: any) => (
+                        <div key={m.id} className="mem-row">
+                          <div className="mdot" style={{background:m.type==="project"?"var(--acc)":m.type==="agent"?"var(--pur)":m.type==="meeting"?"var(--amb)":"var(--grn)"}}/>
+                          <div style={{flex:1}}><div className="mem-text">{m.content||m.text}</div><div className="mem-src">{m.source||m.src}</div></div>
+                          <button className="btn btn-danger btn-sm" onClick={() => forgetMem(m.id)}>Forget</button>
+                        </div>
+                      ))}
                     </div>
                   </div>
                   <div className="col">
@@ -1894,7 +1730,7 @@ export default function PMDashboard() {
                         {[{k:"persist",l:"Persistent memory",s:"Agent remembers across sessions"},{k:"learn",l:"Agent learning",s:"Agents improve from your usage patterns"},{k:"session",l:"Session-only mode",s:"Wipe memory when you close the app"},{k:"audit",l:"Audit log",s:"Record every agent action for compliance"}].map(({k,l,s}) => (
                           <div key={k} className="tog-row">
                             <div><div className="tog-lbl">{l}</div><div className="tog-sub">{s}</div></div>
-                            <div className={`tog ${privTogs[k]?"on":"off"}`} onClick={() => togglePriv(k)}/>
+                            <div className={`tog ${(privTogs as any)[k]?"on":"off"}`} onClick={() => togglePriv(k)}/>
                           </div>
                         ))}
                       </div>
@@ -1931,59 +1767,55 @@ export default function PMDashboard() {
             {/* ══ INTEGRATIONS ════════════════════════════════════════════ */}
             {page === "integrations" && (
               <div className="col">
-
-                {/* Connection status cards */}
                 <div className="g4">
                   {[
-                    { name:"jira", label:"Jira", icon:"🔷", desc:"Issues, sprints, project tracking", syncFn: () => syncJira() },
-                    { name:"webex", label:"Webex", icon:"💬", desc:"Meeting recordings and transcripts", syncFn: syncWebex },
-                    { name:"gmail", label:"Gmail", icon:"📧", desc:"Starred emails as tasks", syncFn: syncGmail },
-                    { name:"google_calendar", label:"Google Calendar", icon:"📅", desc:"Events synced to schedule tab", syncFn: () => syncCalendar() },
+                    { name:"jira",            label:"Jira",            icon:"🔷", desc:"Issues, sprints, project tracking",    syncFn: () => syncJira() },
+                    { name:"webex",           label:"Webex",           icon:"💬", desc:"Meeting recordings and transcripts",   syncFn: syncWebex },
+                    { name:"gmail",           label:"Gmail",           icon:"📧", desc:"Starred emails as tasks",              syncFn: syncGmail },
+                    { name:"google_calendar", label:"Google Calendar", icon:"📅", desc:"Events synced to schedule tab",        syncFn: () => syncCalendar() },
                   ].map(({ name, label, icon, desc, syncFn }) => {
                     const status = getIntegrationStatus(name);
-                    const displayStatus = syncingIntegration === name ? "syncing" : status.status;
+                    const isThisSyncing = syncingIntegration === name || (isSyncing && syncingIntegration === null);
+                    const displayStatus = isThisSyncing ? "syncing" : status.status;
                     return (
                       <div key={name} className="card" style={{padding:16}}>
                         <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:10}}>
                           <div style={{fontSize:24}}>{icon}</div>
-                         <span className={`tag ${displayStatus === "connected" ? "tag-grn" :displayStatus === "syncing"   ? "tag-blu" :displayStatus === "error"     ? "tag-red" : "tag-dim"}`} style={{fontSize:9}}>{displayStatus === "connected" ? "● Connected" :displayStatus === "syncing"   ? "⟳ Syncing..." :displayStatus === "error"     ? "● Error" : "○ Disconnected"}
+                          <span className={`tag ${displayStatus==="connected"?"tag-grn":displayStatus==="syncing"?"tag-blu":displayStatus==="error"?"tag-red":"tag-dim"}`} style={{fontSize:9}}>
+                            {displayStatus==="connected" ? "● Connected" : displayStatus==="syncing" ? "⟳ Syncing..." : displayStatus==="error" ? "● Error" : "○ Disconnected"}
                           </span>
                         </div>
                         <div style={{fontFamily:"Syne",fontWeight:700,fontSize:14,marginBottom:3}}>{label}</div>
                         <div style={{fontSize:11,color:"var(--mut)",marginBottom:10}}>{desc}</div>
-                        {status.last_synced_at && (
-                          <div style={{fontFamily:"DM Mono",fontSize:9,color:"var(--mut)",marginBottom:8}}>
-                            Last sync: {new Date(status.last_synced_at).toLocaleString()}
-                          </div>
-                        )}
-                        <button className="btn btn-primary" style={{width:"100%",fontSize:11}} disabled={isSyncing} onClick={syncFn}>
-                          {isSyncing ? <span style={{display:"flex",alignItems:"center",justifyContent:"center",gap:6}}><span className="spin" style={{width:12,height:12,borderWidth:1.5}}/>Syncing...</span> : `⟳ Sync ${label}`}
+                        {status.last_synced_at && <div style={{fontFamily:"DM Mono",fontSize:9,color:"var(--mut)",marginBottom:8}}>Last sync: {new Date(status.last_synced_at).toLocaleString()}</div>}
+                        <button className="btn btn-primary" style={{width:"100%",fontSize:11}} disabled={syncingIntegration===name} onClick={syncFn}>
+                          {syncingIntegration===name ? <span style={{display:"flex",alignItems:"center",justifyContent:"center",gap:6}}><span className="spin" style={{width:12,height:12,borderWidth:1.5}}/>Syncing...</span> : `⟳ Sync ${label}`}
                         </button>
                       </div>
                     );
                   })}
                 </div>
 
-                {/* Jira Issues */}
                 <div className="card">
                   <div className="ch">
                     <div className="ct">Jira Issues · Live</div>
                     <div style={{display:"flex",gap:6}}>
                       <button className="btn btn-sm" onClick={() => syncJira()} disabled={syncingIntegration==="jira"}>⟳ Sync</button>
-                      <button className="btn btn-sm btn-primary" onClick={() => setShowCreateJira(true)}>+ Create Issue</button>
+                      <button className="btn btn-primary btn-sm" onClick={() => setShowCreateJira(true)}>+ Create Issue</button>
                     </div>
                   </div>
                   {jiraIssues.length === 0 ? (
-                    <div className="empty">No Jira issues synced yet. Click Sync Jira to pull issues.</div>
+                    <div className="empty">
+                      {isSyncing ? "Syncing Jira issues..." : "No issues synced yet. Auto-sync runs on page load, or click Sync manually."}
+                    </div>
                   ) : (
                     <>
                       <div className="th-row" style={{gridTemplateColumns:"80px 1fr 80px 80px 100px"}}>
                         <span>Key</span><span>Summary</span><span>Status</span><span>Priority</span><span>Assignee</span>
                       </div>
-                      {jiraIssues.map((issue,i) => (
+                      {jiraIssues.map((issue: any) => (
                         <div key={issue.id} className="tr" style={{gridTemplateColumns:"80px 1fr 80px 80px 100px"}}>
-                          <a href={`#/browse/${issue.jira_key}`} target="_blank" rel="noopener noreferrer"
-                            style={{fontFamily:"DM Mono",fontSize:11,color:"var(--acc)",textDecoration:"none"}}>{issue.jira_key}</a>
+                          <a href={`${import.meta.env?.VITE_JIRA_BASE_URL || "#"}/browse/${issue.jira_key}`} target="_blank" rel="noopener noreferrer" style={{fontFamily:"DM Mono",fontSize:11,color:"var(--acc)",textDecoration:"none"}}>{issue.jira_key}</a>
                           <span style={{fontSize:12}}>{issue.summary}</span>
                           <span className={`tag ${issue.status?.includes("done")||issue.status?.includes("closed")?"tag-grn":issue.status?.includes("progress")?"tag-blu":"tag-dim"}`} style={{fontSize:9}}>{issue.status}</span>
                           <span className={`tag ${issue.priority==="high"?"tag-red":issue.priority==="low"?"tag-grn":"tag-amb"}`} style={{fontSize:9}}>{issue.priority}</span>
@@ -1994,16 +1826,15 @@ export default function PMDashboard() {
                   )}
                 </div>
 
-                {/* Gmail Threads */}
                 <div className="card">
                   <div className="ch">
                     <div className="ct">Gmail · Starred & Important</div>
                     <button className="btn btn-sm" onClick={syncGmail} disabled={syncingIntegration==="gmail"}>⟳ Sync Gmail</button>
                   </div>
                   {gmailThreads.length === 0 ? (
-                    <div className="empty">No Gmail threads synced. Click Sync Gmail to pull starred and important emails.</div>
+                    <div className="empty">{isSyncing ? "Syncing Gmail..." : "No Gmail threads synced yet."}</div>
                   ) : (
-                    gmailThreads.map((thread,i) => (
+                    gmailThreads.map((thread: any,i: number) => (
                       <div key={thread.id} style={{display:"flex",alignItems:"flex-start",gap:10,padding:"11px 16px",borderBottom:i<gmailThreads.length-1?"1px solid var(--bdr)":"none"}}>
                         <div style={{width:6,height:6,borderRadius:"50%",background:thread.is_read?"var(--bdr2)":"var(--acc)",flexShrink:0,marginTop:5}}/>
                         <div style={{flex:1}}>
@@ -2023,19 +1854,18 @@ export default function PMDashboard() {
                   )}
                 </div>
 
-                {/* Agent Run History */}
                 <div className="card">
                   <div className="ch"><div className="ct">Agent Run History · Live</div></div>
                   {agentRuns.length === 0 ? (
                     <div className="empty">No agent runs yet. Run any agent to see history here.</div>
                   ) : (
                     <>
-                      <div className="th-row" style={{gridTemplateColumns:"140px 1fr 1fr 70px 60px"}}>
+                      <div className="th-row" style={{gridTemplateColumns:"140px 1fr 1fr 70px 70px"}}>
                         <span>Agent</span><span>Input</span><span>Output</span><span>Tokens</span><span>When</span>
                       </div>
-                      {agentRuns.map((run,i) => (
-                        <div key={run.id} className="tr" style={{gridTemplateColumns:"140px 1fr 1fr 70px 60px"}}>
-                          <span className="tag tag-pur" style={{fontSize:9,display:"inline-flex"}}>{run.agent_name}</span>
+                      {agentRuns.map((run: any) => (
+                        <div key={run.id} className="tr" style={{gridTemplateColumns:"140px 1fr 1fr 70px 70px"}}>
+                          <span className="tag tag-pur" style={{fontSize:9}}>{run.agent_name}</span>
                           <span style={{fontSize:11,color:"var(--mut)"}}>{run.input_summary}</span>
                           <span style={{fontSize:11,color:"var(--mut)"}}>{run.output_summary}</span>
                           <span className="mono dim" style={{fontSize:10}}>{run.tokens_used}</span>
@@ -2045,93 +1875,19 @@ export default function PMDashboard() {
                     </>
                   )}
                 </div>
-
               </div>
             )}
 
           </div>
         </main>
 
-        {/* ── Create Jira Issue Modal ─────────────────────────────────────── */}
-        {showCreateJira && (
-          <Modal title="Create Jira Issue" onClose={() => setShowCreateJira(false)}>
-            <div className="form-grid">
-              <div className="form-row" style={{gridColumn:"1/-1"}}>
-                <label className="form-label">Summary</label>
-                <input className="input" value={jiraForm.summary} onChange={e => setJiraForm(p=>({...p,summary:e.target.value}))} placeholder="Issue summary..." autoFocus/>
-              </div>
-              <div className="form-row">
-                <label className="form-label">Project Key</label>
-                <input className="input" value={jiraForm.projectKey} onChange={e => setJiraForm(p=>({...p,projectKey:e.target.value}))} placeholder="PM"/>
-              </div>
-              <div className="form-row">
-                <label className="form-label">Issue Type</label>
-                <select className="input select" value={jiraForm.issueType} onChange={e => setJiraForm(p=>({...p,issueType:e.target.value}))}>
-                  <option>Task</option><option>Story</option><option>Bug</option><option>Epic</option>
-                </select>
-              </div>
-              <div className="form-row">
-                <label className="form-label">Priority</label>
-                <select className="input select" value={jiraForm.priority} onChange={e => setJiraForm(p=>({...p,priority:e.target.value}))}>
-                  <option value="high">High</option><option value="med">Medium</option><option value="low">Low</option>
-                </select>
-              </div>
-              <div className="form-row" style={{gridColumn:"1/-1"}}>
-                <label className="form-label">Description (optional)</label>
-                <textarea className="input" value={jiraForm.description} onChange={e => setJiraForm(p=>({...p,description:e.target.value}))} style={{minHeight:80,resize:"vertical"}} placeholder="Describe the issue..."/>
-              </div>
-            </div>
-            <div className="form-actions">
-              <button className="btn" onClick={() => setShowCreateJira(false)}>Cancel</button>
-              <button className="btn btn-primary" onClick={createJiraIssue} disabled={syncingIntegration==="jira-create"}>
-                {syncingIntegration==="jira-create" ? "Creating..." : "Create in Jira"}
-              </button>
-            </div>
-          </Modal>
-        )}
+        {/* ── Modals ──────────────────────────────────────────────────────── */}
 
-        {/* ── Add Calendar Event Modal ────────────────────────────────────── */}
-        {showAddCalEvent && (
-          <Modal title="Add Calendar Event" onClose={() => setShowAddCalEvent(false)}>
-            <div className="form-grid">
-              <div className="form-row" style={{gridColumn:"1/-1"}}>
-                <label className="form-label">Event Title</label>
-                <input className="input" value={calForm.title} onChange={e => setCalForm(p=>({...p,title:e.target.value}))} placeholder="Sprint Planning — Mobile Team" autoFocus/>
-              </div>
-              <div className="form-row">
-                <label className="form-label">Start Time</label>
-                <input className="input" type="time" value={calForm.startTime} onChange={e => setCalForm(p=>({...p,startTime:e.target.value}))}/>
-              </div>
-              <div className="form-row">
-                <label className="form-label">End Time</label>
-                <input className="input" type="time" value={calForm.endTime} onChange={e => setCalForm(p=>({...p,endTime:e.target.value}))}/>
-              </div>
-              <div className="form-row" style={{gridColumn:"1/-1"}}>
-                <label className="form-label">Attendees (comma-separated emails)</label>
-                <input className="input" value={calForm.attendees} onChange={e => setCalForm(p=>({...p,attendees:e.target.value}))} placeholder="ana@company.com, chen@company.com"/>
-              </div>
-              <div className="form-row" style={{gridColumn:"1/-1"}}>
-                <label className="form-label">Description (optional)</label>
-                <input className="input" value={calForm.description} onChange={e => setCalForm(p=>({...p,description:e.target.value}))} placeholder="Agenda or context..."/>
-              </div>
-            </div>
-            <div style={{fontSize:11,color:"var(--mut)"}}>
-              A Google Meet link will be auto-generated and added to the event.
-            </div>
-            <div className="form-actions">
-              <button className="btn" onClick={() => setShowAddCalEvent(false)}>Cancel</button>
-              <button className="btn btn-primary" onClick={createCalendarEvent} disabled={syncingIntegration==="cal-create"}>
-                {syncingIntegration==="cal-create" ? "Creating..." : "Create Event + Meet Link"}
-              </button>
-            </div>
-          </Modal>
-        )}
-
-        {/* Error modal */}
+        {/* Agent Error */}
         {agentResultType === "error" && (
           <Modal title="Agent Error" onClose={closeAgentResult}>
             <div className="infobox ib-red" style={{fontSize:13}}>{agentError || "An unexpected error occurred."}</div>
-            <div style={{fontSize:12,color:"var(--mut)"}}>Check that your edge function is deployed and all secrets are set in Supabase.</div>
+            <div style={{fontSize:12,color:"var(--mut)"}}>Check that your edge function is deployed and all Supabase secrets are set.</div>
             <div className="form-actions"><button className="btn btn-primary" onClick={closeAgentResult}>Close</button></div>
           </Modal>
         )}
@@ -2139,13 +1895,11 @@ export default function PMDashboard() {
         {/* Prioritization result */}
         {agentResultType === "prioritization" && agentResult && (
           <Modal title="Prioritization Results" onClose={closeAgentResult}>
-            <div className="infobox ib-blue" style={{fontSize:12,marginBottom:4}}>
-              🤖 {agentResult.summary}
-            </div>
+            <div className="infobox ib-blue" style={{fontSize:12}}>🤖 {agentResult.summary}</div>
             {agentResult.top_3_recommendation?.length > 0 && (
               <div>
                 <div className="section-lbl" style={{marginBottom:6}}>Top 3 to ship this sprint</div>
-                {agentResult.top_3_recommendation.map((t, i) => (
+                {agentResult.top_3_recommendation.map((t: string,i: number) => (
                   <div key={i} style={{display:"flex",alignItems:"center",gap:8,padding:"6px 0",borderBottom:"1px solid var(--bdr)",fontSize:13}}>
                     <span style={{fontFamily:"DM Mono",fontSize:10,color:"var(--acc)",width:16}}>#{i+1}</span>
                     <span style={{flex:1}}>{t}</span>
@@ -2157,14 +1911,11 @@ export default function PMDashboard() {
               <div>
                 <div className="section-lbl" style={{marginBottom:6}}>All scored items</div>
                 <div style={{display:"flex",flexDirection:"column",gap:6}}>
-                  {[...agentResult.scored_items].sort((a,b) => b.rice_score - a.rice_score).map((item, i) => (
+                  {[...agentResult.scored_items].sort((a: any,b: any) => b.rice_score-a.rice_score).map((item: any,i: number) => (
                     <div key={i} style={{padding:"8px 10px",background:"var(--surf2)",borderRadius:7,border:"1px solid var(--bdr)"}}>
                       <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:3}}>
                         <span style={{fontWeight:500,fontSize:12}}>{item.title}</span>
-                        <div style={{display:"flex",gap:6,alignItems:"center"}}>
-                          <span className="tag tag-blu" style={{fontSize:9}}>RICE {Math.round(item.rice_score)}</span>
-                          <span className="tag tag-pur" style={{fontSize:9}}>{item.recommended_quarter}</span>
-                        </div>
+                        <div style={{display:"flex",gap:6}}><span className="tag tag-blu" style={{fontSize:9}}>RICE {Math.round(item.rice_score)}</span><span className="tag tag-pur" style={{fontSize:9}}>{item.recommended_quarter}</span></div>
                       </div>
                       <div style={{fontSize:11,color:"var(--mut)"}}>{item.reasoning}</div>
                     </div>
@@ -2182,30 +1933,25 @@ export default function PMDashboard() {
         {/* Weekly Digest result */}
         {agentResultType === "weekly-digest" && agentResult && (
           <Modal title="Weekly Digest" onClose={closeAgentResult}>
-            <div style={{fontFamily:"Syne",fontWeight:800,fontSize:16,color:"var(--acc)",marginBottom:4}}>
-              {agentResult.headline}
-            </div>
+            <div style={{fontFamily:"Syne",fontWeight:800,fontSize:16,color:"var(--acc)",marginBottom:4}}>{agentResult.headline}</div>
             {[
-              { label: "On track", items: agentResult.whats_on_track, color: "var(--grn)" },
-              { label: "At risk", items: agentResult.whats_at_risk, color: "var(--red)" },
-              { label: "Wins last week", items: agentResult.wins_last_week, color: "var(--acc)" },
-              { label: "Top 3 priorities this week", items: agentResult.top_3_priorities, color: "var(--amb)" },
-              { label: "Decisions needed", items: agentResult.decisions_needed, color: "var(--pur)" },
-              { label: "Blocked items", items: agentResult.blocked_items, color: "var(--red)" },
+              { label:"On track",items:agentResult.whats_on_track,color:"var(--grn)"},
+              { label:"At risk",items:agentResult.whats_at_risk,color:"var(--red)"},
+              { label:"Wins last week",items:agentResult.wins_last_week,color:"var(--acc)"},
+              { label:"Top 3 priorities this week",items:agentResult.top_3_priorities,color:"var(--amb)"},
+              { label:"Decisions needed",items:agentResult.decisions_needed,color:"var(--pur)"},
+              { label:"Blocked items",items:agentResult.blocked_items,color:"var(--red)"},
             ].filter(s => s.items?.length > 0).map(({ label, items, color }) => (
               <div key={label}>
                 <div style={{fontFamily:"DM Mono",fontSize:9,textTransform:"uppercase",letterSpacing:"0.1em",color:"var(--mut)",marginBottom:5}}>{label}</div>
-                {items.map((item, i) => (
+                {items.map((item: string,i: number) => (
                   <div key={i} style={{display:"flex",gap:7,fontSize:12,padding:"4px 0",borderBottom:"1px solid var(--bdr)",alignItems:"flex-start"}}>
-                    <div style={{width:4,height:4,borderRadius:"50%",background:color,flexShrink:0,marginTop:5}}/>
-                    {item}
+                    <div style={{width:4,height:4,borderRadius:"50%",background:color,flexShrink:0,marginTop:5}}/>{item}
                   </div>
                 ))}
               </div>
             ))}
-            <div className="form-actions">
-              <button className="btn btn-primary" onClick={closeAgentResult}>Done</button>
-            </div>
+            <div className="form-actions"><button className="btn btn-primary" onClick={closeAgentResult}>Done</button></div>
           </Modal>
         )}
 
@@ -2214,20 +1960,18 @@ export default function PMDashboard() {
           <Modal title="Risk Scan Results" onClose={closeAgentResult}>
             <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:4}}>
               <div style={{fontFamily:"Syne",fontWeight:700,fontSize:13}}>Portfolio Health</div>
-              <span className={`tag ${agentResult.overall_health === "green" ? "tag-grn" : agentResult.overall_health === "amber" ? "tag-amb" : "tag-red"}`}>
-                {agentResult.overall_health?.toUpperCase()}
-              </span>
+              <span className={`tag ${agentResult.overall_health==="green"?"tag-grn":agentResult.overall_health==="amber"?"tag-amb":"tag-red"}`}>{agentResult.overall_health?.toUpperCase()}</span>
             </div>
             <div style={{fontSize:12,color:"var(--mut)",marginBottom:8}}>{agentResult.summary}</div>
             {agentResult.alerts?.length > 0 ? (
               <div style={{display:"flex",flexDirection:"column",gap:8}}>
-                {agentResult.alerts.map((alert, i) => (
-                  <div key={i} className={`alert-b ${alert.risk_level === "high" ? "al-warn" : "al-good"}`}>
+                {agentResult.alerts.map((alert: any,i: number) => (
+                  <div key={i} className={`alert-b ${alert.risk_level==="high"?"al-warn":"al-good"}`}>
                     <div style={{flex:1}}>
                       <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:3}}>
-                        <div className="al-ttl" style={{color: alert.risk_level === "high" ? "var(--red)" : "var(--amb)"}}>{alert.project}</div>
+                        <div className="al-ttl" style={{color:alert.risk_level==="high"?"var(--red)":"var(--amb)"}}>{alert.project}</div>
                         <div style={{display:"flex",gap:5}}>
-                          <span className={`tag ${alert.risk_level === "high" ? "tag-red" : alert.risk_level === "med" ? "tag-amb" : "tag-grn"}`} style={{fontSize:9}}>{alert.risk_level} risk</span>
+                          <span className={`tag ${alert.risk_level==="high"?"tag-red":alert.risk_level==="med"?"tag-amb":"tag-grn"}`} style={{fontSize:9}}>{alert.risk_level} risk</span>
                           <span className="tag tag-pur" style={{fontSize:9}}>{alert.urgency}</span>
                         </div>
                       </div>
@@ -2259,24 +2003,17 @@ export default function PMDashboard() {
             {agentResult.key_highlights?.length > 0 && (
               <div>
                 <div className="section-lbl" style={{marginBottom:5}}>Key Highlights</div>
-                {agentResult.key_highlights.map((h, i) => (
-                  <div key={i} style={{fontSize:12,display:"flex",gap:7,padding:"3px 0",borderBottom:"1px solid var(--bdr)"}}>
-                    <span style={{color:"var(--grn)"}}>✓</span>{h}
-                  </div>
+                {agentResult.key_highlights.map((h: string,i: number) => (
+                  <div key={i} style={{fontSize:12,display:"flex",gap:7,padding:"3px 0",borderBottom:"1px solid var(--bdr)"}}><span style={{color:"var(--grn)"}}>✓</span>{h}</div>
                 ))}
               </div>
             )}
             <div className="form-actions">
-              <button className="btn" onClick={() => {
-                navigator.clipboard.writeText(`Subject: ${agentResult.subject}\n\n${agentResult.body}`)
-                  .then(() => alert("Copied to clipboard!"));
-              }}>Copy Email</button>
+              <button className="btn" onClick={() => { navigator.clipboard.writeText(`Subject: ${agentResult.subject}\n\n${agentResult.body}`).then(() => alert("Copied!")); }}>Copy Email</button>
               <button className="btn btn-primary" onClick={closeAgentResult}>Done</button>
             </div>
           </Modal>
         )}
-
-
 
         {/* Add / Edit Project */}
         {showAddProj && (
@@ -2293,24 +2030,22 @@ export default function PMDashboard() {
               <div className="form-row">
                 <label className="form-label">Status</label>
                 <select className="input select" value={projForm.status} onChange={e => setProjForm(p=>({...p,status:e.target.value}))}>
-                  <option value="planning">Planning</option>
-                  <option value="on-track">On Track</option>
-                  <option value="at-risk">At Risk</option>
-                  <option value="delayed">Delayed</option>
+                  <option value="planning">Planning</option><option value="on-track">On Track</option><option value="at-risk">At Risk</option><option value="delayed">Delayed</option>
                 </select>
               </div>
               <div className="form-row">
                 <label className="form-label">Progress (%)</label>
-                <input className="input" type="number" min="0" max="100" value={projForm.progress} onChange={e => setProjForm(p=>({...p,progress:Number(e.target.value)}))}/>
+                <input className="input" type="number" min="0" max="100" value={projForm.progress} onChange={e => setProjForm(p=>({...p,progress:e.target.value as any}))}/>
               </div>
               <div className="form-row">
                 <label className="form-label">Due Date</label>
                 <input className="input" type="date" value={projForm.due_date} onChange={e => setProjForm(p=>({...p,due_date:e.target.value}))}/>
               </div>
             </div>
+            {!editProj && <div style={{fontSize:11,color:"var(--mut)"}}>This project will also be created as a Jira Epic automatically.</div>}
             <div className="form-actions">
               <button className="btn" onClick={() => setShowAddProj(false)}>Cancel</button>
-              <button className="btn btn-primary" onClick={saveProject}>{editProj ? "Save Changes" : "Add Project"}</button>
+              <button className="btn btn-primary" onClick={saveProject}>{editProj ? "Save Changes" : "Add Project + Create Jira Epic"}</button>
             </div>
           </Modal>
         )}
@@ -2328,9 +2063,7 @@ export default function PMDashboard() {
             </div>
             <div className="form-row">
               <label className="form-label">Transcript (paste for AI processing)</label>
-              <textarea className="input" value={meetForm.raw_transcript} onChange={e => setMeetForm(p=>({...p,raw_transcript:e.target.value}))}
-                placeholder="Paste meeting transcript here. The Meeting Scribe agent will extract action items, decisions, and risks automatically..."
-                style={{minHeight:140,resize:"vertical"}}/>
+              <textarea className="input" value={meetForm.raw_transcript} onChange={e => setMeetForm(p=>({...p,raw_transcript:e.target.value}))} placeholder="Paste meeting transcript here. The Meeting Scribe agent will extract action items and decisions automatically..." style={{minHeight:140,resize:"vertical" as any}}/>
             </div>
             <div className="form-actions">
               <button className="btn" onClick={() => setShowAddMeet(false)}>Cancel</button>
@@ -2345,32 +2078,20 @@ export default function PMDashboard() {
         {showAddSh && (
           <Modal title={editSh ? "Edit Stakeholder" : "Add Stakeholder"} onClose={() => setShowAddSh(false)}>
             <div className="form-grid">
-              <div className="form-row">
-                <label className="form-label">Full Name</label>
-                <input className="input" value={shForm.name} onChange={e => setShForm(p=>({...p,name:e.target.value}))} placeholder="Sarah Mitchell" autoFocus/>
-              </div>
-              <div className="form-row">
-                <label className="form-label">Role</label>
-                <input className="input" value={shForm.role} onChange={e => setShForm(p=>({...p,role:e.target.value}))} placeholder="Chief Product Officer"/>
-              </div>
-              <div className="form-row" style={{gridColumn:"1/-1"}}>
-                <label className="form-label">Email</label>
-                <input className="input" type="email" value={shForm.email} onChange={e => setShForm(p=>({...p,email:e.target.value}))} placeholder="s.mitchell@company.com"/>
-              </div>
-              <div className="form-row">
-                <label className="form-label">Type</label>
+              <div className="form-row"><label className="form-label">Full Name</label><input className="input" value={shForm.name} onChange={e => setShForm(p=>({...p,name:e.target.value}))} placeholder="Sarah Mitchell" autoFocus/></div>
+              <div className="form-row"><label className="form-label">Role</label><input className="input" value={shForm.role} onChange={e => setShForm(p=>({...p,role:e.target.value}))} placeholder="Chief Product Officer"/></div>
+              <div className="form-row" style={{gridColumn:"1/-1"}}><label className="form-label">Email</label><input className="input" type="email" value={shForm.email} onChange={e => setShForm(p=>({...p,email:e.target.value}))} placeholder="s.mitchell@company.com"/></div>
+              <div className="form-row"><label className="form-label">Type</label>
                 <select className="input select" value={shForm.type} onChange={e => setShForm(p=>({...p,type:e.target.value}))}>
                   {["Internal — Executive","Internal — Engineering","Internal — Design","Internal — GTM","Internal — ML","Internal — CS","External — Client"].map(t => <option key={t} value={t}>{t}</option>)}
                 </select>
               </div>
-              <div className="form-row">
-                <label className="form-label">Influence (1–5)</label>
+              <div className="form-row"><label className="form-label">Influence (1–5)</label>
                 <select className="input select" value={shForm.influence} onChange={e => setShForm(p=>({...p,influence:parseInt(e.target.value)}))}>
                   {[1,2,3,4,5].map(n => <option key={n} value={n}>{n}</option>)}
                 </select>
               </div>
-              <div className="form-row">
-                <label className="form-label">Colour</label>
+              <div className="form-row"><label className="form-label">Colour</label>
                 <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
                   {["#00d4ff","#7c3aed","#10b981","#f59e0b","#ef4444","#ec4899"].map(c => (
                     <div key={c} onClick={() => setShForm(p=>({...p,color:c}))} style={{width:22,height:22,borderRadius:6,background:c,cursor:"pointer",border:shForm.color===c?"2px solid #fff":"2px solid transparent"}}/>
@@ -2381,6 +2102,53 @@ export default function PMDashboard() {
             <div className="form-actions">
               <button className="btn" onClick={() => setShowAddSh(false)}>Cancel</button>
               <button className="btn btn-primary" onClick={saveSh}>{editSh ? "Save Changes" : "Add Stakeholder"}</button>
+            </div>
+          </Modal>
+        )}
+
+        {/* Create Jira Issue */}
+        {showCreateJira && (
+          <Modal title="Create Jira Issue" onClose={() => setShowCreateJira(false)}>
+            <div className="form-grid">
+              <div className="form-row" style={{gridColumn:"1/-1"}}><label className="form-label">Summary</label><input className="input" value={jiraForm.summary} onChange={e => setJiraForm(p=>({...p,summary:e.target.value}))} placeholder="Issue summary..." autoFocus/></div>
+              <div className="form-row"><label className="form-label">Project Key</label><input className="input" value={jiraForm.projectKey} onChange={e => setJiraForm(p=>({...p,projectKey:e.target.value}))} placeholder="PM"/></div>
+              <div className="form-row"><label className="form-label">Issue Type</label>
+                <select className="input select" value={jiraForm.issueType} onChange={e => setJiraForm(p=>({...p,issueType:e.target.value}))}>
+                  <option>Task</option><option>Story</option><option>Bug</option><option>Epic</option>
+                </select>
+              </div>
+              <div className="form-row"><label className="form-label">Priority</label>
+                <select className="input select" value={jiraForm.priority} onChange={e => setJiraForm(p=>({...p,priority:e.target.value}))}>
+                  <option value="high">High</option><option value="med">Medium</option><option value="low">Low</option>
+                </select>
+              </div>
+              <div className="form-row" style={{gridColumn:"1/-1"}}><label className="form-label">Description (optional)</label><textarea className="input" value={jiraForm.description} onChange={e => setJiraForm(p=>({...p,description:e.target.value}))} style={{minHeight:80,resize:"vertical" as any}} placeholder="Describe the issue..."/></div>
+            </div>
+            <div className="form-actions">
+              <button className="btn" onClick={() => setShowCreateJira(false)}>Cancel</button>
+              <button className="btn btn-primary" onClick={createJiraIssue} disabled={syncingIntegration==="jira-create"}>
+                {syncingIntegration==="jira-create" ? "Creating..." : "Create in Jira"}
+              </button>
+            </div>
+          </Modal>
+        )}
+
+        {/* Add Calendar Event */}
+        {showAddCalEvent && (
+          <Modal title="Add Calendar Event" onClose={() => setShowAddCalEvent(false)}>
+            <div className="form-grid">
+              <div className="form-row" style={{gridColumn:"1/-1"}}><label className="form-label">Event Title</label><input className="input" value={calForm.title} onChange={e => setCalForm(p=>({...p,title:e.target.value}))} placeholder="Sprint Planning — Mobile Team" autoFocus/></div>
+              <div className="form-row"><label className="form-label">Start Time</label><input className="input" type="time" value={calForm.startTime} onChange={e => setCalForm(p=>({...p,startTime:e.target.value}))}/></div>
+              <div className="form-row"><label className="form-label">End Time</label><input className="input" type="time" value={calForm.endTime} onChange={e => setCalForm(p=>({...p,endTime:e.target.value}))}/></div>
+              <div className="form-row" style={{gridColumn:"1/-1"}}><label className="form-label">Attendees (comma-separated emails)</label><input className="input" value={calForm.attendees} onChange={e => setCalForm(p=>({...p,attendees:e.target.value}))} placeholder="ana@company.com, chen@company.com"/></div>
+              <div className="form-row" style={{gridColumn:"1/-1"}}><label className="form-label">Description</label><input className="input" value={calForm.description} onChange={e => setCalForm(p=>({...p,description:e.target.value}))} placeholder="Agenda or context..."/></div>
+            </div>
+            <div style={{fontSize:11,color:"var(--mut)"}}>A Google Meet link will be auto-generated and added to the event.</div>
+            <div className="form-actions">
+              <button className="btn" onClick={() => setShowAddCalEvent(false)}>Cancel</button>
+              <button className="btn btn-primary" onClick={createCalendarEvent} disabled={syncingIntegration==="cal-create"}>
+                {syncingIntegration==="cal-create" ? "Creating..." : "Create Event + Meet Link"}
+              </button>
             </div>
           </Modal>
         )}
