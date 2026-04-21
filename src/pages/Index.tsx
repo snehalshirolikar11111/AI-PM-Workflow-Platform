@@ -351,12 +351,12 @@ const AGE_TAG      = { recent:"tag-grn", old:"tag-amb", stale:"tag-red" };
 const initials = name => name.split(' ').map(n=>n[0]).join('').toUpperCase().slice(0,2);
 const contactAge = dt => {
   if (!dt) return "stale";
-  const days = (Date.now() - new Date(dt)) / 86400000;
+  const days = (Date.now() - new Date(dt).getTime()) / 86400000;
   return days < 7 ? "recent" : days < 14 ? "old" : "stale";
 };
 const contactLabel = dt => {
   if (!dt) return "Never";
-  const days = Math.floor((Date.now() - new Date(dt)) / 86400000);
+  const days = Math.floor((Date.now() - new Date(dt).getTime()) / 86400000);
   if (days === 0) return "Today";
   if (days === 1) return "1d ago";
   return `${days}d ago`;
@@ -455,47 +455,6 @@ export default function PMDashboard() {
     });
     return () => subscription.unsubscribe();
   }, []);
-
-  /* ── Auto-sync all integrations on mount + tab focus ─────────────────── */
-const autoSyncAll = useCallback(async () => {
-  // Run all syncs in parallel, silently — no alerts
-  await Promise.allSettled([
-    supabase.functions.invoke("jira-sync",      { body: { action: "pull" } }),
-    supabase.functions.invoke("webex-sync",     { body: { action: "pull" } }),
-    supabase.functions.invoke("gmail-sync",     { body: { action: "pull" } }),
-    supabase.functions.invoke("calendar-sync",  { body: {} }),
-  ]);
-  // Refresh all data
-  await Promise.allSettled([
-    loadIntegrations(),
-    loadJiraIssues(),
-    loadGmailThreads(),
-    loadCalendarEvents(),
-    loadTasks(),
-    loadMeetings(),
-  ]);
-}, [loadIntegrations, loadJiraIssues, loadGmailThreads, loadCalendarEvents, loadTasks, loadMeetings]);
-
-// Auto-sync on first load
-useEffect(() => {
-  autoSyncAll();
-}, [autoSyncAll]);
-
-// Auto-sync when user switches back to this tab
-useEffect(() => {
-  const onFocus = () => autoSyncAll();
-  window.addEventListener("focus", onFocus);
-  document.addEventListener("visibilitychange", () => {
-    if (document.visibilityState === "visible") autoSyncAll();
-  });
-  return () => window.removeEventListener("focus", onFocus);
-}, [autoSyncAll]);
-
-// Poll every 5 minutes
-useEffect(() => {
-  const interval = setInterval(autoSyncAll, 5 * 60 * 1000);
-  return () => clearInterval(interval);
-}, [autoSyncAll]);
 
   /* ── Fetch tasks ──────────────────────────────────────────────────────── */
   const loadTasks = useCallback(async () => {
