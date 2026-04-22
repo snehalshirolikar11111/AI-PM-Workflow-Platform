@@ -287,6 +287,7 @@ const PAGE_INFO: Record<string,{title:string;sub:string}> = {
   prd:{title:"PRD Agent",sub:"Focus group data in → structured PRD out in seconds"},
   stakeholders:{title:"Stakeholders",sub:"Influence map with last-contact tracking"},
   metrics:{title:"Pilot Metrics",sub:"Adoption funnel, time saved and agent usage"},
+  tokens:{title:"Token Analytics",sub:"Cost per agent · per user · daily trends · workflow tracking"},
   privacy:{title:"Privacy Controls",sub:"Memory log, data flow audit and right to delete"},
   integrations:{title:"Integrations",sub:"Jira, Gmail and Google Calendar — auto-synced"},
 };
@@ -512,6 +513,12 @@ export default function PMDashboard(){
   // Calendar date for todos
   const [selectedTodoDate,setSelectedTodoDate]=useState(new Date());
 
+  // Token Analytics
+  const [tokenUsage,setTokenUsage]=useState<any[]>([]);
+  const [tokenWorkflows,setTokenWorkflows]=useState<any[]>([]);
+  const [tokenRollup,setTokenRollup]=useState<any[]>([]);
+  const [tokenLoading,setTokenLoading]=useState(false);
+
   // Super Agent
   const [superRequest,setSuperRequest]=useState("");
   const [superFocus,setSuperFocus]=useState("all");
@@ -557,13 +564,25 @@ export default function PMDashboard(){
   const loadMoscow=useCallback(async()=>{const{data}=await supabase.from("moscow_items").select("*").order("created_at").catch(()=>({data:[]}));if(data)setMoscowItems(data);},[]);
   const loadRoadmap=useCallback(async()=>{const{data}=await supabase.from("roadmap_items").select("*").order("start_quarter").catch(()=>({data:[]}));if(data)setRoadmapItems(data);},[]);
   const loadAlign=useCallback(async()=>{const{data}=await supabase.from("okr_alignment").select("*").limit(1).catch(()=>({data:[]}));if(data&&data[0])setOkrAlign(data[0]);},[]);
+  const loadTokens=useCallback(async()=>{
+    setTokenLoading(true);
+    const[a,b,c]=await Promise.allSettled([
+      supabase.from("token_usage").select("*").order("created_at",{ascending:false}).limit(100),
+      supabase.from("token_workflows").select("*").order("started_at",{ascending:false}).limit(20),
+      supabase.from("token_daily_rollup").select("*").order("date",{ascending:false}).limit(60),
+    ]);
+    if(a.status==="fulfilled"&&a.value.data)setTokenUsage(a.value.data);
+    if(b.status==="fulfilled"&&b.value.data)setTokenWorkflows(b.value.data);
+    if(c.status==="fulfilled"&&c.value.data)setTokenRollup(c.value.data);
+    setTokenLoading(false);
+  },[]);
 
   useEffect(()=>{
     loadTasks();loadProjects();loadMeetings();loadOkrs();loadStakeholders();loadMemory();
     loadIntegrations();loadJira();loadGmail();loadCal();loadAgentRuns();loadRice();
-    loadMoscow();loadRoadmap();loadAlign();
+    loadMoscow();loadRoadmap();loadAlign();loadTokens();
   },[loadTasks,loadProjects,loadMeetings,loadOkrs,loadStakeholders,loadMemory,
-     loadIntegrations,loadJira,loadGmail,loadCal,loadAgentRuns,loadRice,loadMoscow,loadRoadmap,loadAlign]);
+     loadIntegrations,loadJira,loadGmail,loadCal,loadAgentRuns,loadRice,loadMoscow,loadRoadmap,loadAlign,loadTokens]);
 
   useEffect(()=>{
     if(!user)return;
@@ -1486,6 +1505,175 @@ export default function PMDashboard(){
                     <div style={{fontSize:12,color:"var(--mut)",maxWidth:380,margin:"0 auto"}}>Enter a request above or leave blank for a full portfolio brief. The agent will fetch real data from all sources and return PRD + Risks + Prioritization + Exec Summary.</div>
                   </div>
                 )}
+
+              </div>
+            )}
+
+
+            {/* TOKEN ANALYTICS */}
+            {page==="tokens"&&(
+              <div className="col">
+                {tokenLoading&&<div className="loading"><div className="spin"/>Loading token data...</div>}
+
+                {/* KPI strip */}
+                {!tokenLoading&&(()=>{
+                  const totalTokens=tokenUsage.reduce((s:number,r:any)=>s+(r.total_tokens||0),0);
+                  const totalCost=tokenUsage.reduce((s:number,r:any)=>s+(parseFloat(r.estimated_cost)||0),0);
+                  const todayCost=tokenRollup.filter((r:any)=>r.date===new Date().toISOString().split("T")[0]).reduce((s:number,r:any)=>s+(parseFloat(r.total_cost)||0),0);
+                  const agentSet=new Set(tokenUsage.map((r:any)=>r.agent_name));
+                  return(
+                    <div className="g4">
+                      {[
+                        {v:totalTokens.toLocaleString(),l:"Total Tokens",c:"var(--acc)"},
+                        {v:`$${totalCost.toFixed(4)}`,l:"Total Cost (USD)",c:"var(--grn)"},
+                        {v:`$${todayCost.toFixed(4)}`,l:"Cost Today",c:"var(--amb)"},
+                        {v:agentSet.size.toString(),l:"Agents Tracked",c:"var(--pur)"},
+                      ].map(({v,l,c})=>(
+                        <div key={l} className="kpi"><div className="kpi-v" style={{color:c}}>{v}</div><div className="kpi-l">{l}</div></div>
+                      ))}
+                    </div>
+                  );
+                })()}
+
+                <div className="g2">
+                  {/* Top agents */}
+                  <div className="card">
+                    <div className="ch"><div className="ct">Top Agents · Token Usage</div></div>
+                    {tokenUsage.length===0?<div className="empty">No token data yet. Run any agent to start tracking.</div>:(()=>{
+                      const byAgent=tokenUsage.reduce((acc:any,r:any)=>{
+                        const k=r.agent_name;
+                        if(!acc[k])acc[k]={agent:k,calls:0,tokens:0,cost:0};
+                        acc[k].calls++;acc[k].tokens+=(r.total_tokens||0);acc[k].cost+=(parseFloat(r.estimated_cost)||0);
+                        return acc;
+                      },{});
+                      const sorted=Object.values(byAgent).sort((a:any,b:any)=>b.tokens-a.tokens);
+                      const max=(sorted[0] as any)?.tokens||1;
+                      return(
+                        <div className="cb0" style={{padding:"4px 16px"}}>
+                          {sorted.map((ag:any)=>(
+                            <div key={ag.agent} style={{display:"flex",alignItems:"center",gap:10,padding:"9px 0",borderBottom:"1px solid var(--bdr)"}}>
+                              <span style={{width:140,fontSize:12,flexShrink:0}}>{ag.agent}</span>
+                              <div style={{flex:1,height:6,background:"var(--bdr2)",borderRadius:3,overflow:"hidden"}}>
+                                <div style={{height:"100%",width:`${(ag.tokens/max)*100}%`,background:"var(--acc)",borderRadius:3}}/>
+                              </div>
+                              <span className="mono" style={{fontSize:10,color:"var(--acc)",width:70,textAlign:"right"}}>{ag.tokens.toLocaleString()}</span>
+                              <span className="mono" style={{fontSize:10,color:"var(--grn)",width:55,textAlign:"right"}}>${ag.cost.toFixed(4)}</span>
+                              <span className="mono dim" style={{fontSize:10,width:35,textAlign:"right"}}>{ag.calls}x</span>
+                            </div>
+                          ))}
+                        </div>
+                      );
+                    })()}
+                  </div>
+
+                  {/* Daily trend */}
+                  <div className="card">
+                    <div className="ch"><div className="ct">Daily Cost Trend · Last 14 Days</div></div>
+                    {tokenRollup.length===0?<div className="empty">No rollup data yet.</div>:(()=>{
+                      const byDate=tokenRollup.reduce((acc:any,r:any)=>{
+                        const d=r.date;
+                        if(!acc[d])acc[d]={date:d,cost:0,tokens:0};
+                        acc[d].cost+=(parseFloat(r.total_cost)||0);acc[d].tokens+=(r.total_tokens||0);
+                        return acc;
+                      },{});
+                      const days=Object.values(byDate).sort((a:any,b:any)=>a.date.localeCompare(b.date)).slice(-14);
+                      const maxCost=Math.max(...days.map((d:any)=>d.cost),0.001);
+                      return(
+                        <div className="cb0" style={{padding:"4px 16px"}}>
+                          {days.map((d:any)=>(
+                            <div key={d.date} style={{display:"flex",alignItems:"center",gap:10,padding:"7px 0",borderBottom:"1px solid var(--bdr)"}}>
+                              <span className="mono dim" style={{fontSize:10,width:80,flexShrink:0}}>{new Date(d.date).toLocaleDateString("en-US",{month:"short",day:"numeric"})}</span>
+                              <div style={{flex:1,height:6,background:"var(--bdr2)",borderRadius:3,overflow:"hidden"}}>
+                                <div style={{height:"100%",width:`${(d.cost/maxCost)*100}%`,background:"var(--grn)",borderRadius:3}}/>
+                              </div>
+                              <span className="mono" style={{fontSize:10,color:"var(--grn)",width:60,textAlign:"right"}}>${d.cost.toFixed(4)}</span>
+                              <span className="mono dim" style={{fontSize:10,width:65,textAlign:"right"}}>{d.tokens.toLocaleString()}</span>
+                            </div>
+                          ))}
+                        </div>
+                      );
+                    })()}
+                  </div>
+                </div>
+
+                {/* Model breakdown */}
+                <div className="card">
+                  <div className="ch"><div className="ct">Model Breakdown</div></div>
+                  {tokenUsage.length===0?<div className="empty">No data yet.</div>:(()=>{
+                    const byModel=tokenUsage.reduce((acc:any,r:any)=>{
+                      const k=r.model||"unknown";
+                      if(!acc[k])acc[k]={model:k,calls:0,input:0,output:0,cost:0};
+                      acc[k].calls++;acc[k].input+=(r.input_tokens||0);acc[k].output+=(r.output_tokens||0);acc[k].cost+=(parseFloat(r.estimated_cost)||0);
+                      return acc;
+                    },{});
+                    const rows=Object.values(byModel).sort((a:any,b:any)=>b.cost-a.cost);
+                    return(
+                      <>
+                        <div className="th-row" style={{gridTemplateColumns:"1fr 60px 80px 80px 80px 80px"}}>
+                          <span>Model</span><span>Calls</span><span>Input tok</span><span>Output tok</span><span>Total tok</span><span>Cost USD</span>
+                        </div>
+                        {rows.map((m:any)=>(
+                          <div key={m.model} className="tr" style={{gridTemplateColumns:"1fr 60px 80px 80px 80px 80px"}}>
+                            <span className="tag tag-pur" style={{fontSize:9,width:"fit-content"}}>{m.model}</span>
+                            <span className="mono dim" style={{fontSize:11}}>{m.calls}</span>
+                            <span className="mono dim" style={{fontSize:11}}>{m.input.toLocaleString()}</span>
+                            <span className="mono dim" style={{fontSize:11}}>{m.output.toLocaleString()}</span>
+                            <span className="mono acc" style={{fontSize:11}}>{(m.input+m.output).toLocaleString()}</span>
+                            <span className="mono" style={{fontSize:11,color:"var(--grn)"}}>${m.cost.toFixed(4)}</span>
+                          </div>
+                        ))}
+                      </>
+                    );
+                  })()}
+                </div>
+
+                {/* Workflow runs */}
+                <div className="card">
+                  <div className="ch">
+                    <div className="ct">Workflow Runs · Orchestrated Calls</div>
+                    <button className="btn btn-sm" onClick={loadTokens}>⟳ Refresh</button>
+                  </div>
+                  {tokenWorkflows.length===0?<div className="empty">No workflow runs yet. Workflow tracking activates on Super Agent runs.</div>:(
+                    <>
+                      <div className="th-row" style={{gridTemplateColumns:"1fr 80px 80px 80px 60px 90px"}}>
+                        <span>Workflow</span><span>Agents</span><span>Tokens</span><span>Cost</span><span>Status</span><span>Started</span>
+                      </div>
+                      {tokenWorkflows.map((wf:any)=>(
+                        <div key={wf.id} className="tr" style={{gridTemplateColumns:"1fr 80px 80px 80px 60px 90px"}}>
+                          <div><div style={{fontWeight:500,fontSize:12}}>{wf.workflow_name}</div>{wf.triggered_by&&<span className="mono dim" style={{fontSize:9}}>{wf.triggered_by}</span>}</div>
+                          <span className="mono dim" style={{fontSize:11}}>{wf.agent_count}</span>
+                          <span className="mono acc" style={{fontSize:11}}>{(wf.total_tokens||0).toLocaleString()}</span>
+                          <span className="mono" style={{fontSize:11,color:"var(--grn)"}}>${parseFloat(wf.total_cost||0).toFixed(4)}</span>
+                          <span className={`tag ${wf.status==="completed"?"tag-grn":wf.status==="failed"?"tag-red":"tag-amb"}`} style={{fontSize:9}}>{wf.status}</span>
+                          <span className="mono dim" style={{fontSize:10}}>{wf.started_at?new Date(wf.started_at).toLocaleDateString("en-US",{month:"short",day:"numeric",hour:"2-digit",minute:"2-digit"}):"—"}</span>
+                        </div>
+                      ))}
+                    </>
+                  )}
+                </div>
+
+                {/* Raw log */}
+                <div className="card">
+                  <div className="ch"><div className="ct">Raw Token Log · Last 100 Calls</div></div>
+                  {tokenUsage.length===0?<div className="empty">No token logs yet.</div>:(
+                    <>
+                      <div className="th-row" style={{gridTemplateColumns:"140px 1fr 70px 70px 80px 80px 100px"}}>
+                        <span>Agent</span><span>Model</span><span>Input</span><span>Output</span><span>Total</span><span>Cost USD</span><span>When</span>
+                      </div>
+                      {tokenUsage.slice(0,50).map((r:any)=>(
+                        <div key={r.id} className="tr" style={{gridTemplateColumns:"140px 1fr 70px 70px 80px 80px 100px"}}>
+                          <span className="tag tag-pur" style={{fontSize:9}}>{r.agent_name}</span>
+                          <span className="mono dim" style={{fontSize:10}}>{r.model}</span>
+                          <span className="mono dim" style={{fontSize:11}}>{(r.input_tokens||0).toLocaleString()}</span>
+                          <span className="mono dim" style={{fontSize:11}}>{(r.output_tokens||0).toLocaleString()}</span>
+                          <span className="mono acc" style={{fontSize:11}}>{(r.total_tokens||0).toLocaleString()}</span>
+                          <span className="mono" style={{fontSize:11,color:"var(--grn)"}}>${parseFloat(r.estimated_cost||0).toFixed(6)}</span>
+                          <span className="mono dim" style={{fontSize:10}}>{r.created_at?new Date(r.created_at).toLocaleDateString("en-US",{month:"short",day:"numeric",hour:"2-digit",minute:"2-digit"}):"—"}</span>
+                        </div>
+                      ))}
+                    </>
+                  )}
+                </div>
 
               </div>
             )}
