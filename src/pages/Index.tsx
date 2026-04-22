@@ -1586,6 +1586,55 @@ export default function PMDashboard(){
                 {superResult&&!superRunning&&(
                   <div className="col">
 
+                    {/* Model Routing Decision */}
+                    {(superResult.task_classification||superResult.model_decision)&&(
+                      <div style={{background:"var(--surf2)",border:"1px solid var(--bdr)",borderRadius:10,padding:"12px 16px",display:"flex",gap:20,flexWrap:"wrap",alignItems:"flex-start"}}>
+                        {superResult.task_classification&&(
+                          <div>
+                            <div className="section-lbl" style={{marginBottom:5}}>Task Classification</div>
+                            <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
+                              <span className="tag tag-pur" style={{fontSize:9}}>{superResult.task_classification.type}</span>
+                              <span className={`tag ${superResult.task_classification.complexity==="high"?"tag-red":superResult.task_classification.complexity==="low"?"tag-grn":"tag-amb"}`} style={{fontSize:9}}>{superResult.task_classification.complexity} complexity</span>
+                              <span className="tag tag-dim" style={{fontSize:9}}>{superResult.task_classification.context_size} context</span>
+                            </div>
+                          </div>
+                        )}
+                        {superResult.optimizer_recommendation?.recommended_model&&(
+                          <div>
+                            <div className="section-lbl" style={{marginBottom:5}}>Optimizer Rec</div>
+                            <div style={{display:"flex",gap:6,alignItems:"center"}}>
+                              <span className="tag tag-blu" style={{fontSize:9}}>{superResult.optimizer_recommendation.recommended_model?.split("-").slice(-2).join("-")}</span>
+                              <span className={`tag ${superResult.optimizer_recommendation.confidence==="high"?"tag-grn":superResult.optimizer_recommendation.confidence==="low"?"tag-red":"tag-amb"}`} style={{fontSize:9}}>{superResult.optimizer_recommendation.confidence} confidence</span>
+                            </div>
+                          </div>
+                        )}
+                        {superResult.model_decision&&(
+                          <div>
+                            <div className="section-lbl" style={{marginBottom:5}}>Model Selected</div>
+                            <div style={{display:"flex",gap:6,alignItems:"center",flexWrap:"wrap"}}>
+                              <span className="tag tag-grn" style={{fontSize:9}}>{superResult.model_decision.selected_model?.split("-").slice(-2).join("-")}</span>
+                              <span className="tag tag-dim" style={{fontSize:9}}>{superResult.model_decision.selection_source}</span>
+                            </div>
+                            {superResult.model_decision.reason&&<div style={{fontSize:10,color:"var(--mut)",marginTop:4,maxWidth:240}}>{superResult.model_decision.reason}</div>}
+                          </div>
+                        )}
+                        {superResult.post_optimization&&(
+                          <div>
+                            <div className="section-lbl" style={{marginBottom:5}}>Post-Opt</div>
+                            <div style={{display:"flex",gap:6,alignItems:"center"}}>
+                              <span className={`tag ${superResult.post_optimization.model_was_optimal?"tag-grn":"tag-amb"}`} style={{fontSize:9}}>{superResult.post_optimization.model_was_optimal?"✓ Optimal":"⚠ Suboptimal"}</span>
+                              {superResult.post_optimization.estimated_cost_savings&&superResult.post_optimization.estimated_cost_savings!=="$0"&&(
+                                <span className="tag tag-grn" style={{fontSize:9}}>Save {superResult.post_optimization.estimated_cost_savings}</span>
+                              )}
+                            </div>
+                            {superResult.post_optimization.suggested_change&&superResult.post_optimization.suggested_change!=="none"&&(
+                              <div style={{fontSize:10,color:"var(--acc)",marginTop:4}}>{superResult.post_optimization.suggested_change}</div>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    )}
+
                     {/* Exec Summary */}
                     <div className="sa-out-sec">
                       <div className="sa-out-hd" onClick={()=>toggleSuperSec("exec")}>
