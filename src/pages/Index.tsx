@@ -269,7 +269,7 @@ const NAV = [
   {grp:"Today",items:[{id:"schedule",ic:"🕐",lbl:"Daily Schedule"},{id:"todos",ic:"☑",lbl:"To-Do List"}]},
   {grp:"Execution",items:[{id:"tracker",ic:"◎",lbl:"Projects"},{id:"meetings",ic:"✦",lbl:"Meeting Intel"}]},
   {grp:"Strategy",items:[{id:"priority",ic:"◈",lbl:"Prioritization"},{id:"roadmap",ic:"🗺",lbl:"Roadmap"},{id:"okr",ic:"◎",lbl:"OKR Tracker"}]},
-  {grp:"Intelligence",items:[{id:"super",ic:"🔮",lbl:"Super Agent"},{id:"optimizer",ic:"⚡",lbl:"Cost Optimizer"},{id:"decisions",ic:"📌",lbl:"Decision Log"},{id:"knowledge",ic:"🧠",lbl:"Knowledge"},{id:"agents",ic:"⬡",lbl:"AI Agents"},{id:"prd",ic:"📄",lbl:"PRD Agent"}]},
+  {grp:"Intelligence",items:[{id:"super",ic:"🔮",lbl:"Super Agent"},{id:"optimizer",ic:"⚡",lbl:"Cost Optimizer"},{id:"research",ic:"🔍",lbl:"Research"},{id:"decisions",ic:"📌",lbl:"Decision Log"},{id:"knowledge",ic:"🧠",lbl:"Knowledge"},{id:"agents",ic:"⬡",lbl:"AI Agents"},{id:"prd",ic:"📄",lbl:"PRD Agent"}]},
   {grp:"People",items:[{id:"stakeholders",ic:"◉",lbl:"Stakeholders"}]},
   {grp:"Operations",items:[{id:"metrics",ic:"◎",lbl:"Pilot Metrics"},{id:"outcomes",ic:"🎯",lbl:"Outcomes"},{id:"tokens",ic:"◈",lbl:"Token Analytics"},{id:"privacy",ic:"◈",lbl:"Privacy"},{id:"integrations",ic:"⚡",lbl:"Integrations"}]},
 ];
@@ -282,6 +282,7 @@ const PAGE_INFO: Record<string,{title:string;sub:string}> = {
   priority:{title:"Prioritization",sub:"Choose a framework and project — AI scores your backlog"},
   roadmap:{title:"Roadmap",sub:"Quarterly initiative planning across all projects"},
   okr:{title:"OKR Tracker",sub:"Key results with AI-generated weekly and quarterly insights"},
+  research:{title:"Research Agents",sub:"Competitive · Market · Customer — AI-powered with live web search"},
   decisions:{title:"Decision Log",sub:"Every decision · rationale · data used · trade-offs · outcome status"},
   knowledge:{title:"Knowledge Memory",sub:"Past PRDs · insights · learnings · reusable patterns"},
   outcomes:{title:"Outcome Tracking",sub:"Feature impact post-launch · OKR contribution · business results"},
@@ -516,6 +517,16 @@ export default function PMDashboard(){
 
   // Calendar date for todos
   const [selectedTodoDate,setSelectedTodoDate]=useState(new Date());
+
+  // Research Agents
+  const [researchProduct,setResearchProduct]=useState("");
+  const [researchContext,setResearchContext]=useState("");
+  const [researchProject,setResearchProject]=useState("");
+  const [researchRunning,setResearchRunning]=useState(false);
+  const [researchResult,setResearchResult]=useState<any>(null);
+  const [researchError,setResearchError]=useState<string|null>(null);
+  const [researchTab,setResearchTab]=useState("synthesis");
+  const [researchStep,setResearchStep]=useState(0);
 
   // Decision Log
   const [decisions,setDecisions]=useState<any[]>([]);
@@ -839,6 +850,20 @@ export default function PMDashboard(){
   /* ── Roadmap ── */
   const saveRm=async()=>{if(!rmForm.title.trim())return;await supabase.from("roadmap_items").insert({...rmForm,year:rmYear,user_id:user?.id}).catch(()=>{});setShowAddRoadmap(false);setRmForm({title:"",project:"",startQ:0,endQ:1,color:"#00d4ff"});loadRoadmap();};
   const deleteRm=async(id:string)=>{await supabase.from("roadmap_items").delete().eq("id",id).catch(()=>{});loadRoadmap();};
+
+  /* ── Research Agents ── */
+  const RESEARCH_STEPS=["Running Competitive Analysis Agent (web search)…","Running Market Analysis Agent (web search)…","Running Customer Insights Agent…","Synthesizing across all three agents…"];
+  const runResearch=async()=>{
+    if(!researchProduct.trim())return;
+    setResearchRunning(true);setResearchResult(null);setResearchError(null);setResearchStep(0);
+    const interval=setInterval(()=>setResearchStep(s=>Math.min(s+1,RESEARCH_STEPS.length-1)),3500);
+    try{
+      const{data,error}=await supabase.functions.invoke("research-agents",{body:{product:researchProduct,context:researchContext,userId:user?.id,projectId:researchProject||null}});
+      if(error)throw new Error(error.message);if(data?.error)throw new Error(data.error);
+      setResearchResult(data);setResearchTab("synthesis");loadKnowledge();loadAgentRuns();
+    }catch(e:any){setResearchError(e.message);}
+    finally{clearInterval(interval);setResearchStep(3);setResearchRunning(false);}
+  };
 
   /* ── Decision Log ── */
   const saveDecision=async()=>{
@@ -1564,6 +1589,263 @@ export default function PMDashboard(){
               </div>
             )}
 
+
+
+            {/* RESEARCH AGENTS */}
+            {page==="research"&&(
+              <div className="col">
+
+                {/* Hero */}
+                <div style={{background:"linear-gradient(135deg,rgba(124,58,237,0.1),rgba(0,212,255,0.07))",border:"1px solid rgba(124,58,237,0.2)",borderRadius:14,padding:"20px 24px"}}>
+                  <div style={{fontFamily:"Syne",fontWeight:800,fontSize:20,marginBottom:6}}>🔍 Research Agents</div>
+                  <div style={{fontSize:13,color:"var(--mut)",maxWidth:600,lineHeight:1.6,marginBottom:12}}>Three specialized AI agents running in parallel with live web search. Produces competitive analysis, market sizing, and customer insights — grounded in real data.</div>
+                  <div style={{display:"flex",gap:10,flexWrap:"wrap"}}>
+                    {[{ic:"🏆",l:"Competitive Agent",d:"Competitors · Pricing · Gaps",c:"var(--pur)"},{ic:"🌍",l:"Market Agent",d:"TAM/SAM/SOM · Trends · Growth",c:"var(--acc)"},{ic:"👥",l:"Customer Agent",d:"Themes · Pain Points · Segments",c:"var(--grn)"}].map(({ic,l,d,c})=>(
+                      <div key={l} style={{background:"var(--surf)",border:`1px solid ${c}30`,borderRadius:9,padding:"10px 14px",flex:"1 1 180px"}}>
+                        <div style={{fontSize:18,marginBottom:4}}>{ic}</div>
+                        <div style={{fontFamily:"Syne",fontWeight:700,fontSize:12,color:c,marginBottom:2}}>{l}</div>
+                        <div style={{fontSize:11,color:"var(--mut)"}}>{d}</div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Input */}
+                <div className="card">
+                  <div className="ch"><div className="ct">Research Brief</div></div>
+                  <div className="cb">
+                    <div className="form-grid" style={{marginBottom:10}}>
+                      <div className="form-row" style={{gridColumn:"1/-1"}}>
+                        <label className="form-label">Product / Feature / Problem</label>
+                        <input className="input" value={researchProduct} onChange={e=>setResearchProduct(e.target.value)} placeholder="e.g. AI-powered network anomaly detection for enterprise NOC teams" autoFocus/>
+                      </div>
+                      <div className="form-row">
+                        <label className="form-label">Link to Project (optional)</label>
+                        <select className="input select" value={researchProject} onChange={e=>setResearchProject(e.target.value)}>
+                          <option value="">None</option>{projects.map(p=><option key={p.id} value={p.id}>{p.name}</option>)}
+                        </select>
+                      </div>
+                      <div className="form-row">
+                        <label className="form-label">Additional Context</label>
+                        <input className="input" value={researchContext} onChange={e=>setResearchContext(e.target.value)} placeholder="Target market, stage, constraints..."/>
+                      </div>
+                    </div>
+                    {researchError&&<div className="infobox ib-red" style={{marginBottom:10}}>⚠️ {researchError}</div>}
+                    <button style={{width:"100%",padding:13,background:researchRunning||!researchProduct.trim()?"var(--bdr)":"linear-gradient(90deg,var(--pur),var(--acc))",border:"none",borderRadius:9,fontFamily:"Syne",fontWeight:800,fontSize:14,color:researchRunning||!researchProduct.trim()?"var(--mut)":"#000",cursor:researchRunning||!researchProduct.trim()?"not-allowed":"pointer",display:"flex",alignItems:"center",justifyContent:"center",gap:10}} onClick={runResearch} disabled={researchRunning||!researchProduct.trim()}>
+                      {researchRunning?<><span className="spin" style={{width:16,height:16,borderWidth:2,borderTopColor:"#000",borderColor:"rgba(0,0,0,0.2)"}}/>Researching...</>:"🔍 Run Research Agents"}
+                    </button>
+                  </div>
+                </div>
+
+                {/* Thinking steps */}
+                {researchRunning&&(
+                  <div className="sa-thinking">
+                    <div style={{fontFamily:"Syne",fontWeight:700,fontSize:13,marginBottom:4}}>3 agents running in parallel…</div>
+                    {RESEARCH_STEPS.map((step,i)=>(
+                      <div key={i} className="sa-think-step">
+                        <div className={`sa-think-dot ${i<researchStep?"sa-think-done":i===researchStep?"sa-think-active":"sa-think-wait"}`}/>
+                        <span style={{color:i<researchStep?"var(--grn)":i===researchStep?"var(--acc)":"var(--mut)"}}>{step}</span>
+                        {i<researchStep&&<span style={{marginLeft:"auto",fontFamily:"DM Mono",fontSize:9,color:"var(--grn)"}}>✓</span>}
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                {/* Results */}
+                {researchResult&&!researchRunning&&(
+                  <div className="col">
+                    {/* Confidence + meta strip */}
+                    <div style={{display:"flex",gap:10,alignItems:"center",flexWrap:"wrap",padding:"10px 14px",background:"var(--surf2)",border:"1px solid var(--bdr)",borderRadius:9}}>
+                      <span style={{fontFamily:"Syne",fontWeight:700,fontSize:13,flex:1}}>{researchResult.product}</span>
+                      <span className={researchResult.confidence_score==="high"?"confidence-high":researchResult.confidence_score==="medium"?"confidence-medium":"confidence-low"}>Confidence: {researchResult.confidence_score}</span>
+                      <span className="mono dim" style={{fontSize:10}}>{researchResult.data_sources?.length||0} sources · {new Date(researchResult.generated_at).toLocaleTimeString()}</span>
+                      {researchResult.data_gaps?.length>0&&<span className="tag tag-amb" style={{fontSize:9}}>{researchResult.data_gaps.length} data gaps</span>}
+                      <button className="btn btn-sm" onClick={()=>navigator.clipboard.writeText(JSON.stringify(researchResult,null,2)).then(()=>alert("Copied JSON!"))}>Copy JSON</button>
+                    </div>
+
+                    {/* Tab navigation */}
+                    <div className="fw-tabs">
+                      {[{k:"synthesis",l:"🎯 Synthesis"},{k:"competitive",l:"🏆 Competitive"},{k:"market",l:"🌍 Market"},{k:"customer",l:"👥 Customer"}].map(({k,l})=>(
+                        <button key={k} className={`fw-tab${researchTab===k?" on":""}`} onClick={()=>setResearchTab(k)}>{l}</button>
+                      ))}
+                    </div>
+
+                    {/* Synthesis tab */}
+                    {researchTab==="synthesis"&&researchResult.synthesis&&(
+                      <div className="col">
+                        <div className="card">
+                          <div className="ch"><div style={{fontFamily:"Syne",fontWeight:700,fontSize:14}}>Strategic Synthesis</div><span className={`tag ${researchResult.synthesis.investment_recommendation==="build"?"tag-grn":researchResult.synthesis.investment_recommendation==="avoid"?"tag-red":"tag-amb"}`} style={{fontSize:9,textTransform:"uppercase"}}>Recommendation: {researchResult.synthesis.investment_recommendation}</span></div>
+                          {researchResult.synthesis.investment_rationale&&<div className="cb"><p style={{fontSize:13,lineHeight:1.8,color:"var(--txt)"}}>{researchResult.synthesis.investment_rationale}</p></div>}
+                        </div>
+                        <div className="g2">
+                          <div className="card">
+                            <div className="ch"><div className="ct">Key Insights</div></div>
+                            <div className="cb">
+                              {(researchResult.synthesis.key_insights||[]).map((ins:string,i:number)=>(
+                                <div key={i} style={{display:"flex",gap:10,padding:"8px 0",borderBottom:"1px solid var(--bdr)",alignItems:"flex-start"}}>
+                                  <div style={{width:20,height:20,borderRadius:"50%",background:"rgba(0,212,255,0.1)",border:"1px solid rgba(0,212,255,0.2)",display:"flex",alignItems:"center",justifyContent:"center",fontFamily:"DM Mono",fontSize:10,color:"var(--acc)",flexShrink:0}}>{i+1}</div>
+                                  <span style={{fontSize:12,lineHeight:1.6}}>{ins}</span>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                          <div className="card">
+                            <div className="ch"><div className="ct">Recommended Actions</div></div>
+                            <div className="cb">
+                              {(researchResult.synthesis.recommended_actions||[]).map((a:any,i:number)=>(
+                                <div key={i} style={{padding:"9px 0",borderBottom:"1px solid var(--bdr)"}}>
+                                  <div style={{display:"flex",gap:6,marginBottom:3}}>
+                                    <span className={`tag ${a.priority==="p0"?"tag-red":a.priority==="p1"?"tag-amb":"tag-dim"}`} style={{fontSize:9}}>{a.priority}</span>
+                                    <span className="tag tag-dim" style={{fontSize:9}}>{a.timeframe}</span>
+                                  </div>
+                                  <div style={{fontWeight:500,fontSize:12,marginBottom:2}}>{a.action}</div>
+                                  <div style={{fontSize:11,color:"var(--mut)"}}>{a.rationale}</div>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        </div>
+                        {(researchResult.synthesis.strategic_implications||[]).length>0&&(
+                          <div className="card">
+                            <div className="ch"><div className="ct">Strategic Implications</div></div>
+                            <div className="cb">
+                              {researchResult.synthesis.strategic_implications.map((si:string,i:number)=>(
+                                <div key={i} style={{fontSize:12,display:"flex",gap:8,padding:"5px 0",borderBottom:"1px solid var(--bdr)",color:"var(--txt)"}}><span style={{color:"var(--pur)",flexShrink:0}}>◈</span>{si}</div>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    )}
+
+                    {/* Competitive tab */}
+                    {researchTab==="competitive"&&researchResult.competitive_analysis&&(()=>{
+                      const ca=researchResult.competitive_analysis;
+                      return(
+                        <div className="col">
+                          <div style={{display:"flex",gap:10,alignItems:"center"}}>
+                            <span className={`tag ${ca.threat_level==="high"?"tag-red":ca.threat_level==="medium"?"tag-amb":"tag-grn"}`}>Threat Level: {ca.threat_level}</span>
+                            {ca.competitive_positioning&&<span style={{fontSize:12,color:"var(--mut)"}}>{ca.competitive_positioning}</span>}
+                          </div>
+                          <div className="ga">
+                            {(ca.competitors||[]).map((c:any,i:number)=>(
+                              <div key={i} className="card" style={{padding:"14px 16px"}}>
+                                <div style={{display:"flex",justifyContent:"space-between",marginBottom:8}}>
+                                  <div style={{fontFamily:"Syne",fontWeight:700,fontSize:14}}>{c.name}</div>
+                                  <span className={`tag ${c.type==="direct"?"tag-red":"tag-amb"}`} style={{fontSize:9}}>{c.type}</span>
+                                </div>
+                                {c.pricing_model&&<div style={{fontFamily:"DM Mono",fontSize:10,color:"var(--acc)",marginBottom:8}}>{c.pricing_model}</div>}
+                                {c.key_features?.length>0&&<div style={{marginBottom:6}}><div className="section-lbl" style={{marginBottom:3}}>Key Features</div>{c.key_features.slice(0,4).map((f:string,j:number)=><div key={j} style={{fontSize:11,display:"flex",gap:5,padding:"1px 0",color:"var(--txt)"}}><span style={{opacity:0.4}}>—</span>{f}</div>)}</div>}
+                                <div className="g2" style={{gap:8}}>
+                                  {c.strengths?.length>0&&<div><div className="section-lbl" style={{marginBottom:3}}>Strengths</div>{c.strengths.slice(0,3).map((s:string,j:number)=><div key={j} style={{fontSize:10,color:"var(--grn)",display:"flex",gap:4}}><span>+</span>{s}</div>)}</div>}
+                                  {c.weaknesses?.length>0&&<div><div className="section-lbl" style={{marginBottom:3}}>Weaknesses</div>{c.weaknesses.slice(0,3).map((w:string,j:number)=><div key={j} style={{fontSize:10,color:"var(--red)",display:"flex",gap:4}}><span>−</span>{w}</div>)}</div>}
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                          {ca.gaps_opportunities?.length>0&&(
+                            <div className="card">
+                              <div className="ch"><div className="ct">Gaps & Opportunities</div></div>
+                              <div className="cb">{ca.gaps_opportunities.map((g:string,i:number)=><div key={i} style={{fontSize:12,display:"flex",gap:8,padding:"5px 0",borderBottom:"1px solid var(--bdr)"}}><span style={{color:"var(--grn)"}}>💡</span>{g}</div>)}</div>
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })()}
+
+                    {/* Market tab */}
+                    {researchTab==="market"&&researchResult.market_analysis&&(()=>{
+                      const ma=researchResult.market_analysis;
+                      return(
+                        <div className="col">
+                          <div className="g3">
+                            {[["TAM",ma.market_size?.TAM,"var(--acc)"],["SAM",ma.market_size?.SAM,"var(--pur)"],["SOM",ma.market_size?.SOM,"var(--grn)"]].map(([l,v,c])=>(
+                              <div key={l} className="kpi"><div className="kpi-v" style={{color:c as string,fontSize:22}}>{v||"DATA GAP"}</div><div className="kpi-l">{l as string}</div>{ma.market_size?.source&&l==="TAM"&&<div style={{fontSize:9,color:"var(--mut)",marginTop:2,fontFamily:"DM Mono"}}>{ma.market_size.source}</div>}</div>
+                            ))}
+                          </div>
+                          <div style={{display:"flex",gap:8,alignItems:"center"}}>
+                            <span style={{fontFamily:"DM Mono",fontSize:10,color:"var(--mut)"}}>Market Opportunity:</span>
+                            <span className={`tag ${ma.market_opportunity_score==="high"?"tag-grn":ma.market_opportunity_score==="low"?"tag-red":"tag-amb"}`}>{ma.market_opportunity_score}</span>
+                          </div>
+                          <div className="g2">
+                            <div className="card">
+                              <div className="ch"><div className="ct">Key Trends</div></div>
+                              <div className="cb">{(ma.key_trends||[]).map((t:any,i:number)=><div key={i} style={{padding:"8px 0",borderBottom:"1px solid var(--bdr)"}}><div style={{fontWeight:500,fontSize:12,marginBottom:2}}>{t.trend||t}</div>{t.evidence&&<div style={{fontSize:11,color:"var(--mut)",marginBottom:2}}>{t.evidence}</div>}{t.implication&&<div style={{fontSize:11,color:"var(--acc)"}}>→ {t.implication}</div>}</div>)}</div>
+                            </div>
+                            <div className="col">
+                              {ma.growth_drivers?.length>0&&<div className="card"><div className="ch"><div className="ct">Growth Drivers</div></div><div className="cb">{ma.growth_drivers.map((d:string,i:number)=><div key={i} style={{fontSize:12,display:"flex",gap:7,padding:"4px 0",borderBottom:"1px solid var(--bdr)"}}><span style={{color:"var(--grn)"}}>▲</span>{d}</div>)}</div></div>}
+                              {ma.risks?.length>0&&<div className="card"><div className="ch"><div className="ct">Risks</div></div><div className="cb">{ma.risks.map((r:any,i:number)=><div key={i} style={{display:"flex",gap:8,padding:"5px 0",borderBottom:"1px solid var(--bdr)",fontSize:12}}><span className={`tag ${(r.severity||"medium")==="high"?"tag-red":(r.severity||"medium")==="low"?"tag-grn":"tag-amb"}`} style={{fontSize:9,flexShrink:0}}>{r.severity||"med"}</span>{r.risk||r}</div>)}</div></div>}
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })()}
+
+                    {/* Customer tab */}
+                    {researchTab==="customer"&&researchResult.customer_insights&&(()=>{
+                      const ci=researchResult.customer_insights;
+                      return(
+                        <div className="col">
+                          {ci.insight_summary&&<div className="infobox ib-blue" style={{fontSize:13,lineHeight:1.8}}>{ci.insight_summary}</div>}
+                          <div className="g2">
+                            <div className="card">
+                              <div className="ch"><div className="ct">Themes</div></div>
+                              <div className="cb0" style={{padding:"4px 16px"}}>
+                                {(ci.themes||[]).map((t:any,i:number)=>(
+                                  <div key={i} style={{padding:"10px 0",borderBottom:"1px solid var(--bdr)"}}>
+                                    <div style={{display:"flex",gap:6,marginBottom:4}}>
+                                      <span style={{fontWeight:600,fontSize:12}}>{t.label}</span>
+                                      <span className={`tag ${t.frequency==="high"?"tag-red":t.frequency==="medium"?"tag-amb":"tag-dim"}`} style={{fontSize:9}}>{t.frequency}</span>
+                                      {t.source&&<span className="tag tag-dim" style={{fontSize:9}}>{t.source}</span>}
+                                    </div>
+                                    {t.representative_quote&&<div style={{fontSize:11,color:"var(--mut)",fontStyle:"italic",padding:"4px 8px",borderLeft:"2px solid var(--bdr2)",lineHeight:1.6}}>"{t.representative_quote}"</div>}
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                            <div className="col">
+                              <div className="card">
+                                <div className="ch"><div className="ct">Pain Points</div></div>
+                                <div className="cb">{(ci.pain_points||[]).map((p:any,i:number)=><div key={i} style={{display:"flex",gap:8,padding:"6px 0",borderBottom:"1px solid var(--bdr)",fontSize:12}}><span className={`tag ${(p.severity||"high")==="critical"?"tag-red":(p.severity||"high")==="high"?"tag-amb":"tag-dim"}`} style={{fontSize:9,flexShrink:0}}>{p.severity||"high"}</span><div><div>{p.pain||p}</div>{p.affected_segment&&<div style={{fontSize:10,color:"var(--mut)"}}>{p.affected_segment}</div>}</div></div>)}</div>
+                              </div>
+                              <div className="card">
+                                <div className="ch"><div className="ct">User Segments</div></div>
+                                <div className="cb">{(ci.user_segments||[]).map((s:any,i:number)=><div key={i} style={{padding:"7px 0",borderBottom:"1px solid var(--bdr)"}}><div style={{display:"flex",gap:6,marginBottom:2}}><span style={{fontWeight:500,fontSize:12}}>{s.segment}</span>{s.willingness_to_pay&&<span className={`tag ${s.willingness_to_pay==="high"?"tag-grn":"tag-dim"}`} style={{fontSize:9}}>WTP: {s.willingness_to_pay}</span>}</div><div style={{fontSize:11,color:"var(--mut)"}}>{s.key_need}</div>{s.size_estimate&&<div style={{fontSize:10,color:"var(--acc)",fontFamily:"DM Mono"}}>{s.size_estimate}</div>}</div>)}</div>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })()}
+
+                    {/* Data Sources */}
+                    {researchResult.data_sources?.length>0&&(
+                      <div className="card">
+                        <div className="ch"><div className="ct">Data Sources · {researchResult.data_sources.length} total</div></div>
+                        <div className="cb">
+                          {researchResult.data_sources.slice(0,8).map((s:any,i:number)=>(
+                            <div key={i} style={{display:"flex",gap:8,padding:"5px 0",borderBottom:"1px solid var(--bdr)",fontSize:11}}>
+                              <span className={`tag ${s.type==="web"?"tag-blu":s.type==="internal"?"tag-grn":"tag-dim"}`} style={{fontSize:9,flexShrink:0}}>{s.type}</span>
+                              <span style={{color:"var(--mut)"}}>{s.summary}</span>
+                            </div>
+                          ))}
+                          {researchResult.data_gaps?.length>0&&<div style={{marginTop:10}}>{researchResult.data_gaps.map((g:string,i:number)=><div key={i} style={{fontSize:11,color:"var(--amb)",display:"flex",gap:6,padding:"2px 0"}}><span>⚠</span>{g}</div>)}</div>}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* Empty state */}
+                {!researchResult&&!researchRunning&&(
+                  <div className="card" style={{padding:32,textAlign:"center",opacity:0.5}}>
+                    <div style={{fontSize:40,marginBottom:10}}>🔍</div>
+                    <div style={{fontFamily:"Syne",fontWeight:700,fontSize:15,marginBottom:6}}>Research appears here</div>
+                    <div style={{fontSize:12,color:"var(--mut)",maxWidth:380,margin:"0 auto"}}>Enter a product or feature. Three AI agents run in parallel with live web search — competitive analysis, market sizing, and customer insights in one pass.</div>
+                  </div>
+                )}
+              </div>
+            )}
 
             {/* DECISION LOG */}
             {page==="decisions"&&(
