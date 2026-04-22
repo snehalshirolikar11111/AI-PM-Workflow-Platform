@@ -271,7 +271,7 @@ const NAV = [
   {grp:"Strategy",items:[{id:"priority",ic:"◈",lbl:"Prioritization"},{id:"roadmap",ic:"🗺",lbl:"Roadmap"},{id:"okr",ic:"◎",lbl:"OKR Tracker"}]},
   {grp:"Intelligence",items:[{id:"super",ic:"🔮",lbl:"Super Agent"},{id:"agents",ic:"⬡",lbl:"AI Agents"},{id:"prd",ic:"📄",lbl:"PRD Agent"}]},
   {grp:"People",items:[{id:"stakeholders",ic:"◉",lbl:"Stakeholders"}]},
-  {grp:"Operations",items:[{id:"metrics",ic:"◎",lbl:"Pilot Metrics"},{id:"privacy",ic:"◈",lbl:"Privacy"},{id:"integrations",ic:"⚡",lbl:"Integrations"}]},
+  {grp:"Operations",items:[{id:"metrics",ic:"◎",lbl:"Pilot Metrics"},{id:"tokens",ic:"◈",lbl:"Token Analytics"},{id:"privacy",ic:"◈",lbl:"Privacy"},{id:"integrations",ic:"⚡",lbl:"Integrations"}]},
 ];
 
 const PAGE_INFO: Record<string,{title:string;sub:string}> = {
