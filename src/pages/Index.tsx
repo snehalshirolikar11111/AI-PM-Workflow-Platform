@@ -269,7 +269,7 @@ const NAV = [
   {grp:"Today",items:[{id:"schedule",ic:"🕐",lbl:"Daily Schedule"},{id:"todos",ic:"☑",lbl:"To-Do List"}]},
   {grp:"Execution",items:[{id:"tracker",ic:"◎",lbl:"Projects"},{id:"meetings",ic:"✦",lbl:"Meeting Intel"}]},
   {grp:"Strategy",items:[{id:"priority",ic:"◈",lbl:"Prioritization"},{id:"roadmap",ic:"🗺",lbl:"Roadmap"},{id:"okr",ic:"◎",lbl:"OKR Tracker"}]},
-  {grp:"Intelligence",items:[{id:"super",ic:"🔮",lbl:"Super Agent"},{id:"agents",ic:"⬡",lbl:"AI Agents"},{id:"prd",ic:"📄",lbl:"PRD Agent"}]},
+  {grp:"Intelligence",items:[{id:"super",ic:"🔮",lbl:"Super Agent"},{id:"optimizer",ic:"⚡",lbl:"Cost Optimizer"},{id:"agents",ic:"⬡",lbl:"AI Agents"},{id:"prd",ic:"📄",lbl:"PRD Agent"}]},
   {grp:"People",items:[{id:"stakeholders",ic:"◉",lbl:"Stakeholders"}]},
   {grp:"Operations",items:[{id:"metrics",ic:"◎",lbl:"Pilot Metrics"},{id:"tokens",ic:"◈",lbl:"Token Analytics"},{id:"privacy",ic:"◈",lbl:"Privacy"},{id:"integrations",ic:"⚡",lbl:"Integrations"}]},
 ];
@@ -282,6 +282,7 @@ const PAGE_INFO: Record<string,{title:string;sub:string}> = {
   priority:{title:"Prioritization",sub:"Choose a framework and project — AI scores your backlog"},
   roadmap:{title:"Roadmap",sub:"Quarterly initiative planning across all projects"},
   okr:{title:"OKR Tracker",sub:"Key results with AI-generated weekly and quarterly insights"},
+  optimizer:{title:"Token Cost Optimizer",sub:"Analyze any agent · reduce token spend · model recommendations · caching strategy"},
   super:{title:"Super Agent",sub:"PM Orchestrator — multi-agent reasoning · real data grounding · self-evaluation loop"},
   agents:{title:"AI Agents",sub:"6 agents running — click any to invoke now"},
   prd:{title:"PRD Agent",sub:"Focus group data in → structured PRD out in seconds"},
@@ -512,6 +513,18 @@ export default function PMDashboard(){
 
   // Calendar date for todos
   const [selectedTodoDate,setSelectedTodoDate]=useState(new Date());
+
+  // Cost Optimizer
+  const [optAgentName,setOptAgentName]=useState("super-agent");
+  const [optPrompt,setOptPrompt]=useState("");
+  const [optMemory,setOptMemory]=useState("");
+  const [optTools,setOptTools]=useState("");
+  const [optWorkflow,setOptWorkflow]=useState("single-agent");
+  const [optFreq,setOptFreq]=useState("medium");
+  const [optRunning,setOptRunning]=useState(false);
+  const [optResult,setOptResult]=useState<any>(null);
+  const [optError,setOptError]=useState<string|null>(null);
+  const [optExpanded,setOptExpanded]=useState<Record<string,boolean>>({summary:true,tokens:true,prompt:true,memory:false,tools:false,model:true,cache:false,workflow:false,reco:true});
 
   // Token Analytics
   const [tokenUsage,setTokenUsage]=useState<any[]>([]);
@@ -791,6 +804,27 @@ export default function PMDashboard(){
   /* ── Roadmap ── */
   const saveRm=async()=>{if(!rmForm.title.trim())return;await supabase.from("roadmap_items").insert({...rmForm,year:rmYear,user_id:user?.id}).catch(()=>{});setShowAddRoadmap(false);setRmForm({title:"",project:"",startQ:0,endQ:1,color:"#00d4ff"});loadRoadmap();};
   const deleteRm=async(id:string)=>{await supabase.from("roadmap_items").delete().eq("id",id).catch(()=>{});loadRoadmap();};
+
+  /* ── Cost Optimizer ── */
+  const runOptimizer=async()=>{
+    setOptRunning(true);setOptResult(null);setOptError(null);
+    try{
+      const{data,error}=await supabase.functions.invoke("token-cost-optimizer",{body:{
+        agent_name:optAgentName,
+        prompt:optPrompt,
+        memory_context:optMemory,
+        tools_used:optTools.split(",").map((t:string)=>t.trim()).filter(Boolean),
+        workflow_type:optWorkflow,
+        frequency:optFreq,
+        userId:user?.id,
+      }});
+      if(error)throw new Error(error.message);
+      if(data?.error)throw new Error(data.error);
+      setOptResult(data);
+    }catch(e:any){setOptError(e.message);}
+    finally{setOptRunning(false);loadTokens();}
+  };
+  const toggleOpt=(k:string)=>setOptExpanded(p=>({...p,[k]:!p[k]}));
 
   /* ── Super Agent ── */
   const THINK_STEPS = [
@@ -1266,6 +1300,212 @@ export default function PMDashboard(){
               </div>
             )}
 
+
+
+            {/* COST OPTIMIZER */}
+            {page==="optimizer"&&(
+              <div className="col">
+
+                {/* Hero */}
+                <div style={{background:"linear-gradient(135deg,rgba(0,212,255,0.08),rgba(16,185,129,0.06))",border:"1px solid rgba(0,212,255,0.2)",borderRadius:14,padding:"22px 26px"}}>
+                  <div style={{fontFamily:"Syne",fontWeight:800,fontSize:20,marginBottom:6}}>⚡ Token Cost Optimizer</div>
+                  <div style={{fontSize:13,color:"var(--mut)",maxWidth:600,lineHeight:1.6}}>Analyzes any agent's prompt, memory and tool usage. Returns optimization recommendations, model strategy, caching opportunities and a compressed prompt — powered by Claude Haiku (cheapest model, ~$0.001 per analysis).</div>
+                  <div style={{display:"flex",gap:6,marginTop:14,flexWrap:"wrap"}}>
+                    {["Prompt compression","Memory trimming","Tool batching","Model selection","Cache strategy","Workflow collapse"].map(l=>(
+                      <span key={l} style={{fontFamily:"DM Mono",fontSize:9,padding:"3px 9px",borderRadius:100,background:"rgba(0,212,255,0.07)",border:"1px solid rgba(0,212,255,0.15)",color:"var(--acc)"}}>{l}</span>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Input form */}
+                <div className="card">
+                  <div className="ch"><div className="ct">Agent to Analyze</div></div>
+                  <div className="cb">
+                    <div className="g2" style={{gap:10,marginBottom:10}}>
+                      <div className="form-row">
+                        <label className="form-label">Agent Name</label>
+                        <select className="input select" value={optAgentName} onChange={e=>setOptAgentName(e.target.value)}>
+                          {["super-agent","meeting-scribe","weekly-digest","risk-monitor","stakeholder-update","prd-agent","prioritization","token-cost-optimizer"].map(a=><option key={a} value={a}>{a}</option>)}
+                        </select>
+                      </div>
+                      <div className="form-row">
+                        <label className="form-label">Workflow Type</label>
+                        <select className="input select" value={optWorkflow} onChange={e=>setOptWorkflow(e.target.value)}>
+                          <option value="single-agent">Single Agent</option>
+                          <option value="multi-agent">Multi-Agent</option>
+                          <option value="orchestrated">Orchestrated</option>
+                        </select>
+                      </div>
+                      <div className="form-row">
+                        <label className="form-label">Run Frequency</label>
+                        <select className="input select" value={optFreq} onChange={e=>setOptFreq(e.target.value)}>
+                          <option value="low">Low (on-demand)</option>
+                          <option value="medium">Medium (daily)</option>
+                          <option value="high">High (per user action)</option>
+                        </select>
+                      </div>
+                      <div className="form-row">
+                        <label className="form-label">Tools Used (comma-separated)</label>
+                        <input className="input" value={optTools} onChange={e=>setOptTools(e.target.value)} placeholder="jira-sync, calendar-sync, gmail-sync"/>
+                      </div>
+                    </div>
+                    <div className="form-row" style={{marginBottom:10}}>
+                      <label className="form-label">System Prompt (paste or describe)</label>
+                      <textarea className="input" value={optPrompt} onChange={e=>setOptPrompt(e.target.value)} style={{minHeight:100,resize:"vertical" as any}} placeholder={"Paste the agent's system prompt here.\n\nLeave blank to analyze based on live token_usage DB stats for the selected agent."}/>
+                    </div>
+                    <div className="form-row" style={{marginBottom:14}}>
+                      <label className="form-label">Memory / Context Injected (optional)</label>
+                      <textarea className="input" value={optMemory} onChange={e=>setOptMemory(e.target.value)} style={{minHeight:60,resize:"vertical" as any}} placeholder="Paste any memory or context block injected into this agent..."/>
+                    </div>
+                    {optError&&<div className="infobox ib-red" style={{marginBottom:10}}>{optError}</div>}
+                    <button style={{width:"100%",padding:13,background:"linear-gradient(90deg,var(--acc),var(--grn))",border:"none",borderRadius:9,fontFamily:"Syne",fontWeight:800,fontSize:14,color:"#000",cursor:optRunning?"not-allowed":"pointer",opacity:optRunning?0.6:1,display:"flex",alignItems:"center",justifyContent:"center",gap:10}} onClick={runOptimizer} disabled={optRunning}>
+                      {optRunning?<><span className="spin" style={{width:16,height:16,borderWidth:2,borderTopColor:"#000",borderColor:"rgba(0,0,0,0.2)"}}/>Analyzing...</>:"⚡ Run Optimizer"}
+                    </button>
+                  </div>
+                </div>
+
+                {/* Results */}
+                {optResult&&(
+                  <div className="col">
+
+                    {/* Summary + tokens */}
+                    {[
+                      {k:"summary",icon:"📋",label:"Summary",content:(
+                        <p style={{fontSize:13,lineHeight:1.8}}>{optResult.summary}</p>
+                      )},
+                      {k:"tokens",icon:"📊",label:"Token Analysis",content:(
+                        <div className="g4" style={{gap:10}}>
+                          {[
+                            {v:optResult.token_analysis?.input_tokens?.toLocaleString()||"—",  l:"Input Tokens",  c:"var(--acc)"},
+                            {v:optResult.token_analysis?.output_tokens?.toLocaleString()||"—", l:"Output Tokens", c:"var(--pur)"},
+                            {v:`${optResult.token_analysis?.optimization_potential_percent||0}%`,l:"Reduction Potential",c:"var(--grn)"},
+                            {v:optResult.token_analysis?.estimated_cost||optResult.token_analysis?.live_total_cost||"—",l:"Est. Cost",c:"var(--amb)"},
+                          ].map(({v,l,c})=>(
+                            <div key={l} style={{background:"var(--surf2)",border:"1px solid var(--bdr)",borderRadius:9,padding:"12px 14px"}}>
+                              <div style={{fontFamily:"Syne",fontWeight:800,fontSize:20,color:c,marginBottom:4}}>{v}</div>
+                              <div style={{fontFamily:"DM Mono",fontSize:10,color:"var(--mut)"}}>{l}</div>
+                            </div>
+                          ))}
+                        </div>
+                      )},
+                    ].map(({k,icon,label,content})=>(
+                      <div key={k} className="sa-out-sec">
+                        <div className="sa-out-hd" onClick={()=>toggleOpt(k)}>
+                          <div style={{display:"flex",alignItems:"center",gap:10}}><span style={{fontSize:14}}>{icon}</span><span style={{fontFamily:"Syne",fontWeight:700,fontSize:14}}>{label}</span></div>
+                          <span style={{fontSize:13,color:"var(--mut)"}}>{optExpanded[k]?"▾":"▸"}</span>
+                        </div>
+                        {optExpanded[k]&&<div className="sa-out-body">{content}</div>}
+                      </div>
+                    ))}
+
+                    {/* Prompt optimization */}
+                    <div className="sa-out-sec">
+                      <div className="sa-out-hd" onClick={()=>toggleOpt("prompt")}>
+                        <div style={{display:"flex",alignItems:"center",gap:10}}><span style={{fontSize:14}}>✏️</span><span style={{fontFamily:"Syne",fontWeight:700,fontSize:14}}>Prompt Optimization</span>{optResult.prompt_optimization?.reduction_percent>0&&<span className="tag tag-grn" style={{fontSize:9}}>-{optResult.prompt_optimization.reduction_percent}% tokens</span>}</div>
+                        <span style={{fontSize:13,color:"var(--mut)"}}>{optExpanded.prompt?"▾":"▸"}</span>
+                      </div>
+                      {optExpanded.prompt&&optResult.prompt_optimization&&(
+                        <div className="sa-out-body">
+                          {optResult.prompt_optimization.issues?.length>0&&(
+                            <div style={{marginBottom:12}}>
+                              <div className="section-lbl" style={{marginBottom:6}}>Issues Found</div>
+                              {optResult.prompt_optimization.issues.map((i:string,j:number)=><div key={j} style={{fontSize:12,display:"flex",gap:7,padding:"3px 0",color:"var(--amb)"}}><span>⚠</span>{i}</div>)}
+                            </div>
+                          )}
+                          {optResult.prompt_optimization.optimized_prompt&&(
+                            <>
+                              <div className="section-lbl" style={{marginBottom:6}}>Optimized Prompt</div>
+                              <div style={{background:"var(--surf2)",border:"1px solid var(--bdr)",borderRadius:8,padding:12,fontSize:12,lineHeight:1.7,whiteSpace:"pre-wrap",fontFamily:"DM Mono",marginBottom:8}}>{optResult.prompt_optimization.optimized_prompt}</div>
+                              <button className="btn btn-sm" onClick={()=>navigator.clipboard.writeText(optResult.prompt_optimization.optimized_prompt).then(()=>alert("Copied!"))}>Copy Optimized Prompt</button>
+                            </>
+                          )}
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Memory, Tools, Model, Cache, Workflow in collapsible sections */}
+                    {[
+                      {k:"memory",icon:"🧠",label:"Memory Optimization",data:optResult.memory_optimization,render:(d:any)=>(
+                        <div>
+                          {d.issues?.map((i:string,j:number)=><div key={j} style={{fontSize:12,display:"flex",gap:7,padding:"3px 0",color:"var(--amb)"}}><span>⚠</span>{i}</div>)}
+                          {d.recommended_context&&<div style={{marginTop:10}}><div className="section-lbl" style={{marginBottom:4}}>Recommended Context</div><div style={{fontSize:12,color:"var(--txt)",lineHeight:1.6}}>{d.recommended_context}</div></div>}
+                          {d.reduction_percent>0&&<div className="tag tag-grn" style={{marginTop:8,display:"inline-flex"}}>-{d.reduction_percent}% context tokens</div>}
+                        </div>
+                      )},
+                      {k:"tools",icon:"🔧",label:"Tool Optimization",data:optResult.tool_optimization,render:(d:any)=>(
+                        <div className="col" style={{gap:10}}>
+                          {d.redundant_calls?.length>0&&<div><div className="section-lbl" style={{marginBottom:4}}>Redundant Calls</div>{d.redundant_calls.map((c:string,j:number)=><div key={j} style={{fontSize:12,display:"flex",gap:7,color:"var(--red)"}}><span>✕</span>{c}</div>)}</div>}
+                          {d.recommended_calls?.length>0&&<div><div className="section-lbl" style={{marginBottom:4}}>Recommended</div>{d.recommended_calls.map((c:string,j:number)=><div key={j} style={{fontSize:12,display:"flex",gap:7,color:"var(--grn)"}}><span>✓</span>{c}</div>)}</div>}
+                          {d.batching_strategy&&<div className="infobox ib-blue" style={{fontSize:12}}>Batching: {d.batching_strategy}</div>}
+                        </div>
+                      )},
+                      {k:"model",icon:"🤖",label:"Model Strategy",data:optResult.model_strategy,render:(d:any)=>(
+                        <div style={{display:"flex",gap:16,alignItems:"flex-start",flexWrap:"wrap"}}>
+                          <div style={{flex:1}}><div className="section-lbl" style={{marginBottom:4}}>Current</div><span className="tag tag-amb">{d.current_model}</span></div>
+                          <div style={{fontSize:20,paddingTop:14}}>→</div>
+                          <div style={{flex:1}}><div className="section-lbl" style={{marginBottom:4}}>Recommended</div><span className="tag tag-grn">{d.recommended_model}</span></div>
+                          <div style={{flex:2}}><div className="section-lbl" style={{marginBottom:4}}>Justification</div><div style={{fontSize:12,color:"var(--mut)",lineHeight:1.6}}>{d.justification}</div></div>
+                        </div>
+                      )},
+                      {k:"cache",icon:"💾",label:"Caching Strategy",data:optResult.caching_strategy,render:(d:any)=>(
+                        <div className="col" style={{gap:8}}>
+                          {d.cacheable_components?.length>0&&<div><div className="section-lbl" style={{marginBottom:4}}>Cacheable</div>{d.cacheable_components.map((c:string,j:number)=><div key={j} style={{fontSize:12,display:"flex",gap:7,color:"var(--grn)"}}><span>💾</span>{c}</div>)}</div>}
+                          <div style={{display:"flex",gap:20,flexWrap:"wrap",marginTop:4}}>
+                            {d.ttl_recommendation&&<div><div className="section-lbl" style={{marginBottom:2}}>TTL</div><span className="mono acc" style={{fontSize:12}}>{d.ttl_recommendation}</span></div>}
+                            {d.expected_savings&&<div><div className="section-lbl" style={{marginBottom:2}}>Expected Savings</div><span className="mono" style={{fontSize:12,color:"var(--grn)"}}>{d.expected_savings}</span></div>}
+                          </div>
+                        </div>
+                      )},
+                      {k:"workflow",icon:"🔀",label:"Workflow Optimization",data:optResult.workflow_optimization,render:(d:any)=>(
+                        <div>
+                          {d.issues?.map((i:string,j:number)=><div key={j} style={{fontSize:12,display:"flex",gap:7,padding:"3px 0",color:"var(--amb)"}}><span>⚠</span>{i}</div>)}
+                          {d.optimized_flow&&<div style={{marginTop:10}}><div className="section-lbl" style={{marginBottom:4}}>Optimized Flow</div><div style={{fontSize:12,lineHeight:1.7,color:"var(--txt)"}}>{d.optimized_flow}</div></div>}
+                        </div>
+                      )},
+                    ].map(({k,icon,label,data,render})=>data?(
+                      <div key={k} className="sa-out-sec">
+                        <div className="sa-out-hd" onClick={()=>toggleOpt(k)}>
+                          <div style={{display:"flex",alignItems:"center",gap:10}}><span style={{fontSize:14}}>{icon}</span><span style={{fontFamily:"Syne",fontWeight:700,fontSize:14}}>{label}</span></div>
+                          <span style={{fontSize:13,color:"var(--mut)"}}>{optExpanded[k]?"▾":"▸"}</span>
+                        </div>
+                        {optExpanded[k]&&<div className="sa-out-body">{render(data)}</div>}
+                      </div>
+                    ):null)}
+
+                    {/* Final recommendations */}
+                    {optResult.final_recommendation?.length>0&&(
+                      <div className="sa-out-sec">
+                        <div className="sa-out-hd" onClick={()=>toggleOpt("reco")}>
+                          <div style={{display:"flex",alignItems:"center",gap:10}}><span style={{fontSize:14}}>🎯</span><span style={{fontFamily:"Syne",fontWeight:700,fontSize:14}}>Top 3 Actions</span></div>
+                          <span style={{fontSize:13,color:"var(--mut)"}}>{optExpanded.reco?"▾":"▸"}</span>
+                        </div>
+                        {optExpanded.reco&&(
+                          <div className="sa-out-body">
+                            {optResult.final_recommendation.map((r:string,i:number)=>(
+                              <div key={i} style={{display:"flex",gap:12,padding:"10px 0",borderBottom:"1px solid var(--bdr)",alignItems:"flex-start"}}>
+                                <div style={{width:24,height:24,borderRadius:"50%",background:"rgba(0,212,255,0.1)",border:"1px solid rgba(0,212,255,0.2)",display:"flex",alignItems:"center",justifyContent:"center",fontFamily:"DM Mono",fontWeight:700,fontSize:11,color:"var(--acc)",flexShrink:0}}>#{i+1}</div>
+                                <span style={{fontSize:13,lineHeight:1.6}}>{r}</span>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    )}
+
+                  </div>
+                )}
+
+                {/* Empty state */}
+                {!optResult&&!optRunning&&(
+                  <div className="card" style={{padding:32,textAlign:"center",opacity:0.5}}>
+                    <div style={{fontSize:42,marginBottom:10}}>⚡</div>
+                    <div style={{fontFamily:"Syne",fontWeight:700,fontSize:15,marginBottom:6}}>Analysis appears here</div>
+                    <div style={{fontSize:12,color:"var(--mut)",maxWidth:340,margin:"0 auto"}}>Select an agent, optionally paste its prompt, and click Run Optimizer. Works even without a prompt — uses live token_usage data from the DB.</div>
+                  </div>
+                )}
+
+              </div>
+            )}
 
             {/* SUPER AGENT */}
             {page==="super"&&(
