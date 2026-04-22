@@ -269,9 +269,9 @@ const NAV = [
   {grp:"Today",items:[{id:"schedule",ic:"🕐",lbl:"Daily Schedule"},{id:"todos",ic:"☑",lbl:"To-Do List"}]},
   {grp:"Execution",items:[{id:"tracker",ic:"◎",lbl:"Projects"},{id:"meetings",ic:"✦",lbl:"Meeting Intel"}]},
   {grp:"Strategy",items:[{id:"priority",ic:"◈",lbl:"Prioritization"},{id:"roadmap",ic:"🗺",lbl:"Roadmap"},{id:"okr",ic:"◎",lbl:"OKR Tracker"}]},
-  {grp:"Intelligence",items:[{id:"super",ic:"🔮",lbl:"Super Agent"},{id:"optimizer",ic:"⚡",lbl:"Cost Optimizer"},{id:"agents",ic:"⬡",lbl:"AI Agents"},{id:"prd",ic:"📄",lbl:"PRD Agent"}]},
+  {grp:"Intelligence",items:[{id:"super",ic:"🔮",lbl:"Super Agent"},{id:"optimizer",ic:"⚡",lbl:"Cost Optimizer"},{id:"decisions",ic:"📌",lbl:"Decision Log"},{id:"knowledge",ic:"🧠",lbl:"Knowledge"},{id:"agents",ic:"⬡",lbl:"AI Agents"},{id:"prd",ic:"📄",lbl:"PRD Agent"}]},
   {grp:"People",items:[{id:"stakeholders",ic:"◉",lbl:"Stakeholders"}]},
-  {grp:"Operations",items:[{id:"metrics",ic:"◎",lbl:"Pilot Metrics"},{id:"tokens",ic:"◈",lbl:"Token Analytics"},{id:"privacy",ic:"◈",lbl:"Privacy"},{id:"integrations",ic:"⚡",lbl:"Integrations"}]},
+  {grp:"Operations",items:[{id:"metrics",ic:"◎",lbl:"Pilot Metrics"},{id:"outcomes",ic:"🎯",lbl:"Outcomes"},{id:"tokens",ic:"◈",lbl:"Token Analytics"},{id:"privacy",ic:"◈",lbl:"Privacy"},{id:"integrations",ic:"⚡",lbl:"Integrations"}]},
 ];
 
 const PAGE_INFO: Record<string,{title:string;sub:string}> = {
@@ -282,6 +282,9 @@ const PAGE_INFO: Record<string,{title:string;sub:string}> = {
   priority:{title:"Prioritization",sub:"Choose a framework and project — AI scores your backlog"},
   roadmap:{title:"Roadmap",sub:"Quarterly initiative planning across all projects"},
   okr:{title:"OKR Tracker",sub:"Key results with AI-generated weekly and quarterly insights"},
+  decisions:{title:"Decision Log",sub:"Every decision · rationale · data used · trade-offs · outcome status"},
+  knowledge:{title:"Knowledge Memory",sub:"Past PRDs · insights · learnings · reusable patterns"},
+  outcomes:{title:"Outcome Tracking",sub:"Feature impact post-launch · OKR contribution · business results"},
   optimizer:{title:"Token Cost Optimizer",sub:"Analyze any agent · reduce token spend · model recommendations · caching strategy"},
   super:{title:"Super Agent",sub:"PM Orchestrator — multi-agent reasoning · real data grounding · self-evaluation loop"},
   agents:{title:"AI Agents",sub:"6 agents running — click any to invoke now"},
@@ -514,6 +517,32 @@ export default function PMDashboard(){
   // Calendar date for todos
   const [selectedTodoDate,setSelectedTodoDate]=useState(new Date());
 
+  // Decision Log
+  const [decisions,setDecisions]=useState<any[]>([]);
+  const [showAddDecision,setShowAddDecision]=useState(false);
+  const [decisionForm,setDecisionForm]=useState({title:"",decision:"",rationale:"",trade_offs:"",project_id:"",tags:""});
+
+  // Knowledge
+  const [knowledgeItems,setKnowledgeItems]=useState<any[]>([]);
+  const [knowledgeFilter,setKnowledgeFilter]=useState("all");
+  const [showAddKnowledge,setShowAddKnowledge]=useState(false);
+  const [knowledgeForm,setKnowledgeForm]=useState({type:"insight",title:"",content:"",tags:""});
+
+  // Outcomes
+  const [outcomes,setOutcomes]=useState<any[]>([]);
+  const [showAddOutcome,setShowAddOutcome]=useState(false);
+  const [outcomeForm,setOutcomeForm]=useState({feature_name:"",project_id:"",hypothesis:"",target_metric:"",target_value:"",measurement_date:""});
+
+  // Risk predictions
+  const [riskPredictions,setRiskPredictions]=useState<any[]>([]);
+
+  // Cost anomalies
+  const [costAnomalies,setCostAnomalies]=useState<any[]>([]);
+  const [budgetStatus,setBudgetStatus]=useState<any>(null);
+
+  // Feedback
+  const [feedbackEvents,setFeedbackEvents]=useState<any[]>([]);
+
   // Cost Optimizer
   const [optAgentName,setOptAgentName]=useState("super-agent");
   const [optPrompt,setOptPrompt]=useState("");
@@ -577,6 +606,12 @@ export default function PMDashboard(){
   const loadMoscow=useCallback(async()=>{const{data}=await supabase.from("moscow_items").select("*").order("created_at").catch(()=>({data:[]}));if(data)setMoscowItems(data);},[]);
   const loadRoadmap=useCallback(async()=>{const{data}=await supabase.from("roadmap_items").select("*").order("start_quarter").catch(()=>({data:[]}));if(data)setRoadmapItems(data);},[]);
   const loadAlign=useCallback(async()=>{const{data}=await supabase.from("okr_alignment").select("*").limit(1).catch(()=>({data:[]}));if(data&&data[0])setOkrAlign(data[0]);},[]);
+  const loadDecisions=useCallback(async()=>{const{data}=await supabase.from("decision_log").select("*,projects(name)").order("created_at",{ascending:false}).catch(()=>({data:[]}));if(data)setDecisions(data);},[]);
+  const loadKnowledge=useCallback(async()=>{const{data}=await supabase.from("knowledge_items").select("*").order("created_at",{ascending:false}).catch(()=>({data:[]}));if(data)setKnowledgeItems(data);},[]);
+  const loadOutcomes=useCallback(async()=>{const{data}=await supabase.from("outcomes").select("*,projects(name),okrs(objective)").order("created_at",{ascending:false}).catch(()=>({data:[]}));if(data)setOutcomes(data);},[]);
+  const loadRiskPreds=useCallback(async()=>{const{data}=await supabase.from("risk_predictions").select("*,projects(name)").eq("status","active").order("detected_at",{ascending:false}).catch(()=>({data:[]}));if(data)setRiskPredictions(data);},[]);
+  const loadCostAnomalies=useCallback(async()=>{const{data}=await supabase.from("v_cost_anomalies").select("*").limit(10).catch(()=>({data:[]}));if(data)setCostAnomalies(data);const{data:bs}=await supabase.from("v_budget_status").select("*").limit(1).catch(()=>({data:[]}));if(bs&&bs[0])setBudgetStatus(bs[0]);},[]);
+  const loadFeedback=useCallback(async()=>{const{data}=await supabase.from("feedback_events").select("*").order("created_at",{ascending:false}).limit(30).catch(()=>({data:[]}));if(data)setFeedbackEvents(data);},[]);
   const loadTokens=useCallback(async()=>{
     setTokenLoading(true);
     const[a,b,c]=await Promise.allSettled([
@@ -593,9 +628,9 @@ export default function PMDashboard(){
   useEffect(()=>{
     loadTasks();loadProjects();loadMeetings();loadOkrs();loadStakeholders();loadMemory();
     loadIntegrations();loadJira();loadGmail();loadCal();loadAgentRuns();loadRice();
-    loadMoscow();loadRoadmap();loadAlign();loadTokens();
+    loadMoscow();loadRoadmap();loadAlign();loadTokens();loadDecisions();loadKnowledge();loadOutcomes();loadRiskPreds();loadCostAnomalies();loadFeedback();
   },[loadTasks,loadProjects,loadMeetings,loadOkrs,loadStakeholders,loadMemory,
-     loadIntegrations,loadJira,loadGmail,loadCal,loadAgentRuns,loadRice,loadMoscow,loadRoadmap,loadAlign,loadTokens]);
+     loadIntegrations,loadJira,loadGmail,loadCal,loadAgentRuns,loadRice,loadMoscow,loadRoadmap,loadAlign,loadTokens,loadDecisions,loadKnowledge,loadOutcomes,loadRiskPreds,loadCostAnomalies,loadFeedback]);
 
   useEffect(()=>{
     if(!user)return;
@@ -805,6 +840,26 @@ export default function PMDashboard(){
   const saveRm=async()=>{if(!rmForm.title.trim())return;await supabase.from("roadmap_items").insert({...rmForm,year:rmYear,user_id:user?.id}).catch(()=>{});setShowAddRoadmap(false);setRmForm({title:"",project:"",startQ:0,endQ:1,color:"#00d4ff"});loadRoadmap();};
   const deleteRm=async(id:string)=>{await supabase.from("roadmap_items").delete().eq("id",id).catch(()=>{});loadRoadmap();};
 
+  /* ── Decision Log ── */
+  const saveDecision=async()=>{
+    if(!decisionForm.title.trim()||!decisionForm.decision.trim())return;
+    await supabase.from("decision_log").insert({...decisionForm,user_id:user?.id,trade_offs:decisionForm.trade_offs?decisionForm.trade_offs.split("\n").filter(Boolean):undefined,tags:decisionForm.tags?decisionForm.tags.split(",").map((t:string)=>t.trim()).filter(Boolean):undefined,project_id:decisionForm.project_id||null}).catch(()=>{});
+    setShowAddDecision(false);setDecisionForm({title:"",decision:"",rationale:"",trade_offs:"",project_id:"",tags:""});loadDecisions();
+  };
+  const logFeedback=async(agentName:string,eventType:string,field:string,original:string,corrected:string)=>{
+    await supabase.from("feedback_events").insert({user_id:user?.id,agent_name:agentName,event_type:eventType,field,original,corrected}).catch(()=>{});loadFeedback();
+  };
+  const saveKnowledgeItem=async()=>{
+    if(!knowledgeForm.title.trim()||!knowledgeForm.content.trim())return;
+    await supabase.from("knowledge_items").insert({...knowledgeForm,user_id:user?.id,tags:knowledgeForm.tags?knowledgeForm.tags.split(",").map((t:string)=>t.trim()).filter(Boolean):[]}).catch(()=>{});
+    setShowAddKnowledge(false);setKnowledgeForm({type:"insight",title:"",content:"",tags:""});loadKnowledge();
+  };
+  const saveOutcome=async()=>{
+    if(!outcomeForm.feature_name.trim())return;
+    await supabase.from("outcomes").insert({...outcomeForm,user_id:user?.id,project_id:outcomeForm.project_id||null,target_value:parseFloat(outcomeForm.target_value)||null}).catch(()=>{});
+    setShowAddOutcome(false);setOutcomeForm({feature_name:"",project_id:"",hypothesis:"",target_metric:"",target_value:"",measurement_date:""});loadOutcomes();
+  };
+
   /* ── Cost Optimizer ── */
   const runOptimizer=async()=>{
     setOptRunning(true);setOptResult(null);setOptError(null);
@@ -840,10 +895,12 @@ export default function PMDashboard(){
     setSuperRunning(true);setSuperResult(null);setSuperError(null);setThinkStep(0);
     const interval=setInterval(()=>setThinkStep(s=>Math.min(s+1,THINK_STEPS.length-1)),900);
     try{
-      const{data,error}=await supabase.functions.invoke("super-agent",{body:{userRequest:superRequest||undefined,focusArea:superFocus!=="all"?superFocus:undefined}});
+      const{data,error}=await supabase.functions.invoke("super-agent",{body:{userRequest:superRequest||undefined,focusArea:superFocus!=="all"?superFocus:undefined,userId:user?.id}});
       if(error)throw new Error(error.message);
       if(data?.error)throw new Error(data.error);
-      setSuperResult(data);
+      // Unwrap spec envelope: { result, token_optimization }
+      const payload = data?.result ? { ...data.result, token_optimization: data.token_optimization } : data;
+      setSuperResult(payload);
       setSuperExpanded({exec:true,prd:true,risks:true,prio:true,sources:false,eval:false});
     }catch(e:any){setSuperError(e.message);}
     finally{clearInterval(interval);setThinkStep(THINK_STEPS.length-1);setSuperRunning(false);}
@@ -1507,6 +1564,160 @@ export default function PMDashboard(){
               </div>
             )}
 
+
+            {/* DECISION LOG */}
+            {page==="decisions"&&(
+              <div className="col">
+                <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",flexWrap:"wrap",gap:10}}>
+                  <div style={{display:"flex",gap:8}}>
+                    {[["all","All"],["pending","Pending"],["validated","Validated"],["reversed","Reversed"]].map(([v,l])=>(
+                      <button key={v} style={{fontFamily:"DM Mono",fontSize:10,padding:"4px 12px",borderRadius:100,cursor:"pointer",border:`1px solid ${v==="all"&&decisions.length>=0?"var(--acc)":"var(--bdr)"}`,background:"var(--surf)",color:"var(--mut)"}} onClick={()=>{}}>{l}</button>
+                    ))}
+                  </div>
+                  <button className="btn btn-primary btn-sm" onClick={()=>setShowAddDecision(true)}>+ Log Decision</button>
+                </div>
+                {decisions.length===0&&<div className="empty">No decisions logged yet. Every major PM decision should be recorded here — what, why, what data, what trade-offs.</div>}
+                <div className="col">
+                  {decisions.map((d:any)=>(
+                    <div key={d.id} className="card" style={{padding:"16px 18px"}}>
+                      <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:8,gap:10}}>
+                        <div style={{flex:1}}>
+                          <div style={{fontFamily:"Syne",fontWeight:700,fontSize:14,marginBottom:3}}>{d.title}</div>
+                          <div style={{fontSize:12,color:"var(--mut)"}}>{new Date(d.created_at).toLocaleDateString("en-US",{month:"short",day:"numeric",year:"numeric"})}{d.projects?.name&&<> · {d.projects.name}</>}</div>
+                        </div>
+                        <div style={{display:"flex",gap:5,alignItems:"center",flexShrink:0}}>
+                          <span className={`tag ${d.outcome_status==="validated"?"tag-grn":d.outcome_status==="reversed"?"tag-red":"tag-dim"}`} style={{fontSize:9}}>{d.outcome_status}</span>
+                          <button className="btn btn-danger btn-sm" onClick={async()=>{if(!window.confirm("Delete?"))return;await supabase.from("decision_log").delete().eq("id",d.id).catch(()=>{});loadDecisions();}}>✕</button>
+                        </div>
+                      </div>
+                      <div style={{fontSize:13,lineHeight:1.7,marginBottom:10,padding:"8px 10px",background:"rgba(0,212,255,0.04)",borderRadius:7,borderLeft:"2px solid var(--acc)"}}>{d.decision}</div>
+                      {d.rationale&&<div style={{marginBottom:8}}><div className="section-lbl" style={{marginBottom:3}}>Rationale</div><div style={{fontSize:12,color:"var(--mut)",lineHeight:1.6}}>{d.rationale}</div></div>}
+                      {d.trade_offs?.length>0&&<div style={{marginBottom:8}}><div className="section-lbl" style={{marginBottom:3}}>Trade-offs considered</div>{d.trade_offs.map((t:string,i:number)=><div key={i} style={{fontSize:12,display:"flex",gap:6,color:"var(--mut)",padding:"2px 0"}}><span style={{color:"var(--amb)"}}>↔</span>{t}</div>)}</div>}
+                      {d.tags?.length>0&&<div style={{display:"flex",gap:4,flexWrap:"wrap"}}>{d.tags.map((t:string,i:number)=><span key={i} className="tag tag-dim" style={{fontSize:9}}>{t}</span>)}</div>}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* KNOWLEDGE MEMORY */}
+            {page==="knowledge"&&(
+              <div className="col">
+                <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",flexWrap:"wrap",gap:10}}>
+                  <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
+                    {["all","prd","insight","learning","template","competitive","research"].map(t=>(
+                      <button key={t} onClick={()=>setKnowledgeFilter(t)} style={{fontFamily:"DM Mono",fontSize:10,padding:"4px 11px",borderRadius:100,cursor:"pointer",border:`1px solid ${knowledgeFilter===t?"var(--acc)":"var(--bdr)"}`,background:knowledgeFilter===t?"rgba(0,212,255,0.07)":"var(--surf)",color:knowledgeFilter===t?"var(--acc)":"var(--mut)"}}>{t}</button>
+                    ))}
+                  </div>
+                  <button className="btn btn-primary btn-sm" onClick={()=>setShowAddKnowledge(true)}>+ Add Item</button>
+                </div>
+                {knowledgeItems.filter(k=>knowledgeFilter==="all"||k.type===knowledgeFilter).length===0&&<div className="empty">No knowledge items yet. Save insights, PRD patterns, competitive learnings here for AI reuse.</div>}
+                <div className="ga">
+                  {knowledgeItems.filter((k:any)=>knowledgeFilter==="all"||k.type===knowledgeFilter).map((k:any)=>(
+                    <div key={k.id} className="card" style={{padding:"14px 16px"}}>
+                      <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:8}}>
+                        <span className={`tag ${k.type==="prd"?"tag-pur":k.type==="insight"?"tag-blu":k.type==="competitive"?"tag-amb":k.type==="learning"?"tag-grn":"tag-dim"}`} style={{fontSize:9}}>{k.type}</span>
+                        <button className="btn btn-danger btn-sm" onClick={async()=>{await supabase.from("knowledge_items").delete().eq("id",k.id).catch(()=>{});loadKnowledge();}}>✕</button>
+                      </div>
+                      <div style={{fontFamily:"Syne",fontWeight:700,fontSize:13,marginBottom:6}}>{k.title}</div>
+                      <div style={{fontSize:12,color:"var(--mut)",lineHeight:1.6,marginBottom:8}}>{k.content.slice(0,200)}{k.content.length>200?"...":""}</div>
+                      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+                        <div style={{display:"flex",gap:4,flexWrap:"wrap"}}>{(k.tags||[]).slice(0,3).map((t:string,i:number)=><span key={i} className="tag tag-dim" style={{fontSize:9}}>{t}</span>)}</div>
+                        <span className="mono dim" style={{fontSize:9}}>{new Date(k.created_at).toLocaleDateString("en-US",{month:"short",day:"numeric"})}</span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* OUTCOME TRACKING */}
+            {page==="outcomes"&&(
+              <div className="col">
+                <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+                  <div className="g4" style={{flex:1}}>
+                    {[
+                      {v:outcomes.length,l:"Tracked Features",c:"var(--acc)"},
+                      {v:outcomes.filter((o:any)=>o.status==="achieved"||o.status==="exceeded").length,l:"Achieved / Exceeded",c:"var(--grn)"},
+                      {v:outcomes.filter((o:any)=>o.status==="missed").length,l:"Missed",c:"var(--red)"},
+                      {v:outcomes.filter((o:any)=>o.status==="tracking").length,l:"In Progress",c:"var(--amb)"},
+                    ].map(({v,l,c})=>(
+                      <div key={l} className="kpi"><div className="kpi-v" style={{color:c}}>{v}</div><div className="kpi-l">{l}</div></div>
+                    ))}
+                  </div>
+                  <button className="btn btn-primary btn-sm" style={{flexShrink:0}} onClick={()=>setShowAddOutcome(true)}>+ Track Outcome</button>
+                </div>
+                {outcomes.length===0&&<div className="empty">No outcomes tracked yet. For every shipped feature, define what success looks like — then measure it.</div>}
+                <div className="card">
+                  {outcomes.length>0&&(
+                    <>
+                      <div className="th-row" style={{gridTemplateColumns:"1fr 120px 140px 80px 100px 90px"}}>
+                        <span>Feature</span><span>Project</span><span>Target Metric</span><span>Target</span><span>Actual</span><span>Status</span>
+                      </div>
+                      {outcomes.map((o:any)=>(
+                        <div key={o.id} className="tr" style={{gridTemplateColumns:"1fr 120px 140px 80px 100px 90px"}}>
+                          <div>
+                            <div style={{fontWeight:500,fontSize:12}}>{o.feature_name}</div>
+                            {o.hypothesis&&<div style={{fontSize:10,color:"var(--mut)",marginTop:1}}>{o.hypothesis.slice(0,60)}{o.hypothesis.length>60?"...":""}</div>}
+                          </div>
+                          <span style={{fontSize:11,color:"var(--mut)"}}>{o.projects?.name||"—"}</span>
+                          <span style={{fontSize:11}}>{o.target_metric||"—"}</span>
+                          <span className="mono dim" style={{fontSize:11}}>{o.target_value||"—"}</span>
+                          <span className="mono" style={{fontSize:11,color:o.actual_value>=o.target_value?"var(--grn)":o.actual_value>0?"var(--amb)":"var(--mut)"}}>{o.actual_value||"—"}</span>
+                          <span className={`tag ${o.status==="achieved"||o.status==="exceeded"?"tag-grn":o.status==="missed"?"tag-red":o.status==="tracking"?"tag-amb":"tag-dim"}`} style={{fontSize:9}}>{o.status}</span>
+                        </div>
+                      ))}
+                    </>
+                  )}
+                </div>
+
+                {/* Risk Predictions */}
+                {riskPredictions.length>0&&(
+                  <div className="card">
+                    <div className="ch"><div className="ct">⚠️ Early Risk Predictions</div><span className="tag tag-red" style={{fontSize:9}}>{riskPredictions.length} active</span></div>
+                    {riskPredictions.map((r:any)=>(
+                      <div key={r.id} style={{padding:"12px 16px",borderBottom:"1px solid var(--bdr)",display:"flex",gap:12,alignItems:"flex-start"}}>
+                        <div style={{flex:1}}>
+                          <div style={{display:"flex",gap:7,alignItems:"center",marginBottom:4}}>
+                            <span className={`tag ${r.confidence>70?"tag-red":r.confidence>40?"tag-amb":"tag-dim"}`} style={{fontSize:9}}>{r.risk_type.replace("_"," ")}</span>
+                            <span style={{fontFamily:"DM Mono",fontSize:9,color:"var(--mut)"}}>{r.confidence}% confidence</span>
+                          </div>
+                          <div style={{fontSize:12,marginBottom:3}}>{r.prediction}</div>
+                          {r.recommended_action&&<div style={{fontSize:11,color:"var(--acc)"}}>→ {r.recommended_action}</div>}
+                        </div>
+                        <button className="btn btn-sm" onClick={async()=>{await supabase.from("risk_predictions").update({status:"dismissed"}).eq("id",r.id).catch(()=>{});loadRiskPreds();}}>Dismiss</button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                {/* Feedback loop stats */}
+                {feedbackEvents.length>0&&(
+                  <div className="card">
+                    <div className="ch"><div className="ct">🔁 Feedback Loop · Agent Learning Signals</div></div>
+                    <div className="cb">
+                      <div className="g4" style={{gap:8,marginBottom:12}}>
+                        {Object.entries(feedbackEvents.reduce((acc:any,e:any)=>{acc[e.event_type]=(acc[e.event_type]||0)+1;return acc;},{})).map(([type,count])=>(
+                          <div key={type} style={{background:"var(--surf2)",border:"1px solid var(--bdr)",borderRadius:8,padding:"10px 12px",textAlign:"center"}}>
+                            <div style={{fontFamily:"Syne",fontWeight:800,fontSize:18,color:"var(--acc)"}}>{count as number}</div>
+                            <div style={{fontFamily:"DM Mono",fontSize:10,color:"var(--mut)"}}>{type}s</div>
+                          </div>
+                        ))}
+                      </div>
+                      {feedbackEvents.slice(0,5).map((e:any)=>(
+                        <div key={e.id} style={{display:"flex",gap:8,padding:"6px 0",borderBottom:"1px solid var(--bdr)",fontSize:12,alignItems:"flex-start"}}>
+                          <span className="tag tag-pur" style={{fontSize:9,flexShrink:0}}>{e.agent_name}</span>
+                          <span className="tag tag-dim" style={{fontSize:9,flexShrink:0}}>{e.event_type}</span>
+                          {e.field&&<span style={{color:"var(--mut)",fontSize:11}}>{e.field}</span>}
+                          <span className="mono dim" style={{fontSize:10,marginLeft:"auto",flexShrink:0}}>{new Date(e.created_at).toLocaleDateString()}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+
             {/* SUPER AGENT */}
             {page==="super"&&(
               <div className="col">
@@ -1622,8 +1833,8 @@ export default function PMDashboard(){
                           <div>
                             <div className="section-lbl" style={{marginBottom:5}}>Post-Opt</div>
                             <div style={{display:"flex",gap:6,alignItems:"center"}}>
-                              <span className={`tag ${superResult.post_optimization.model_was_optimal?"tag-grn":"tag-amb"}`} style={{fontSize:9}}>{superResult.post_optimization.model_was_optimal?"✓ Optimal":"⚠ Suboptimal"}</span>
-                              {superResult.post_optimization.estimated_cost_savings&&superResult.post_optimization.estimated_cost_savings!=="$0"&&(
+                              <span className={`tag ${superResult.post_optimization.model_was_optimal?"tag-grn":"tag-amb"}`} style={{fontSize:9}}>{(superResult.token_optimization?.model_was_optimal??superResult.post_optimization?.model_was_optimal)?"✓ Optimal":"⚠ Suboptimal"}</span>
+                              {(superResult.token_optimization?.estimated_savings_percent>0||superResult.post_optimization?.estimated_cost_savings)&&(
                                 <span className="tag tag-grn" style={{fontSize:9}}>Save {superResult.post_optimization.estimated_cost_savings}</span>
                               )}
                             </div>
@@ -1805,6 +2016,17 @@ export default function PMDashboard(){
                 {tokenLoading&&<div className="loading"><div className="spin"/>Loading token data...</div>}
 
                 {/* KPI strip */}
+                {/* Budget alert */}
+                {budgetStatus&&budgetStatus.budget_status!=="ok"&&(
+                  <div className={`infobox ${budgetStatus.budget_status==="critical"?"ib-red":"ib-amb"}`} style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+                    <span>{budgetStatus.budget_status==="critical"?"🚨 Daily budget exceeded":"⚠️ Approaching daily budget"} · Today: ${parseFloat(budgetStatus.today_cost||0).toFixed(4)} · Week: ${parseFloat(budgetStatus.week_cost||0).toFixed(4)} · Month: ${parseFloat(budgetStatus.month_cost||0).toFixed(4)}</span>
+                  </div>
+                )}
+                {costAnomalies.length>0&&(
+                  <div className="infobox ib-amb" style={{fontSize:11}}>
+                    🔍 <strong style={{color:"var(--amb)"}}>Cost anomaly detected:</strong> {costAnomalies[0].multiplier}x above 7-day average on {costAnomalies[0].date} (${parseFloat(costAnomalies[0].day_cost).toFixed(4)} vs avg ${costAnomalies[0].rolling_avg_7d})
+                  </div>
+                )}
                 {!tokenLoading&&(()=>{
                   const totalTokens=tokenUsage.reduce((s:number,r:any)=>s+(r.total_tokens||0),0);
                   const totalCost=tokenUsage.reduce((s:number,r:any)=>s+(parseFloat(r.estimated_cost)||0),0);
