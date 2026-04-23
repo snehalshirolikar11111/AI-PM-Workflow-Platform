@@ -16,6 +16,7 @@ const S = `
   .sb-context{font-family:'DM Mono',monospace;font-size:9px;color:var(--acc);letter-spacing:0.12em;text-transform:uppercase;}
   .sb-nav{flex:1;padding:8px 0;}
   .sb-grp-lbl{font-family:'DM Mono',monospace;font-size:9px;letter-spacing:0.14em;text-transform:uppercase;color:var(--mut);padding:12px 14px 4px;}
+  .sb-grp-lbl.sub{padding-left:20px;color:rgba(78,95,116,0.7);letter-spacing:0.1em;}
   .sb-item{display:flex;align-items:center;gap:9px;padding:7px 14px;cursor:pointer;font-size:13px;color:var(--mut);transition:all 0.13s;border-left:2px solid transparent;user-select:none;white-space:nowrap;}
   .sb-item:hover{color:var(--txt);background:rgba(255,255,255,0.025);}
   .sb-item.on{color:var(--acc);border-left-color:var(--acc);background:rgba(0,212,255,0.055);font-weight:500;}
@@ -266,34 +267,36 @@ const S = `
 `;
 
 const NAV = [
-  {grp:"Today",items:[{id:"schedule",ic:"🕐",lbl:"Daily Schedule"},{id:"todos",ic:"☑",lbl:"To-Do List"}]},
-  {grp:"Execution",items:[{id:"tracker",ic:"◎",lbl:"Projects"},{id:"meetings",ic:"✦",lbl:"Meeting Intel"},{id:"release",ic:"🚦",lbl:"Release Readiness"}]},
-  {grp:"Strategy",items:[{id:"priority",ic:"◈",lbl:"Prioritization"},{id:"roadmap",ic:"🗺",lbl:"Roadmap"},{id:"okr",ic:"◎",lbl:"OKR Tracker"}]},
-  {grp:"Intelligence",items:[{id:"super",ic:"🔮",lbl:"Super Agent"},{id:"optimizer",ic:"⚡",lbl:"Cost Optimizer"},{id:"research",ic:"🔍",lbl:"Research"},{id:"decisions",ic:"📌",lbl:"Decision Log"},{id:"knowledge",ic:"🧠",lbl:"Knowledge"},{id:"agents",ic:"⬡",lbl:"AI Agents"},{id:"prd",ic:"📄",lbl:"PRD Agent"}]},
-  {grp:"People",items:[{id:"stakeholders",ic:"◉",lbl:"Stakeholders"}]},
-  {grp:"Operations",items:[{id:"metrics",ic:"◎",lbl:"Pilot Metrics"},{id:"outcomes",ic:"🎯",lbl:"Outcomes"},{id:"tokens",ic:"◈",lbl:"Token Analytics"},{id:"privacy",ic:"◈",lbl:"Privacy"},{id:"integrations",ic:"⚡",lbl:"Integrations"}]},
+  {grp:"Today",        items:[{id:"schedule",ic:"🕐",lbl:"Daily Schedule"},{id:"todos",ic:"☑",lbl:"To-Do List"}]},
+  {grp:"Execution",    items:[{id:"tracker",ic:"◎",lbl:"Projects"},{id:"roadmap",ic:"🗺",lbl:"Roadmap"}]},
+  {grp:"AI Agents",    items:[{id:"super",ic:"🔮",lbl:"Super Agent"},{id:"release",ic:"🚦",lbl:"Release Readiness"},{id:"research",ic:"🔍",lbl:"Research Agents"}]},
+  {grp:"AI Workflows", items:[{id:"meetings",ic:"✦",lbl:"Meeting Intel"},{id:"prd",ic:"📄",lbl:"PRD Agent"},{id:"priority",ic:"◈",lbl:"Prioritization"},{id:"agents",ic:"⬡",lbl:"All Agents"}]},
+  {grp:"Insights",     items:[{id:"optimizer",ic:"⚡",lbl:"Cost Optimizer"},{id:"decisions",ic:"📌",lbl:"Decision Log"},{id:"knowledge",ic:"🧠",lbl:"Knowledge"}]},
+  {grp:"Metrics",      items:[{id:"okr",ic:"◎",lbl:"OKR Tracker"},{id:"tokens",ic:"◈",lbl:"Token Analytics"},{id:"outcomes",ic:"🎯",lbl:"Outcomes"},{id:"metrics",ic:"◎",lbl:"Pilot Metrics"}]},
+  {grp:"People",       items:[{id:"stakeholders",ic:"◉",lbl:"Stakeholders"}]},
+  {grp:"Settings",     items:[{id:"privacy",ic:"◈",lbl:"Privacy"},{id:"integrations",ic:"⚡",lbl:"Integrations"}]},
 ];
 
 const PAGE_INFO: Record<string,{title:string;sub:string}> = {
   schedule:{title:"Daily Schedule",sub:"Live Google Calendar — click any date to load events"},
   todos:{title:"To-Do List",sub:"Tasks from Jira, meetings and Gmail — schedule any task to a future day"},
   tracker:{title:"Projects",sub:"Program Health Score computed from Jira signals — signal compression, not raw data"},
-  meetings:{title:"Meeting Intelligence",sub:"Paste a transcript → AI extracts decisions, action items and risks"},
+  meetings:{title:"Meeting Intel",sub:"Paste transcript → AI extracts decisions, action items and risks"},
   priority:{title:"Prioritization",sub:"Choose a framework and project — AI scores your backlog"},
   roadmap:{title:"Roadmap",sub:"Quarterly initiative planning across all projects"},
-  okr:{title:"OKR Tracker",sub:"Key results with AI-generated weekly and quarterly insights"},
-  release:{title:"Release Readiness Agent",sub:"Autonomous go/no-go assessment — multi-step reasoning across Jira, risks, stakeholders and OKRs"},
-  research:{title:"Research Agents",sub:"Competitive · Market · Customer — AI-powered with live web search"},
+  okr:{title:"OKR Tracker",sub:"Key results · AI weekly and quarterly insights · outcome alignment"},
+  release:{title:"Release Readiness Agent",sub:"Autonomous go/no-go · Jira + risks + stakeholders + OKRs · saves to Decision Log"},
+  research:{title:"Research Agents",sub:"3 parallel agents · live web search · competitive, market and customer intelligence"},
   decisions:{title:"Decision Log",sub:"Every decision · rationale · data used · trade-offs · outcome status"},
   knowledge:{title:"Knowledge Memory",sub:"Past PRDs · insights · learnings · reusable patterns"},
   outcomes:{title:"Outcome Tracking",sub:"Feature impact post-launch · OKR contribution · business results"},
   optimizer:{title:"Token Cost Optimizer",sub:"Analyze any agent · reduce token spend · model recommendations · caching strategy"},
-  super:{title:"Super Agent",sub:"PM Orchestrator — multi-agent reasoning · real data grounding · self-evaluation loop"},
-  agents:{title:"AI Agents",sub:"6 agents running — click any to invoke now"},
+  super:{title:"Super Agent",sub:"Multi-source reasoning → PRD + Risks + Prioritization + Exec Summary"},
+  agents:{title:"All Agents",sub:"All AI-powered automations — overview and quick launch"},
   prd:{title:"PRD Agent",sub:"Focus group data in → structured PRD out in seconds"},
   stakeholders:{title:"Stakeholders",sub:"Influence map with last-contact tracking"},
-  metrics:{title:"Pilot Metrics",sub:"Adoption funnel, time saved and agent usage"},
-  tokens:{title:"Token Analytics",sub:"Cost per agent · per user · daily trends · workflow tracking"},
+  metrics:{title:"Pilot Metrics",sub:"Adoption funnel · time saved · agent engagement"},
+  tokens:{title:"Token Analytics",sub:"Cost per agent · daily trends · anomaly detection · FinOps"},
   privacy:{title:"Privacy Controls",sub:"Memory log, data flow audit and right to delete"},
   integrations:{title:"Integrations",sub:"Jira, Gmail and Google Calendar — auto-synced"},
 };
@@ -988,7 +991,7 @@ export default function PMDashboard(){
           <nav className="sb-nav">
             {NAV.map(g=>(
               <div key={g.grp}>
-                <div className="sb-grp-lbl">{g.grp}</div>
+                <div className={`sb-grp-lbl${["AI Agents","AI Workflows","Insights"].includes(g.grp)?" sub":""}`}>{g.grp}</div>
                 {g.items.map(it=>(
                   <div key={it.id} className={`sb-item${page===it.id?" on":""}`} onClick={()=>setPage(it.id)}>
                     <span className="sb-item-ic">{it.ic}</span><span>{it.lbl}</span>
@@ -1001,6 +1004,7 @@ export default function PMDashboard(){
             <div className="sb-stat"><div className="sdot" style={{background:isSyncing?"var(--acc)":"var(--grn)",boxShadow:`0 0 4px ${isSyncing?"var(--acc)":"var(--grn)"}`}}/><span>{isSyncing?"Syncing...":"Live"}</span></div>
             <div className="sb-stat"><div className="sdot" style={{background:"var(--acc)"}}/><span>{projects.length} projects</span></div>
             <div className="sb-stat"><div className="sdot" style={{background:"var(--amb)"}}/><span>{todos.filter((t:any)=>t.status==="open").length} open tasks</span></div>
+            <div className="sb-stat"><div className="sdot" style={{background:"var(--pur)"}}/><span>{agentRuns.length} agent runs</span></div>
           </div>
         </aside>
 
