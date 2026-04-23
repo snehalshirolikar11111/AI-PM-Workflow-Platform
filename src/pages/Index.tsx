@@ -639,15 +639,15 @@ export default function PMDashboard(){
   const loadCal=useCallback(async()=>{const{data}=await supabase.from("schedule_blocks").select("*").order("start_time");if(data)setCalEvents(data);},[]);
   const loadAgentRuns=useCallback(async()=>{const{data}=await supabase.from("agent_runs").select("*").order("ran_at",{ascending:false}).limit(20);if(data)setAgentRuns(data);},[]);
   const loadRice=useCallback(async()=>{const{data}=await supabase.from("rice_scores").select("*").order("rice_score",{ascending:false});if(data)setRiceScores(data);},[]);
-  const loadMoscow=useCallback(async()=>{const{data}=await supabase.from("moscow_items").select("*").order("created_at").catch(()=>({data:[]}));if(data)setMoscowItems(data);},[]);
-  const loadRoadmap=useCallback(async()=>{const{data}=await supabase.from("roadmap_items").select("*").order("start_quarter").catch(()=>({data:[]}));if(data)setRoadmapItems(data);},[]);
-  const loadAlign=useCallback(async()=>{const{data}=await supabase.from("okr_alignment").select("*").limit(1).catch(()=>({data:[]}));if(data&&data[0])setOkrAlign(data[0]);},[]);
-  const loadDecisions=useCallback(async()=>{const{data}=await supabase.from("decision_log").select("*,projects(name)").order("created_at",{ascending:false}).catch(()=>({data:[]}));if(data)setDecisions(data);},[]);
-  const loadKnowledge=useCallback(async()=>{const{data}=await supabase.from("knowledge_items").select("*").order("created_at",{ascending:false}).catch(()=>({data:[]}));if(data)setKnowledgeItems(data);},[]);
-  const loadOutcomes=useCallback(async()=>{const{data}=await supabase.from("outcomes").select("*,projects(name),okrs(objective)").order("created_at",{ascending:false}).catch(()=>({data:[]}));if(data)setOutcomes(data);},[]);
-  const loadRiskPreds=useCallback(async()=>{const{data}=await supabase.from("risk_predictions").select("*,projects(name)").eq("status","active").order("detected_at",{ascending:false}).catch(()=>({data:[]}));if(data)setRiskPredictions(data);},[]);
-  const loadCostAnomalies=useCallback(async()=>{const{data}=await supabase.from("v_cost_anomalies").select("*").limit(10).catch(()=>({data:[]}));if(data)setCostAnomalies(data);const{data:bs}=await supabase.from("v_budget_status").select("*").limit(1).catch(()=>({data:[]}));if(bs&&bs[0])setBudgetStatus(bs[0]);},[]);
-  const loadFeedback=useCallback(async()=>{const{data}=await supabase.from("feedback_events").select("*").order("created_at",{ascending:false}).limit(30).catch(()=>({data:[]}));if(data)setFeedbackEvents(data);},[]);
+  const loadMoscow=useCallback(async()=>{const{data}=await supabase.from("moscow_items").select("*").order("created_at").then(undefined,()=>({data:[]}));if(data)setMoscowItems(data);},[]);
+  const loadRoadmap=useCallback(async()=>{const{data}=await supabase.from("roadmap_items").select("*").order("start_quarter").then(undefined,()=>({data:[]}));if(data)setRoadmapItems(data);},[]);
+  const loadAlign=useCallback(async()=>{const{data}=await supabase.from("okr_alignment").select("*").limit(1).then(undefined,()=>({data:[]}));if(data&&data[0])setOkrAlign(data[0]);},[]);
+  const loadDecisions=useCallback(async()=>{const{data}=await supabase.from("decision_log").select("*,projects(name)").order("created_at",{ascending:false}).then(undefined,()=>({data:[]}));if(data)setDecisions(data);},[]);
+  const loadKnowledge=useCallback(async()=>{const{data}=await supabase.from("knowledge_items").select("*").order("created_at",{ascending:false}).then(undefined,()=>({data:[]}));if(data)setKnowledgeItems(data);},[]);
+  const loadOutcomes=useCallback(async()=>{const{data}=await supabase.from("outcomes").select("*,projects(name),okrs(objective)").order("created_at",{ascending:false}).then(undefined,()=>({data:[]}));if(data)setOutcomes(data);},[]);
+  const loadRiskPreds=useCallback(async()=>{const{data}=await supabase.from("risk_predictions").select("*,projects(name)").eq("status","active").order("detected_at",{ascending:false}).then(undefined,()=>({data:[]}));if(data)setRiskPredictions(data);},[]);
+  const loadCostAnomalies=useCallback(async()=>{const{data}=await supabase.from("v_cost_anomalies").select("*").limit(10).then(undefined,()=>({data:[]}));if(data)setCostAnomalies(data);const{data:bs}=await supabase.from("v_budget_status").select("*").limit(1).then(undefined,()=>({data:[]}));if(bs&&bs[0])setBudgetStatus(bs[0]);},[]);
+  const loadFeedback=useCallback(async()=>{const{data}=await supabase.from("feedback_events").select("*").order("created_at",{ascending:false}).limit(30).then(undefined,()=>({data:[]}));if(data)setFeedbackEvents(data);},[]);
   const loadTokens=useCallback(async()=>{
     setTokenLoading(true);
     const[a,b,c]=await Promise.allSettled([
@@ -685,7 +685,7 @@ export default function PMDashboard(){
       .on("postgres_changes",{event:"*",schema:"public",table:"schedule_blocks"},()=>loadCal())
       .on("postgres_changes",{event:"*",schema:"public",table:"agent_runs"},()=>loadAgentRuns())
       .subscribe();
-    return()=>supabase.removeChannel(ch);
+    return()=>{void supabase.removeChannel(ch);};
   },[loadProjects,loadIntegrations,loadJira,loadTasks,loadCal,loadAgentRuns]);
 
   /* ── Auto-sync ── */
@@ -749,7 +749,7 @@ export default function PMDashboard(){
     const ns=t.status==="done"?"open":"done";
     setTodos(p=>p.map((x:any)=>x.id===t.id?{...x,status:ns}:x));
     await supabase.from("tasks").update({status:ns}).eq("id",t.id);
-    if(t.jira_key)supabase.functions.invoke("jira-sync",{body:{action:"transition_issue",issueData:{jiraKey:t.jira_key,transitionName:ns==="done"?"done":"in progress"}}}).catch(()=>{});
+    if(t.jira_key)supabase.functions.invoke("jira-sync",{body:{action:"transition_issue",issueData:{jiraKey:t.jira_key,transitionName:ns==="done"?"done":"in progress"}}}).then(undefined,()=>{});
   };
   const addTask=async()=>{
     if(!newTask.title.trim())return;
@@ -768,7 +768,7 @@ export default function PMDashboard(){
     const payload={name:projForm.name.trim(),owner:projForm.owner,status:projForm.status,progress:parseInt(String(projForm.progress))||0,due_date:projForm.due_date||null,priority:projForm.priority,research_summary:projForm.research_summary||null,competitive_summary:projForm.competitive_summary||null};
     if(editProj){
       await supabase.from("projects").update(payload).eq("id",editProj.id);
-      if(editProj.jira_key)supabase.functions.invoke("jira-sync",{body:{action:"update_issue",issueData:{jiraKey:editProj.jira_key,fields:{summary:payload.name}}}}).catch(()=>{});
+      if(editProj.jira_key)supabase.functions.invoke("jira-sync",{body:{action:"update_issue",issueData:{jiraKey:editProj.jira_key,fields:{summary:payload.name}}}}).then(undefined,()=>{});
     }else{
       const{data:np}=await supabase.from("projects").insert({...payload,user_id:user?.id}).select().single();
       const{data:jd}=await supabase.functions.invoke("jira-sync",{body:{action:"create_issue",issueData:{summary:payload.name,description:`Owner: ${payload.owner||"TBD"}`,projectKey:"PM",priority:"med",issueType:"Epic"}}}).catch(()=>({data:null}));
@@ -873,17 +873,17 @@ export default function PMDashboard(){
     if(!newAlignText.trim())return;
     const updated={...okrAlign,[section]:[...(okrAlign as any)[section],newAlignText.trim()]};
     setOkrAlign(updated);setNewAlignText("");setShowAddAlign(null);
-    await supabase.from("okr_alignment").upsert({user_id:user?.id,...updated},{onConflict:"user_id"}).catch(()=>{});
+    await supabase.from("okr_alignment").upsert({user_id:user?.id,...updated},{onConflict:"user_id"}).then(undefined,()=>{});
   };
   const removeAlignItem=async(section:string,idx:number)=>{
     const arr=[...(okrAlign as any)[section]];arr.splice(idx,1);
     const updated={...okrAlign,[section]:arr};setOkrAlign(updated);
-    await supabase.from("okr_alignment").upsert({user_id:user?.id,...updated},{onConflict:"user_id"}).catch(()=>{});
+    await supabase.from("okr_alignment").upsert({user_id:user?.id,...updated},{onConflict:"user_id"}).then(undefined,()=>{});
   };
 
   /* ── Roadmap ── */
-  const saveRm=async()=>{if(!rmForm.title.trim())return;await supabase.from("roadmap_items").insert({...rmForm,year:rmYear,user_id:user?.id}).catch(()=>{});setShowAddRoadmap(false);setRmForm({title:"",project:"",startQ:0,endQ:1,color:"#00d4ff"});loadRoadmap();};
-  const deleteRm=async(id:string)=>{await supabase.from("roadmap_items").delete().eq("id",id).catch(()=>{});loadRoadmap();};
+  const saveRm=async()=>{if(!rmForm.title.trim())return;await supabase.from("roadmap_items").insert({...rmForm,year:rmYear,user_id:user?.id}).then(undefined,()=>{});setShowAddRoadmap(false);setRmForm({title:"",project:"",startQ:0,endQ:1,color:"#00d4ff"});loadRoadmap();};
+  const deleteRm=async(id:string)=>{await supabase.from("roadmap_items").delete().eq("id",id).then(undefined,()=>{});loadRoadmap();};
 
   /* ── Sprint Intelligence ── */
   const SI_STEPS=["Fetching Jira sprint issues…","Analyzing velocity trend across sprints…","Deep-diving blockers and durations…","Checking assignee workload distribution…","Correlating meeting actions with blockers…","Assessing OKR impact of delays…","Running autonomous action tools…","Self-evaluating and finalizing…"];
@@ -940,20 +940,20 @@ export default function PMDashboard(){
   /* ── Decision Log ── */
   const saveDecision=async()=>{
     if(!decisionForm.title.trim()||!decisionForm.decision.trim())return;
-    await supabase.from("decision_log").insert({...decisionForm,user_id:user?.id,trade_offs:decisionForm.trade_offs?decisionForm.trade_offs.split("\n").filter(Boolean):undefined,tags:decisionForm.tags?decisionForm.tags.split(",").map((t:string)=>t.trim()).filter(Boolean):undefined,project_id:decisionForm.project_id||null}).catch(()=>{});
+    await supabase.from("decision_log").insert({...decisionForm,user_id:user?.id,trade_offs:decisionForm.trade_offs?decisionForm.trade_offs.split("\n").filter(Boolean):undefined,tags:decisionForm.tags?decisionForm.tags.split(",").map((t:string)=>t.trim()).filter(Boolean):undefined,project_id:decisionForm.project_id||null}).then(undefined,()=>{});
     setShowAddDecision(false);setDecisionForm({title:"",decision:"",rationale:"",trade_offs:"",project_id:"",tags:""});loadDecisions();
   };
   const logFeedback=async(agentName:string,eventType:string,field:string,original:string,corrected:string)=>{
-    await supabase.from("feedback_events").insert({user_id:user?.id,agent_name:agentName,event_type:eventType,field,original,corrected}).catch(()=>{});loadFeedback();
+    await supabase.from("feedback_events").insert({user_id:user?.id,agent_name:agentName,event_type:eventType,field,original,corrected}).then(undefined,()=>{});loadFeedback();
   };
   const saveKnowledgeItem=async()=>{
     if(!knowledgeForm.title.trim()||!knowledgeForm.content.trim())return;
-    await supabase.from("knowledge_items").insert({...knowledgeForm,user_id:user?.id,tags:knowledgeForm.tags?knowledgeForm.tags.split(",").map((t:string)=>t.trim()).filter(Boolean):[]}).catch(()=>{});
+    await supabase.from("knowledge_items").insert({...knowledgeForm,user_id:user?.id,tags:knowledgeForm.tags?knowledgeForm.tags.split(",").map((t:string)=>t.trim()).filter(Boolean):[]}).then(undefined,()=>{});
     setShowAddKnowledge(false);setKnowledgeForm({type:"insight",title:"",content:"",tags:""});loadKnowledge();
   };
   const saveOutcome=async()=>{
     if(!outcomeForm.feature_name.trim())return;
-    await supabase.from("outcomes").insert({...outcomeForm,user_id:user?.id,project_id:outcomeForm.project_id||null,target_value:parseFloat(outcomeForm.target_value)||null}).catch(()=>{});
+    await supabase.from("outcomes").insert({...outcomeForm,user_id:user?.id,project_id:outcomeForm.project_id||null,target_value:parseFloat(outcomeForm.target_value)||null}).then(undefined,()=>{});
     setShowAddOutcome(false);setOutcomeForm({feature_name:"",project_id:"",hypothesis:"",target_metric:"",target_value:"",measurement_date:""});loadOutcomes();
   };
 
@@ -1301,7 +1301,7 @@ export default function PMDashboard(){
                           <div key={k} className="mos-bucket">
                             <div className="mos-hd"><span style={{fontFamily:"Syne",fontWeight:700,fontSize:13,color:c}}>{l}</span><span className="tag tag-dim" style={{fontSize:9}}>{items.length}</span></div>
                             {items.length===0&&<div style={{padding:"12px 14px",fontSize:12,color:"var(--mut)"}}>No items</div>}
-                            {items.map((it:any)=>(<div key={it.id} className="mos-item"><div style={{flex:1}}>{it.title}</div>{it.project&&<span className="tag tag-dim" style={{fontSize:9}}>{it.project}</span>}<button className="btn btn-icon btn-danger btn-sm" onClick={async()=>{await supabase.from("moscow_items").delete().eq("id",it.id).catch(()=>{});loadMoscow();}}>✕</button></div>))}
+                            {items.map((it:any)=>(<div key={it.id} className="mos-item"><div style={{flex:1}}>{it.title}</div>{it.project&&<span className="tag tag-dim" style={{fontSize:9}}>{it.project}</span>}<button className="btn btn-icon btn-danger btn-sm" onClick={async()=>{await supabase.from("moscow_items").delete().eq("id",it.id).then(undefined,()=>{});loadMoscow();}}>✕</button></div>))}
                           </div>
                         );
                       })}
@@ -2330,7 +2330,7 @@ export default function PMDashboard(){
                         </div>
                         <div style={{display:"flex",gap:5,alignItems:"center",flexShrink:0}}>
                           <span className={`tag ${d.outcome_status==="validated"?"tag-grn":d.outcome_status==="reversed"?"tag-red":"tag-dim"}`} style={{fontSize:9}}>{d.outcome_status}</span>
-                          <button className="btn btn-danger btn-sm" onClick={async()=>{if(!window.confirm("Delete?"))return;await supabase.from("decision_log").delete().eq("id",d.id).catch(()=>{});loadDecisions();}}>✕</button>
+                          <button className="btn btn-danger btn-sm" onClick={async()=>{if(!window.confirm("Delete?"))return;await supabase.from("decision_log").delete().eq("id",d.id).then(undefined,()=>{});loadDecisions();}}>✕</button>
                         </div>
                       </div>
                       <div style={{fontSize:13,lineHeight:1.7,marginBottom:10,padding:"8px 10px",background:"rgba(0,212,255,0.04)",borderRadius:7,borderLeft:"2px solid var(--acc)"}}>{d.decision}</div>
@@ -2360,7 +2360,7 @@ export default function PMDashboard(){
                     <div key={k.id} className="card" style={{padding:"14px 16px"}}>
                       <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:8}}>
                         <span className={`tag ${k.type==="prd"?"tag-pur":k.type==="insight"?"tag-blu":k.type==="competitive"?"tag-amb":k.type==="learning"?"tag-grn":"tag-dim"}`} style={{fontSize:9}}>{k.type}</span>
-                        <button className="btn btn-danger btn-sm" onClick={async()=>{await supabase.from("knowledge_items").delete().eq("id",k.id).catch(()=>{});loadKnowledge();}}>✕</button>
+                        <button className="btn btn-danger btn-sm" onClick={async()=>{await supabase.from("knowledge_items").delete().eq("id",k.id).then(undefined,()=>{});loadKnowledge();}}>✕</button>
                       </div>
                       <div style={{fontFamily:"Syne",fontWeight:700,fontSize:13,marginBottom:6}}>{k.title}</div>
                       <div style={{fontSize:12,color:"var(--mut)",lineHeight:1.6,marginBottom:8}}>{k.content.slice(0,200)}{k.content.length>200?"...":""}</div>
@@ -2428,7 +2428,7 @@ export default function PMDashboard(){
                           <div style={{fontSize:12,marginBottom:3}}>{r.prediction}</div>
                           {r.recommended_action&&<div style={{fontSize:11,color:"var(--acc)"}}>→ {r.recommended_action}</div>}
                         </div>
-                        <button className="btn btn-sm" onClick={async()=>{await supabase.from("risk_predictions").update({status:"dismissed"}).eq("id",r.id).catch(()=>{});loadRiskPreds();}}>Dismiss</button>
+                        <button className="btn btn-sm" onClick={async()=>{await supabase.from("risk_predictions").update({status:"dismissed"}).eq("id",r.id).then(undefined,()=>{});loadRiskPreds();}}>Dismiss</button>
                       </div>
                     ))}
                   </div>
@@ -2679,6 +2679,10 @@ export default function PMDashboard(){
                         </div>
                       )}
                     </div>
+                  </div>
+                )}
+              </div>
+            )}
 
             {/* PRD */}
             {page==="prd"&&(
@@ -3111,7 +3115,7 @@ ${(prdResult.criteria||[]).join("\n")}`).then(()=>alert("Copied!"))}>Copy</butto
 
         {showAddCal&&(<Modal title="Add Calendar Event" onClose={()=>setShowAddCal(false)}><div className="form-grid"><div className="form-row" style={{gridColumn:"1/-1"}}><label className="form-label">Title</label><input className="input" value={calForm.title} onChange={e=>setCalForm(p=>({...p,title:e.target.value}))} autoFocus placeholder="Sprint Planning — Mobile Team"/></div><div className="form-row"><label className="form-label">Start Time</label><input className="input" type="time" value={calForm.startTime} onChange={e=>setCalForm(p=>({...p,startTime:e.target.value}))}/></div><div className="form-row"><label className="form-label">End Time</label><input className="input" type="time" value={calForm.endTime} onChange={e=>setCalForm(p=>({...p,endTime:e.target.value}))}/></div><div className="form-row" style={{gridColumn:"1/-1"}}><label className="form-label">Attendees (comma-separated)</label><input className="input" value={calForm.attendees} onChange={e=>setCalForm(p=>({...p,attendees:e.target.value}))} placeholder="ana@company.com, chen@company.com"/></div><div className="form-row" style={{gridColumn:"1/-1"}}><label className="form-label">Description</label><input className="input" value={calForm.description} onChange={e=>setCalForm(p=>({...p,description:e.target.value}))} placeholder="Agenda or context..."/></div></div><div style={{fontSize:11,color:"var(--mut)"}}>A Google Meet link will be auto-generated.</div><div className="form-actions"><button className="btn" onClick={()=>setShowAddCal(false)}>Cancel</button><button className="btn btn-primary" onClick={createCalEvent} disabled={syncingInt==="cal-create"}>{syncingInt==="cal-create"?"Creating...":"Create Event + Meet Link"}</button></div></Modal>)}
 
-        {showAddMoscow&&(<Modal title="Add MoSCoW Item" onClose={()=>setShowAddMoscow(false)}><div className="form-row"><label className="form-label">Feature / Initiative</label><input className="input" value={moscowForm.title} onChange={e=>setMoscowForm(p=>({...p,title:e.target.value}))} autoFocus placeholder="e.g. Real-time notifications"/></div><div className="form-grid"><div className="form-row"><label className="form-label">Bucket</label><select className="input select" value={moscowForm.bucket} onChange={e=>setMoscowForm(p=>({...p,bucket:e.target.value}))}><option value="must">Must Have</option><option value="should">Should Have</option><option value="could">Could Have</option><option value="wont">Won't Have</option></select></div><div className="form-row"><label className="form-label">Project</label><select className="input select" value={moscowForm.project} onChange={e=>setMoscowForm(p=>({...p,project:e.target.value}))}><option value="">All</option>{projects.map(p=><option key={p.id} value={p.name}>{p.name}</option>)}</select></div></div><div className="form-actions"><button className="btn" onClick={()=>setShowAddMoscow(false)}>Cancel</button><button className="btn btn-primary" onClick={async()=>{if(!moscowForm.title.trim())return;await supabase.from("moscow_items").insert({...moscowForm,user_id:user?.id}).catch(()=>{});setShowAddMoscow(false);setMoscowForm({title:"",bucket:"must",project:""});loadMoscow();}}>Add Item</button></div></Modal>)}
+        {showAddMoscow&&(<Modal title="Add MoSCoW Item" onClose={()=>setShowAddMoscow(false)}><div className="form-row"><label className="form-label">Feature / Initiative</label><input className="input" value={moscowForm.title} onChange={e=>setMoscowForm(p=>({...p,title:e.target.value}))} autoFocus placeholder="e.g. Real-time notifications"/></div><div className="form-grid"><div className="form-row"><label className="form-label">Bucket</label><select className="input select" value={moscowForm.bucket} onChange={e=>setMoscowForm(p=>({...p,bucket:e.target.value}))}><option value="must">Must Have</option><option value="should">Should Have</option><option value="could">Could Have</option><option value="wont">Won't Have</option></select></div><div className="form-row"><label className="form-label">Project</label><select className="input select" value={moscowForm.project} onChange={e=>setMoscowForm(p=>({...p,project:e.target.value}))}><option value="">All</option>{projects.map(p=><option key={p.id} value={p.name}>{p.name}</option>)}</select></div></div><div className="form-actions"><button className="btn" onClick={()=>setShowAddMoscow(false)}>Cancel</button><button className="btn btn-primary" onClick={async()=>{if(!moscowForm.title.trim())return;await supabase.from("moscow_items").insert({...moscowForm,user_id:user?.id}).then(undefined,()=>{});setShowAddMoscow(false);setMoscowForm({title:"",bucket:"must",project:""});loadMoscow();}}>Add Item</button></div></Modal>)}
 
         {showAddRoadmap&&(<Modal title="Add Initiative" onClose={()=>setShowAddRoadmap(false)}><div className="form-row"><label className="form-label">Title</label><input className="input" value={rmForm.title} onChange={e=>setRmForm(p=>({...p,title:e.target.value}))} autoFocus placeholder="e.g. Mobile App v2"/></div><div className="form-grid"><div className="form-row"><label className="form-label">Project</label><select className="input select" value={rmForm.project} onChange={e=>setRmForm(p=>({...p,project:e.target.value}))}><option value="">None</option>{projects.map(p=><option key={p.id} value={p.name}>{p.name}</option>)}</select></div><div className="form-row"><label className="form-label">Color</label><div style={{display:"flex",gap:6,paddingTop:4}}>{["#00d4ff","#7c3aed","#10b981","#f59e0b","#ef4444"].map(c=><div key={c} onClick={()=>setRmForm(p=>({...p,color:c}))} style={{width:24,height:24,borderRadius:6,background:c,cursor:"pointer",border:rmForm.color===c?"2px solid #fff":"2px solid transparent"}}/>)}</div></div><div className="form-row"><label className="form-label">Start Quarter</label><select className="input select" value={rmForm.startQ} onChange={e=>setRmForm(p=>({...p,startQ:parseInt(e.target.value)}))}>{["Q1","Q2","Q3","Q4"].map((q,i)=><option key={q} value={i}>{q}</option>)}</select></div><div className="form-row"><label className="form-label">End Quarter</label><select className="input select" value={rmForm.endQ} onChange={e=>setRmForm(p=>({...p,endQ:parseInt(e.target.value)}))}>{["Q1","Q2","Q3","Q4"].map((q,i)=><option key={q} value={i}>{q}</option>)}</select></div></div><div className="form-actions"><button className="btn" onClick={()=>setShowAddRoadmap(false)}>Cancel</button><button className="btn btn-primary" onClick={saveRm}>Add Initiative</button></div></Modal>)}
 
