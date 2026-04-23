@@ -2679,6 +2679,8 @@ export default function PMDashboard(){
                         </div>
                       )}
                     </div>
+              </div>
+            )}
 
             {/* PRD */}
             {page==="prd"&&(
