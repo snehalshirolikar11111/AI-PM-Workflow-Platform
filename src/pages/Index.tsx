@@ -663,8 +663,8 @@ export default function PMDashboard(){
   const loadAgentRuns=useCallback(async()=>{const{data}=await supabase.from("agent_runs").select("*").order("ran_at",{ascending:false}).limit(20);if(data)setAgentRuns(data);},[]);
   const loadRice=useCallback(async()=>{const{data}=await supabase.from("rice_scores").select("*").order("rice_score",{ascending:false});if(data)setRiceScores(data);},[]);
   const loadMoscow=useCallback(async()=>{const{data,error}=await supabase.from("moscow_items").select("*");if(error)console.error("loadMoscow:",error.message);if(data)setMoscowItems(data);},[]);
-  const loadRoadmap=useCallback(async()=>{const{data}=await supabase.from("roadmap_items").select("*").order("start_quarter").catch(()=>({data:[]}));if(data)setRoadmapItems(data);},[]);
-  const loadAlign=useCallback(async()=>{const{data}=await supabase.from("okr_alignment").select("*").limit(1).catch(()=>({data:[]}));if(data&&data[0])setOkrAlign(data[0]);},[]);
+  const loadRoadmap=useCallback(async()=>{const{data}=await supabase.from("roadmap_items").select("*").order("start_quarter");if(data)setRoadmapItems(data);},[]);
+  const loadAlign=useCallback(async()=>{const{data}=await supabase.from("okr_alignment").select("*").limit(1);if(data&&data[0])setOkrAlign(data[0]);},[]);
   const loadDecisions=useCallback(async()=>{const{data}=await supabase.from("decision_log").select("*,projects(name)").order("created_at",{ascending:false}).catch(()=>({data:[]}));if(data)setDecisions(data);},[]);
   const loadKnowledge=useCallback(async()=>{const{data}=await supabase.from("knowledge_items").select("*").order("created_at",{ascending:false}).catch(()=>({data:[]}));if(data)setKnowledgeItems(data);},[]);
   const loadOutcomes=useCallback(async()=>{const{data}=await supabase.from("outcomes").select("*,projects(name),okrs(objective)").order("created_at",{ascending:false}).catch(()=>({data:[]}));if(data)setOutcomes(data);},[]);
