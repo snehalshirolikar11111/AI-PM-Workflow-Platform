@@ -628,13 +628,9 @@ export default function PMDashboard(){
   /* ── Auth ── */
   useEffect(()=>{
     supabase.auth.getUser().then(({data:{user}})=>setUser(user));
-    const {data:{subscription}}=supabase.auth.onAuthStateChange((_,s)=>{
-      setUser(s?.user??null);
-      // Re-fetch RLS-protected tables once auth is confirmed
-      if(s?.user){loadOkrs();loadRice();loadMoscow();loadRoadmap();loadAlign();}
-    });
+    const {data:{subscription}}=supabase.auth.onAuthStateChange((_,s)=>setUser(s?.user??null));
     return()=>subscription.unsubscribe();
-  },[loadOkrs,loadRice,loadMoscow,loadRoadmap,loadAlign]);
+  },[]);
 
   /* ── Loaders ── */
   const loadTasks=useCallback(async()=>{setTodosLoading(true);const{data}=await supabase.from("tasks").select("*").order("created_at",{ascending:false});if(data)setTodos(data);setTodosLoading(false);},[]);
@@ -690,6 +686,11 @@ export default function PMDashboard(){
     loadMoscow();loadRoadmap();loadAlign();loadTokens();loadDecisions();loadKnowledge();loadOutcomes();loadRiskPreds();loadCostAnomalies();loadFeedback();
   },[loadTasks,loadProjects,loadMeetings,loadOkrs,loadStakeholders,loadMemory,
      loadIntegrations,loadJira,loadGmail,loadCal,loadAgentRuns,loadRice,loadMoscow,loadRoadmap,loadAlign,loadTokens,loadDecisions,loadKnowledge,loadOutcomes,loadRiskPreds,loadCostAnomalies,loadFeedback]);
+
+  // Re-fetch RLS-protected tables once user session is confirmed
+  useEffect(()=>{
+    if(user){loadOkrs();loadRice();loadRoadmap();loadAlign();}
+  },[user,loadOkrs,loadRice,loadRoadmap,loadAlign]);
 
   useEffect(()=>{
     if(!user)return;
