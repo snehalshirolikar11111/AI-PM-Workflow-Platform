@@ -269,8 +269,8 @@ const S = `
 const NAV = [
   {grp:"Today",        items:[{id:"schedule",ic:"🕐",lbl:"Daily Schedule"},{id:"todos",ic:"☑",lbl:"To-Do List"}]},
   {grp:"Execution",    items:[{id:"tracker",ic:"◎",lbl:"Projects"},{id:"roadmap",ic:"🗺",lbl:"Roadmap"}]},
-  {grp:"AI Agents",    items:[{id:"super",ic:"🔮",lbl:"Executive Briefing"},{id:"sprint",ic:"⚡",lbl:"Sprint Intelligence"},{id:"release",ic:"🚦",lbl:"Release Readiness"},{id:"research",ic:"🔍",lbl:"Research Agents"}]},
-  {grp:"AI Workflows", items:[{id:"meetings",ic:"✦",lbl:"Meeting Intel"},{id:"prd",ic:"📄",lbl:"PRD Agent"},{id:"priority",ic:"◈",lbl:"Prioritization"},{id:"agents",ic:"⬡",lbl:"All Agents"}]},
+  {grp:"AI Agents",    items:[{id:"super",ic:"🔮",lbl:"Executive Briefing"},{id:"sprint",ic:"⚡",lbl:"Sprint Intelligence"},{id:"release",ic:"🚦",lbl:"Release Readiness"},{id:"research",ic:"🔍",lbl:"Research Agents"},{id:"prd",ic:"📄",lbl:"PRD Agent"}]},
+  {grp:"AI Workflows", items:[{id:"meetings",ic:"✦",lbl:"Meeting Intel"},{id:"priority",ic:"◈",lbl:"Prioritization"},{id:"agents",ic:"⬡",lbl:"All Agents"}]},
   {grp:"Insights",     items:[{id:"optimizer",ic:"⚡",lbl:"Cost Optimizer"},{id:"decisions",ic:"📌",lbl:"Decision Log"},{id:"knowledge",ic:"🧠",lbl:"Knowledge"}]},
   {grp:"Metrics",      items:[{id:"okr",ic:"◎",lbl:"OKR Tracker"},{id:"tokens",ic:"◈",lbl:"Token Analytics"},{id:"outcomes",ic:"🎯",lbl:"Outcomes"},{id:"metrics",ic:"◎",lbl:"Pilot Metrics"}]},
   {grp:"People",       items:[{id:"stakeholders",ic:"◉",lbl:"Stakeholders"}]},
@@ -294,7 +294,7 @@ const PAGE_INFO: Record<string,{title:string;sub:string}> = {
   optimizer:{title:"Token Cost Optimizer",sub:"Analyze any agent · reduce token spend · model recommendations · caching strategy"},
   super:{title:"Executive Briefing Agent",sub:"Autonomous multi-source intelligence · tools · cross-agent orchestration · writes back to platform"},
   agents:{title:"All Agents",sub:"All AI-powered automations — overview and quick launch"},
-  prd:{title:"PRD Agent",sub:"Focus group data in → structured PRD out in seconds"},
+  prd:{title:"PRD Agent",sub:"Autonomous · web search · OKR alignment · competitive context · RICE scores · saves to knowledge base"},
   stakeholders:{title:"Stakeholders",sub:"Influence map with last-contact tracking"},
   metrics:{title:"Pilot Metrics",sub:"Adoption funnel · time saved · agent engagement"},
   tokens:{title:"Token Analytics",sub:"Cost per agent · daily trends · anomaly detection · FinOps"},
@@ -480,6 +480,10 @@ export default function PMDashboard(){
 
   // PRD
   const [prdInput,setPrdInput]=useState("");
+  const [prdProductName,setPrdProductName]=useState("");
+  const [prdProjectName,setPrdProjectName]=useState("");
+  const [prdAgentResult,setPrdAgentResult]=useState<any>(null);
+  const [prdAgentStep,setPrdAgentStep]=useState(0);
   const [prdStatus,setPrdStatus]=useState("idle");
   const [prdResult,setPrdResult]=useState<any>(null);
 
@@ -829,13 +833,24 @@ export default function PMDashboard(){
   const togglePriv=async(key:string)=>{const n={...privTogs,[key]:!(privTogs as any)[key]};setPrivTogs(n);await supabase.from("user_settings").upsert({user_id:user?.id,persistent_memory:n.persist,agent_learning:n.learn,session_only:n.session,audit_log:n.audit});};
 
   /* ── PRD ── */
+  const PRD_STEPS=["Aggregating internal focus group data…","Fetching competitive context and research…","Searching web for market signals and benchmarks…","Checking OKR alignment…","Checking RICE scores and effort estimates…","Identifying stakeholders for review…","Writing PRD with self-evaluation loop…","Saving to knowledge base and decision log…"];
   const runPRD=async()=>{
-    if(!prdInput.trim())return;
-    setPrdStatus("processing");
+    if(!prdInput.trim()&&!prdProductName.trim())return;
+    setPrdStatus("processing");setPrdAgentResult(null);setPrdAgentStep(0);
+    const iv=setInterval(()=>setPrdAgentStep(s=>Math.min(s+1,PRD_STEPS.length-1)),2500);
     try{
-      const{data}=await supabase.functions.invoke("prd-agent",{body:{text:prdInput}});
-      if(data){setPrdResult({themes:data.themes?.map((t:any)=>({lbl:t.label,n:t.frequency}))||[],problem:data.problem_statement||"",stories:data.user_stories?.map((s:any)=>`As a ${s.role}, I want ${s.goal} so that ${s.outcome}.`)||[],criteria:data.acceptance_criteria||[],metrics:data.success_metrics?.map((m:any)=>`${m.metric}: ${m.baseline} → ${m.target}`)||[],questions:data.open_questions||[]});setPrdStatus("done");}
-    }catch{setPrdStatus("idle");alert("PRD Agent failed.");}
+      const proj=projects.find(p=>p.name===prdProjectName);
+      const{data}=await supabase.functions.invoke("prd-agent",{body:{text:prdInput,productName:prdProductName,projectName:prdProjectName,userId:user?.id}});
+      clearInterval(iv);setPrdAgentStep(PRD_STEPS.length-1);
+      if(data?.error)throw new Error(data.error);
+      if(data?.prd){
+        setPrdAgentResult(data);
+        // Also set legacy prdResult for backward compat display
+        const prd=data.prd;
+        setPrdResult({themes:[],problem:prd.problem_statement||"",stories:prd.user_stories||[],criteria:prd.acceptance_criteria||[],metrics:(prd.success_metrics||[]).map((m:any)=>`${m.metric}: ${m.baseline} → ${m.target}`),questions:prd.open_questions||[]});
+        setPrdStatus("done");loadKnowledge();loadDecisions();loadAgentRuns();
+      }
+    }catch(e:any){clearInterval(iv);setPrdStatus("idle");alert("PRD Agent failed: "+e.message);}
   };
 
   /* ── Agent runners ── */
@@ -2667,303 +2682,205 @@ export default function PMDashboard(){
                       )}
                     </div>
 
-                    {/* PRD */}
-                    <div className="sa-out-sec">
-                      <div className="sa-out-hd" onClick={()=>toggleSuperSec("prd")}>
-                        <div style={{display:"flex",alignItems:"center",gap:10}}><span style={{fontSize:16}}>📄</span><span style={{fontFamily:"Syne",fontWeight:700,fontSize:14}}>Product Requirements</span></div>
-                        <div style={{display:"flex",gap:6}}><button className="btn btn-sm" onClick={e=>{e.stopPropagation();const prd=superResult.prd;if(prd)navigator.clipboard.writeText(`# PRD\n\n## Problem\n${prd.problem}\n\n## Goals\n${prd.goals}\n\n## Users\n${prd.users}\n\n## Requirements\n${(prd.requirements||[]).map((r:string)=>`- ${r}`).join("\n")}\n\n## Metrics\n${(prd.metrics||[]).map((m:string)=>`- ${m}`).join("\n")}\n\n## Constraints\n${(prd.constraints||[]).map((c:string)=>`- ${c}`).join("\n")}\n\n## Open Questions\n${(prd.open_questions||[]).map((q:string)=>`- ${q}`).join("\n")}`).then(()=>alert("Copied!"));}}>Copy MD</button><span style={{fontSize:13,color:"var(--mut)",lineHeight:"24px"}}>{superExpanded.prd?"▾":"▸"}</span></div>
+        
+            {/* PRD */}
+            {page==="prd"&&(
+              <div className="g2">
+                {/* Input panel */}
+                <div className="col">
+                  <div className="card">
+                    <div className="ch">
+                      <div>
+                        <div style={{fontFamily:"Syne",fontWeight:800,fontSize:15}}>📄 Autonomous PRD Agent</div>
+                        <div style={{fontSize:11,color:"var(--mut)",marginTop:2}}>Searches web · checks OKRs · reads competitive intel · saves to knowledge base</div>
                       </div>
-                      {superExpanded.prd&&superResult.prd&&(
-                        <div className="sa-out-body">
-                          <div className="g2" style={{gap:14}}>
-                            {[{k:"problem",l:"Problem Statement"},{k:"goals",l:"Goals"},{k:"users",l:"User Segments"}].map(({k,l})=>(
-                              <div key={k} className="sa-field">
-                                <div className="sa-lbl">{l}</div>
-                                <div className="sa-val">{(superResult.prd as any)[k]||<span style={{color:"var(--mut)"}}>—</span>}</div>
-                              </div>
-                            ))}
-                          </div>
-                          <div className="g2" style={{gap:14,marginTop:12}}>
-                            {[{k:"requirements",l:"Requirements"},{k:"metrics",l:"Success Metrics"},{k:"constraints",l:"Constraints"},{k:"open_questions",l:"Open Questions"}].map(({k,l})=>{
-                              const items=(superResult.prd as any)[k]||[];
-                              return(
-                                <div key={k} className="sa-field">
-                                  <div className="sa-lbl">{l}</div>
-                                  {Array.isArray(items)?<div className="sa-list">{items.map((it:string,j:number)=><div key={j} style={{display:"flex",gap:8,fontSize:12,padding:"3px 0",borderBottom:"1px solid var(--bdr)",color:"var(--txt)"}}><span style={{color:k==="open_questions"?"var(--amb)":k==="constraints"?"var(--red)":"var(--grn)",flexShrink:0}}>{k==="open_questions"?"?":k==="constraints"?"⚠":"✓"}</span>{it}</div>)}</div>:<div className="sa-val">{items}</div>}
-                                </div>
-                              );
-                            })}
-                          </div>
-                        </div>
-                      )}
                     </div>
-
-                    {/* Risks */}
-                    <div className="sa-out-sec">
-                      <div className="sa-out-hd" onClick={()=>toggleSuperSec("risks")}>
-                        <div style={{display:"flex",alignItems:"center",gap:10}}><span style={{fontSize:16}}>🔔</span><span style={{fontFamily:"Syne",fontWeight:700,fontSize:14}}>Risks</span><span className="tag tag-red" style={{fontSize:9}}>{superResult.risks?.filter((r:any)=>r.severity==="Critical"||r.severity==="High").length||0} critical/high</span></div>
-                        <span style={{fontSize:13,color:"var(--mut)"}}>{superExpanded.risks?"▾":"▸"}</span>
-                      </div>
-                      {superExpanded.risks&&superResult.risks?.length>0&&(
-                        <div className="sa-out-body">
-                          {[...superResult.risks].sort((a:any,b:any)=>{const ord:any={Critical:0,High:1,Medium:2,Low:3};return(ord[a.severity]??4)-(ord[b.severity]??4);}).map((risk:any,i:number)=>(
-                            <div key={i} className={`sa-risk-card ${saRiskClass(risk.severity)}`}>
-                              <div style={{flexShrink:0,marginTop:2}}>
-                                <span style={{fontFamily:"DM Mono",fontSize:9,color:saRiskColor(risk.severity),background:`${saRiskColor(risk.severity)}15`,border:`1px solid ${saRiskColor(risk.severity)}30`,padding:"2px 7px",borderRadius:100}}>{risk.severity}</span>
-                              </div>
-                              <div style={{flex:1}}>
-                                <div style={{display:"flex",gap:6,alignItems:"center",marginBottom:4}}>
-                                  <span style={{fontFamily:"Syne",fontWeight:700,fontSize:12}}>{risk.description}</span>
-                                  <span className="tag tag-dim" style={{fontSize:9}}>{risk.type}</span>
-                                </div>
-                                <div style={{fontSize:11,color:"var(--acc)"}}>→ {risk.mitigation}</div>
-                              </div>
-                            </div>
+                    <div className="cb">
+                      <div className="col" style={{gap:10}}>
+                        <div className="form-row">
+                          <label className="form-label">Product / Feature Name</label>
+                          <input className="input" value={prdProductName} onChange={e=>setPrdProductName(e.target.value)} placeholder="e.g. AI Alert Suppression Engine for NOC teams"/>
+                        </div>
+                        <div className="form-row">
+                          <label className="form-label">Link to Project (optional)</label>
+                          <select className="input select" value={prdProjectName} onChange={e=>setPrdProjectName(e.target.value)}>
+                            <option value="">None</option>{projects.map(p=><option key={p.id} value={p.name}>{p.name}</option>)}
+                          </select>
+                        </div>
+                        <div className="upload-z" style={{marginBottom:0}} onClick={()=>document.getElementById("pf")?.click()}>
+                          <div style={{fontSize:24,marginBottom:6}}>📎</div>
+                          <div style={{fontFamily:"Syne",fontWeight:700,fontSize:12,marginBottom:2}}>Drop files or click</div>
+                          <div style={{fontSize:11,color:"var(--mut)"}}>Supports .txt .csv .docx</div>
+                          <input id="pf" type="file" style={{display:"none"}} onChange={async(e:any)=>{const f=e.target.files[0];if(f){const t=await f.text();setPrdInput(t);}}}/>
+                        </div>
+                        <div className="form-row">
+                          <label className="form-label">Or paste raw text</label>
+                          <textarea className="input" value={prdInput} onChange={e=>setPrdInput(e.target.value)} placeholder={"Paste focus group transcript, survey results, or feature brief...\n\nLeave blank — agent will use internal data from your platform if a project is selected."} style={{minHeight:140,resize:"vertical" as any}}/>
+                        </div>
+                        {/* What the agent does */}
+                        <div style={{display:"flex",gap:5,flexWrap:"wrap"}}>
+                          {["Web search","OKR alignment","Competitive context","RICE scores","Stakeholder mapping","Saves to knowledge base"].map(l=>(
+                            <span key={l} style={{fontFamily:"DM Mono",fontSize:9,padding:"3px 8px",borderRadius:100,background:"rgba(124,58,237,0.07)",border:"1px solid rgba(124,58,237,0.15)",color:"var(--pur)"}}>{l}</span>
                           ))}
                         </div>
-                      )}
-                    </div>
-
-                    {/* Data Sources */}
-                    <div className="sa-out-sec">
-                      <div className="sa-out-hd" onClick={()=>toggleSuperSec("sources")}>
-                        <div style={{display:"flex",alignItems:"center",gap:10}}><span style={{fontSize:14}}>⚡</span><span style={{fontFamily:"Syne",fontWeight:700,fontSize:13}}>Data Sources</span><span className="tag tag-grn" style={{fontSize:9}}>{superResult.data_sources?.length||0} agents</span>{superResult.data_gaps?.length>0&&<span className="tag tag-amb" style={{fontSize:9}}>{superResult.data_gaps.length} gaps</span>}</div>
-                        <span style={{fontSize:13,color:"var(--mut)"}}>{superExpanded.sources?"▾":"▸"}</span>
+                        <button onClick={runPRD} disabled={(!prdInput.trim()&&!prdProductName.trim())||prdStatus==="processing"}
+                          style={{width:"100%",padding:12,background:(!prdInput.trim()&&!prdProductName.trim())||prdStatus==="processing"?"var(--bdr)":"linear-gradient(90deg,var(--pur),var(--acc))",border:"none",borderRadius:9,fontFamily:"Syne",fontWeight:800,fontSize:14,color:(!prdInput.trim()&&!prdProductName.trim())||prdStatus==="processing"?"var(--mut)":"#000",cursor:(!prdInput.trim()&&!prdProductName.trim())||prdStatus==="processing"?"not-allowed":"pointer",display:"flex",alignItems:"center",justifyContent:"center",gap:10}}>
+                          {prdStatus==="processing"?<><span className="spin" style={{width:15,height:15,borderWidth:2,borderTopColor:"#000",borderColor:"rgba(0,0,0,0.2)"}}/>Generating...</>:"📄 Generate PRD Autonomously"}
+                        </button>
                       </div>
-                      {superExpanded.sources&&(
-                        <div className="sa-out-body">
-                          {superResult.data_sources?.map((ds:any,i:number)=>(
-                            <div key={i} style={{display:"flex",gap:10,padding:"7px 0",borderBottom:"1px solid var(--bdr)",fontSize:12}}>
-                              <span className="tag tag-pur" style={{fontSize:9,flexShrink:0,alignSelf:"flex-start",marginTop:2}}>{ds.agent}</span>
-                              <span style={{color:"var(--mut)"}}>{ds.summary}</span>
-                            </div>
-                          ))}
-                          {superResult.data_gaps?.length>0&&(
-                            <div style={{marginTop:12}}>
-                              <div className="section-lbl" style={{marginBottom:6}}>Data Gaps</div>
-                              {superResult.data_gaps.map((gap:string,i:number)=>(
-                                <div key={i} style={{display:"flex",gap:7,fontSize:11,padding:"4px 0",color:"var(--amb)"}}><span>⚠</span>{gap}</div>
-                              ))}
-                            </div>
-                          )}
+                    </div>
+                  </div>
+
+                  {/* Thinking steps */}
+                  {prdStatus==="processing"&&(
+                    <div className="sa-thinking">
+                      <div style={{fontFamily:"Syne",fontWeight:700,fontSize:13,marginBottom:4}}>Investigating and writing PRD…</div>
+                      {PRD_STEPS.map((step,i)=>(
+                        <div key={i} className="sa-think-step">
+                          <div className={`sa-think-dot ${i<prdAgentStep?"sa-think-done":i===prdAgentStep?"sa-think-active":"sa-think-wait"}`}/>
+                          <span style={{color:i<prdAgentStep?"var(--grn)":i===prdAgentStep?"var(--acc)":"var(--mut)"}}>{step}</span>
+                          {i<prdAgentStep&&<span style={{marginLeft:"auto",fontFamily:"DM Mono",fontSize:9,color:"var(--grn)"}}>✓</span>}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                {/* Output panel */}
+                <div>
+                  {!prdResult&&prdStatus!=="processing"&&(
+                    <div className="card" style={{height:"100%",display:"flex",alignItems:"center",justifyContent:"center",flexDirection:"column",gap:10,opacity:0.4}}>
+                      <div style={{fontSize:36}}>📄</div>
+                      <div style={{fontFamily:"Syne",fontWeight:700,fontSize:13}}>PRD appears here</div>
+                      <div style={{fontSize:11,color:"var(--mut)",textAlign:"center",maxWidth:240}}>Enter a product name or paste focus group data — the agent investigates before writing</div>
+                    </div>
+                  )}
+                  {prdStatus==="processing"&&(
+                    <div className="card" style={{height:"100%",display:"flex",alignItems:"center",justifyContent:"center",flexDirection:"column",gap:12}}>
+                      <div className="spin" style={{width:32,height:32,borderWidth:3}}/><div style={{fontFamily:"Syne",fontWeight:700}}>Writing PRD…</div>
+                    </div>
+                  )}
+                  {prdResult&&prdStatus==="done"&&(
+                    <div className="col">
+                      {/* Agent context strip */}
+                      {prdAgentResult&&(
+                        <div style={{display:"flex",gap:10,flexWrap:"wrap",padding:"10px 14px",background:"var(--surf2)",border:"1px solid var(--bdr)",borderRadius:9,alignItems:"center"}}>
+                          <span className={prdAgentResult.confidence_score==="High"?"confidence-high":prdAgentResult.confidence_score==="Medium"?"confidence-medium":"confidence-low"}>Confidence: {prdAgentResult.confidence_score}</span>
+                          {prdAgentResult.okr_alignment?.length>0&&<span className="tag tag-grn" style={{fontSize:9}}>✓ OKR aligned</span>}
+                          {prdAgentResult.competitive_context&&<span className="tag tag-pur" style={{fontSize:9}}>✓ Competitive context</span>}
+                          {prdAgentResult.market_signals&&<span className="tag tag-blu" style={{fontSize:9}}>✓ Market signals</span>}
+                          {prdAgentResult.effort_estimate&&<span className="tag tag-amb" style={{fontSize:9}}>Effort: {prdAgentResult.effort_estimate}</span>}
+                          {prdAgentResult.actions_taken?.filter((a:any)=>a.status==="success").length>0&&<span className="tag tag-grn" style={{fontSize:9,marginLeft:"auto"}}>{prdAgentResult.actions_taken.filter((a:any)=>a.status==="success").length} actions taken</span>}
+                          <button className="btn btn-sm" onClick={()=>{setPrdStatus("idle");setPrdInput("");setPrdResult(null);setPrdAgentResult(null);setPrdProductName("");setPrdProjectName("");}}>↺ New PRD</button>
                         </div>
                       )}
-                    </div>
 
-                    {/* Self Evaluation */}
-                    {superResult.self_evaluation&&(
-                      <div className="sa-out-sec">
-                        <div className="sa-out-hd" onClick={()=>toggleSuperSec("eval")}>
-                          <div style={{display:"flex",alignItems:"center",gap:10}}><span style={{fontSize:14}}>🔍</span><span style={{fontFamily:"Syne",fontWeight:700,fontSize:13}}>Self-Evaluation</span><span className={superResult.self_evaluation.hallucination_check==="passed"?"tag tag-grn":"tag tag-red"} style={{fontSize:9}}>Hallucination: {superResult.self_evaluation.hallucination_check}</span></div>
-                          <span style={{fontSize:13,color:"var(--mut)"}}>{superExpanded.eval?"▾":"▸"}</span>
+                      <div className="card">
+                        <div className="ch">
+                          <div>
+                            <div style={{fontFamily:"Syne",fontWeight:800,fontSize:14}}>{prdAgentResult?.prd?.title||"Product Requirements Document"}</div>
+                            <div className="mono dim" style={{fontSize:10}}>v{prdAgentResult?.prd?.version||"1.0"} · {prdAgentResult?.prd?.status||"Draft"} · {new Date().toLocaleDateString()} · Review before sharing</div>
+                          </div>
+                          <div style={{display:"flex",gap:6}}>
+                            <span className="tag tag-dim">Draft</span>
+                            <button className="btn btn-sm" onClick={()=>{const prd=prdAgentResult?.prd||{};const md=`# ${prd.title||"PRD"}\n\n## Problem Statement\n${prd.problem_statement||prdResult.problem}\n\n## Goals\n${(prd.goals||[]).map((g:string)=>`- ${g}`).join("\n")}\n\n## User Stories\n${(prd.user_stories||prdResult.stories||[]).map((s:string)=>`- ${s}`).join("\n")}\n\n## Acceptance Criteria\n${(prd.acceptance_criteria||prdResult.criteria||[]).map((c:string)=>`- [ ] ${c}`).join("\n")}\n\n## Success Metrics\n${(prd.success_metrics||[]).map((m:any)=>typeof m==="string"?`- ${m}`:`- ${m.metric}: ${m.baseline} → ${m.target} (${m.okr_kr||""})`).join("\n")}\n\n## Constraints\n${(prd.constraints||[]).map((c:string)=>`- ${c}`).join("\n")}\n\n## Out of Scope\n${(prd.out_of_scope||[]).map((o:string)=>`- ${o}`).join("\n")}\n\n## Open Questions\n${(prd.open_questions||prdResult.questions||[]).map((q:string)=>`- ${q}`).join("\n")}`;navigator.clipboard.writeText(md).then(()=>alert("Copied!"));}}>Copy MD</button>
+                          </div>
                         </div>
-                        {superExpanded.eval&&(
-                          <div className="sa-out-body">
-                            {[["Data grounding",superResult.self_evaluation.data_grounding],["Hallucination check",superResult.self_evaluation.hallucination_check],["Improvements made",superResult.self_evaluation.improvements_made]].map(([l,v])=>(
-                              <div key={l} style={{display:"flex",justifyContent:"space-between",padding:"7px 0",borderBottom:"1px solid var(--bdr)",fontSize:12}}>
-                                <span className="dim">{l}</span>
-                                <span style={{color:"var(--acc)",fontFamily:"DM Mono",fontSize:11,maxWidth:300,textAlign:"right"}}>{v}</span>
+
+                        <div className="prd-sec">
+                          <div className="prd-lbl">Problem Statement</div>
+                          <p style={{fontSize:12,lineHeight:1.8}}>{prdAgentResult?.prd?.problem_statement||prdResult.problem}</p>
+                        </div>
+
+                        {prdAgentResult?.okr_alignment?.length>0&&(
+                          <div className="prd-sec">
+                            <div className="prd-lbl">OKR Alignment</div>
+                            {prdAgentResult.okr_alignment.map((o:any,i:number)=>(
+                              <div key={i} style={{display:"flex",gap:8,fontSize:12,padding:"4px 0",borderBottom:"1px solid var(--bdr2)"}}>
+                                <span style={{color:"var(--grn)",flexShrink:0}}>◎</span>
+                                <div><strong style={{color:"var(--txt)"}}>{o.objective}</strong>{o.key_result&&<> · {o.key_result}</>}<div style={{fontSize:11,color:"var(--acc)"}}>{o.contribution}</div></div>
                               </div>
                             ))}
                           </div>
                         )}
-                      </div>
-                    )}
 
-                  </div>
-                )}
-
-                {/* Empty state */}
-                {!superResult&&!superRunning&&!superError&&(
-                  <div className="card" style={{padding:32,textAlign:"center",opacity:0.5}}>
-                    <div style={{fontSize:48,marginBottom:12}}>🔮</div>
-                    <div style={{fontFamily:"Syne",fontWeight:700,fontSize:16,marginBottom:6}}>Structured output appears here</div>
-                    <div style={{fontSize:12,color:"var(--mut)",maxWidth:380,margin:"0 auto"}}>Enter a request above or leave blank for a full portfolio brief. The agent will fetch real data from all sources and return PRD + Risks + Prioritization + Exec Summary.</div>
-                  </div>
-                )}
-
-              </div>
-            )}
-
-
-            {/* TOKEN ANALYTICS */}
-            {page==="tokens"&&(
-              <div className="col">
-                {tokenLoading&&<div className="loading"><div className="spin"/>Loading token data...</div>}
-
-                {/* KPI strip */}
-                {/* Budget alert */}
-                {budgetStatus&&budgetStatus.budget_status!=="ok"&&(
-                  <div className={`infobox ${budgetStatus.budget_status==="critical"?"ib-red":"ib-amb"}`} style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
-                    <span>{budgetStatus.budget_status==="critical"?"🚨 Daily budget exceeded":"⚠️ Approaching daily budget"} · Today: ${parseFloat(budgetStatus.today_cost||0).toFixed(4)} · Week: ${parseFloat(budgetStatus.week_cost||0).toFixed(4)} · Month: ${parseFloat(budgetStatus.month_cost||0).toFixed(4)}</span>
-                  </div>
-                )}
-                {costAnomalies.length>0&&(
-                  <div className="infobox ib-amb" style={{fontSize:11}}>
-                    🔍 <strong style={{color:"var(--amb)"}}>Cost anomaly detected:</strong> {costAnomalies[0].multiplier}x above 7-day average on {costAnomalies[0].date} (${parseFloat(costAnomalies[0].day_cost).toFixed(4)} vs avg ${costAnomalies[0].rolling_avg_7d})
-                  </div>
-                )}
-                {!tokenLoading&&(()=>{
-                  const totalTokens=tokenUsage.reduce((s:number,r:any)=>s+(r.total_tokens||0),0);
-                  const totalCost=tokenUsage.reduce((s:number,r:any)=>s+(parseFloat(r.estimated_cost)||0),0);
-                  const todayCost=tokenRollup.filter((r:any)=>r.date===new Date().toISOString().split("T")[0]).reduce((s:number,r:any)=>s+(parseFloat(r.total_cost)||0),0);
-                  const agentSet=new Set(tokenUsage.map((r:any)=>r.agent_name));
-                  return(
-                    <div className="g4">
-                      {[
-                        {v:totalTokens.toLocaleString(),l:"Total Tokens",c:"var(--acc)"},
-                        {v:`$${totalCost.toFixed(4)}`,l:"Total Cost (USD)",c:"var(--grn)"},
-                        {v:`$${todayCost.toFixed(4)}`,l:"Cost Today",c:"var(--amb)"},
-                        {v:agentSet.size.toString(),l:"Agents Tracked",c:"var(--pur)"},
-                      ].map(({v,l,c})=>(
-                        <div key={l} className="kpi"><div className="kpi-v" style={{color:c}}>{v}</div><div className="kpi-l">{l}</div></div>
-                      ))}
-                    </div>
-                  );
-                })()}
-
-                <div className="g2">
-                  {/* Top agents */}
-                  <div className="card">
-                    <div className="ch"><div className="ct">Top Agents · Token Usage</div></div>
-                    {tokenUsage.length===0?<div className="empty">No token data yet. Run any agent to start tracking.</div>:(()=>{
-                      const byAgent=tokenUsage.reduce((acc:any,r:any)=>{
-                        const k=r.agent_name;
-                        if(!acc[k])acc[k]={agent:k,calls:0,tokens:0,cost:0};
-                        acc[k].calls++;acc[k].tokens+=(r.total_tokens||0);acc[k].cost+=(parseFloat(r.estimated_cost)||0);
-                        return acc;
-                      },{});
-                      const sorted=Object.values(byAgent).sort((a:any,b:any)=>b.tokens-a.tokens);
-                      const max=(sorted[0] as any)?.tokens||1;
-                      return(
-                        <div className="cb0" style={{padding:"4px 16px"}}>
-                          {sorted.map((ag:any)=>(
-                            <div key={ag.agent} style={{display:"flex",alignItems:"center",gap:10,padding:"9px 0",borderBottom:"1px solid var(--bdr)"}}>
-                              <span style={{width:140,fontSize:12,flexShrink:0}}>{ag.agent}</span>
-                              <div style={{flex:1,height:6,background:"var(--bdr2)",borderRadius:3,overflow:"hidden"}}>
-                                <div style={{height:"100%",width:`${(ag.tokens/max)*100}%`,background:"var(--acc)",borderRadius:3}}/>
-                              </div>
-                              <span className="mono" style={{fontSize:10,color:"var(--acc)",width:70,textAlign:"right"}}>{ag.tokens.toLocaleString()}</span>
-                              <span className="mono" style={{fontSize:10,color:"var(--grn)",width:55,textAlign:"right"}}>${ag.cost.toFixed(4)}</span>
-                              <span className="mono dim" style={{fontSize:10,width:35,textAlign:"right"}}>{ag.calls}x</span>
-                            </div>
-                          ))}
-                        </div>
-                      );
-                    })()}
-                  </div>
-
-                  {/* Daily trend */}
-                  <div className="card">
-                    <div className="ch"><div className="ct">Daily Cost Trend · Last 14 Days</div></div>
-                    {tokenRollup.length===0?<div className="empty">No rollup data yet.</div>:(()=>{
-                      const byDate=tokenRollup.reduce((acc:any,r:any)=>{
-                        const d=r.date;
-                        if(!acc[d])acc[d]={date:d,cost:0,tokens:0};
-                        acc[d].cost+=(parseFloat(r.total_cost)||0);acc[d].tokens+=(r.total_tokens||0);
-                        return acc;
-                      },{});
-                      const days=Object.values(byDate).sort((a:any,b:any)=>a.date.localeCompare(b.date)).slice(-14);
-                      const maxCost=Math.max(...days.map((d:any)=>d.cost),0.001);
-                      return(
-                        <div className="cb0" style={{padding:"4px 16px"}}>
-                          {days.map((d:any)=>(
-                            <div key={d.date} style={{display:"flex",alignItems:"center",gap:10,padding:"7px 0",borderBottom:"1px solid var(--bdr)"}}>
-                              <span className="mono dim" style={{fontSize:10,width:80,flexShrink:0}}>{new Date(d.date).toLocaleDateString("en-US",{month:"short",day:"numeric"})}</span>
-                              <div style={{flex:1,height:6,background:"var(--bdr2)",borderRadius:3,overflow:"hidden"}}>
-                                <div style={{height:"100%",width:`${(d.cost/maxCost)*100}%`,background:"var(--grn)",borderRadius:3}}/>
-                              </div>
-                              <span className="mono" style={{fontSize:10,color:"var(--grn)",width:60,textAlign:"right"}}>${d.cost.toFixed(4)}</span>
-                              <span className="mono dim" style={{fontSize:10,width:65,textAlign:"right"}}>{d.tokens.toLocaleString()}</span>
-                            </div>
-                          ))}
-                        </div>
-                      );
-                    })()}
-                  </div>
-                </div>
-
-                {/* Model breakdown */}
-                <div className="card">
-                  <div className="ch"><div className="ct">Model Breakdown</div></div>
-                  {tokenUsage.length===0?<div className="empty">No data yet.</div>:(()=>{
-                    const byModel=tokenUsage.reduce((acc:any,r:any)=>{
-                      const k=r.model||"unknown";
-                      if(!acc[k])acc[k]={model:k,calls:0,input:0,output:0,cost:0};
-                      acc[k].calls++;acc[k].input+=(r.input_tokens||0);acc[k].output+=(r.output_tokens||0);acc[k].cost+=(parseFloat(r.estimated_cost)||0);
-                      return acc;
-                    },{});
-                    const rows=Object.values(byModel).sort((a:any,b:any)=>b.cost-a.cost);
-                    return(
-                      <>
-                        <div className="th-row" style={{gridTemplateColumns:"1fr 60px 80px 80px 80px 80px"}}>
-                          <span>Model</span><span>Calls</span><span>Input tok</span><span>Output tok</span><span>Total tok</span><span>Cost USD</span>
-                        </div>
-                        {rows.map((m:any)=>(
-                          <div key={m.model} className="tr" style={{gridTemplateColumns:"1fr 60px 80px 80px 80px 80px"}}>
-                            <span className="tag tag-pur" style={{fontSize:9,width:"fit-content"}}>{m.model}</span>
-                            <span className="mono dim" style={{fontSize:11}}>{m.calls}</span>
-                            <span className="mono dim" style={{fontSize:11}}>{m.input.toLocaleString()}</span>
-                            <span className="mono dim" style={{fontSize:11}}>{m.output.toLocaleString()}</span>
-                            <span className="mono acc" style={{fontSize:11}}>{(m.input+m.output).toLocaleString()}</span>
-                            <span className="mono" style={{fontSize:11,color:"var(--grn)"}}>${m.cost.toFixed(4)}</span>
+                        {prdAgentResult?.competitive_context&&(
+                          <div className="prd-sec">
+                            <div className="prd-lbl">Competitive Context</div>
+                            <div style={{fontSize:12,lineHeight:1.7,color:"var(--txt)"}}>{prdAgentResult.competitive_context}</div>
                           </div>
-                        ))}
-                      </>
-                    );
-                  })()}
-                </div>
+                        )}
 
-                {/* Workflow runs */}
-                <div className="card">
-                  <div className="ch">
-                    <div className="ct">Workflow Runs · Orchestrated Calls</div>
-                    <button className="btn btn-sm" onClick={loadTokens}>⟳ Refresh</button>
-                  </div>
-                  {tokenWorkflows.length===0?<div className="empty">No workflow runs yet. Workflow tracking activates on Super Agent runs.</div>:(
-                    <>
-                      <div className="th-row" style={{gridTemplateColumns:"1fr 80px 80px 80px 60px 90px"}}>
-                        <span>Workflow</span><span>Agents</span><span>Tokens</span><span>Cost</span><span>Status</span><span>Started</span>
-                      </div>
-                      {tokenWorkflows.map((wf:any)=>(
-                        <div key={wf.id} className="tr" style={{gridTemplateColumns:"1fr 80px 80px 80px 60px 90px"}}>
-                          <div><div style={{fontWeight:500,fontSize:12}}>{wf.workflow_name}</div>{wf.triggered_by&&<span className="mono dim" style={{fontSize:9}}>{wf.triggered_by}</span>}</div>
-                          <span className="mono dim" style={{fontSize:11}}>{wf.agent_count}</span>
-                          <span className="mono acc" style={{fontSize:11}}>{(wf.total_tokens||0).toLocaleString()}</span>
-                          <span className="mono" style={{fontSize:11,color:"var(--grn)"}}>${parseFloat(wf.total_cost||0).toFixed(4)}</span>
-                          <span className={`tag ${wf.status==="completed"?"tag-grn":wf.status==="failed"?"tag-red":"tag-amb"}`} style={{fontSize:9}}>{wf.status}</span>
-                          <span className="mono dim" style={{fontSize:10}}>{wf.started_at?new Date(wf.started_at).toLocaleDateString("en-US",{month:"short",day:"numeric",hour:"2-digit",minute:"2-digit"}):"—"}</span>
+                        <div className="prd-sec">
+                          <div className="prd-lbl">User Stories</div>
+                          {(prdAgentResult?.prd?.user_stories||prdResult.stories||[]).map((s:string,i:number)=><div key={i} className="story">{s}</div>)}
                         </div>
-                      ))}
-                    </>
+
+                        <div className="prd-sec">
+                          <div className="prd-lbl">Acceptance Criteria</div>
+                          {(prdAgentResult?.prd?.acceptance_criteria||prdResult.criteria||[]).map((c:string,i:number)=>(
+                            <div key={i} style={{display:"flex",gap:7,fontSize:12,marginBottom:5,alignItems:"flex-start",padding:"4px 8px",background:"rgba(16,185,129,0.04)",borderRadius:6,border:"1px solid rgba(16,185,129,0.12)"}}>
+                              <span style={{color:"var(--grn)",flexShrink:0,marginTop:1}}>✓</span>{c}
+                            </div>
+                          ))}
+                        </div>
+
+                        <div className="prd-sec">
+                          <div className="prd-lbl">Success Metrics</div>
+                          {(prdAgentResult?.prd?.success_metrics||[]).length>0
+                            ?(prdAgentResult.prd.success_metrics.map((m:any,i:number)=>(
+                              <div key={i} style={{display:"flex",gap:10,fontSize:12,padding:"5px 0",borderBottom:"1px solid var(--bdr2)",alignItems:"flex-start"}}>
+                                <div style={{width:4,height:4,borderRadius:"50%",background:"var(--acc)",flexShrink:0,marginTop:6}}/>
+                                <div><strong>{typeof m==="string"?m:m.metric}</strong>{typeof m==="object"&&<> · Baseline: {m.baseline} → Target: {m.target}{m.okr_kr&&<span className="mono" style={{color:"var(--grn)",fontSize:10}}> ({m.okr_kr})</span>}</>}</div>
+                              </div>
+                            )))
+                            :(prdResult.metrics||[]).map((m:string,i:number)=><div key={i} style={{fontSize:12,padding:"4px 0",borderBottom:"1px solid var(--bdr2)",display:"flex",gap:7}}><div style={{width:3,height:3,borderRadius:"50%",background:"var(--acc)",flexShrink:0,marginTop:7}}/>{m}</div>)}
+                        </div>
+
+                        {(prdAgentResult?.prd?.constraints||[]).length>0&&(
+                          <div className="prd-sec">
+                            <div className="prd-lbl">Constraints</div>
+                            {prdAgentResult.prd.constraints.map((c:string,i:number)=><div key={i} style={{fontSize:12,display:"flex",gap:7,padding:"3px 0",color:"var(--txt)"}}><span style={{color:"var(--amb)"}}>⚠</span>{c}</div>)}
+                          </div>
+                        )}
+
+                        {(prdAgentResult?.prd?.out_of_scope||[]).length>0&&(
+                          <div className="prd-sec">
+                            <div className="prd-lbl">Out of Scope</div>
+                            {prdAgentResult.prd.out_of_scope.map((o:string,i:number)=><div key={i} style={{fontSize:12,display:"flex",gap:7,padding:"3px 0",color:"var(--mut)"}}><span style={{color:"var(--red)"}}>✕</span>{o}</div>)}
+                          </div>
+                        )}
+
+                        {(prdAgentResult?.prd?.open_questions||prdResult.questions||[]).length>0&&(
+                          <div className="prd-sec">
+                            <div className="prd-lbl">Open Questions</div>
+                            {(prdAgentResult?.prd?.open_questions||prdResult.questions||[]).map((q:string,i:number)=><div key={i} style={{fontSize:12,padding:"3px 0",color:"var(--amb)",display:"flex",gap:6}}><span>?</span>{q}</div>)}
+                          </div>
+                        )}
+
+                        {prdAgentResult?.recommended_reviewers?.length>0&&(
+                          <div className="prd-sec">
+                            <div className="prd-lbl">Recommended Reviewers</div>
+                            <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
+                              {prdAgentResult.recommended_reviewers.map((r:string,i:number)=><span key={i} className="tag tag-pur" style={{fontSize:10}}>{r}</span>)}
+                            </div>
+                          </div>
+                        )}
+
+                        {prdAgentResult?.self_evaluation&&(
+                          <div className="prd-sec">
+                            <div className="prd-lbl">Self-Evaluation</div>
+                            <div style={{fontSize:11,color:"var(--acc)"}}>{prdAgentResult.self_evaluation.improvements_made}</div>
+                          </div>
+                        )}
+                      </div>
+                    </div>
                   )}
                 </div>
-
-                {/* Raw log */}
-                <div className="card">
-                  <div className="ch"><div className="ct">Raw Token Log · Last 100 Calls</div></div>
-                  {tokenUsage.length===0?<div className="empty">No token logs yet.</div>:(
-                    <>
-                      <div className="th-row" style={{gridTemplateColumns:"140px 1fr 70px 70px 80px 80px 100px"}}>
-                        <span>Agent</span><span>Model</span><span>Input</span><span>Output</span><span>Total</span><span>Cost USD</span><span>When</span>
-                      </div>
-                      {tokenUsage.slice(0,50).map((r:any)=>(
-                        <div key={r.id} className="tr" style={{gridTemplateColumns:"140px 1fr 70px 70px 80px 80px 100px"}}>
-                          <span className="tag tag-pur" style={{fontSize:9}}>{r.agent_name}</span>
-                          <span className="mono dim" style={{fontSize:10}}>{r.model}</span>
-                          <span className="mono dim" style={{fontSize:11}}>{(r.input_tokens||0).toLocaleString()}</span>
-                          <span className="mono dim" style={{fontSize:11}}>{(r.output_tokens||0).toLocaleString()}</span>
-                          <span className="mono acc" style={{fontSize:11}}>{(r.total_tokens||0).toLocaleString()}</span>
-                          <span className="mono" style={{fontSize:11,color:"var(--grn)"}}>${parseFloat(r.estimated_cost||0).toFixed(6)}</span>
-                          <span className="mono dim" style={{fontSize:10}}>{r.created_at?new Date(r.created_at).toLocaleDateString("en-US",{month:"short",day:"numeric",hour:"2-digit",minute:"2-digit"}):"—"}</span>
-                        </div>
-                      ))}
-                    </>
-                  )}
-                </div>
-
               </div>
             )}
+
+
 
             {/* AGENTS */}
             {page==="agents"&&(
@@ -2971,12 +2888,16 @@ export default function PMDashboard(){
                 {agentError&&<div className="infobox ib-red" style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}><span>⚠️ {agentError}</span><button className="btn btn-sm" onClick={()=>setAgentError(null)}>✕</button></div>}
                 <div className="ga">
                   {[
-                    {ic:"🎙️",col:"ic-pur",name:"Meeting Scribe",trig:"After every meeting",desc:"Extracts decisions, action items with owners and due dates, and pushes to To-Do automatically.",chips:["Transcript","Calendar","Jira"],action:()=>setPage("meetings"),lbl:"▶ Go to Meetings",run:null},
-                    {ic:"🧠",col:"ic-blu",name:"Prioritization",trig:"Sprint planning",desc:"RICE-scores your backlog against Q2 OKRs. Surfaces top items with reasoning per item.",chips:["Backlog","OKRs","Capacity"],action:runPrio,lbl:`⚡ Score (${projects.length})`,run:"prioritization"},
-                    {ic:"📊",col:"ic-grn",name:"Weekly Digest",trig:"Every Monday 8am",desc:"Aggregates live project data, tasks and meetings into an executive Monday briefing.",chips:["Projects","Tasks","Meetings"],action:runDigest,lbl:"⚡ Generate Digest",run:"weekly-digest"},
-                    {ic:"🔔",col:"ic-amb",name:"Risk Monitor",trig:"Continuous",desc:"Scans all projects for risk signals, flags blockers, creates alert tasks automatically.",chips:["Projects","Sprints","Blockers"],action:runRisk,lbl:"⚡ Run Risk Scan",run:"risk-monitor"},
+                    {ic:"🔮",col:"ic-pur",name:"Executive Briefing",trig:"On demand",desc:"Multi-source reasoning engine — tools, cross-agent orchestration, writes to decision log and creates tasks.",chips:["Projects","Jira","OKRs","Meetings"],action:()=>setPage("super"),lbl:"▶ Open Agent",run:null},
+                    {ic:"⚡",col:"ic-amb",name:"Sprint Intelligence",trig:"On demand / Sprint review",desc:"Autonomous sprint monitoring — detects blockers, velocity decay, creates tasks, drafts stakeholder alerts.",chips:["Jira","OKRs","Meetings","Tasks"],action:()=>setPage("sprint"),lbl:"▶ Open Agent",run:null},
+                    {ic:"🚦",col:"ic-red",name:"Release Readiness",trig:"Before every release",desc:"Multi-source go/no-go — Jira P0s, risk log, stakeholder coverage, OKR contribution.",chips:["Jira","Risks","Stakeholders","OKRs"],action:()=>setPage("release"),lbl:"▶ Open Agent",run:null},
+                    {ic:"🔍",col:"ic-blu",name:"Research Agents",trig:"On demand",desc:"3 parallel agents (Competitive, Market, Customer) with live web search — synthesizes investment brief.",chips:["Web Search","Competitive","Market","Customer"],action:()=>setPage("research"),lbl:"▶ Open Agent",run:null},
+                    {ic:"📄",col:"ic-pur",name:"Autonomous PRD Agent",trig:"On demand",desc:"Searches web, checks OKRs, reads competitive intel, generates PRD with acceptance criteria and success metrics.",chips:["Web Search","OKRs","Jira","Knowledge"],action:()=>setPage("prd"),lbl:"▶ Open Agent",run:null},
+                    {ic:"🙋",col:"ic-grn",name:"Meeting Scribe",trig:"After every meeting",desc:"Paste transcript → extracts decisions, action items with owners and due dates, creates tasks automatically.",chips:["Transcript","Tasks","Calendar"],action:()=>setPage("meetings"),lbl:"▶ Go to Meetings",run:null},
+                    {ic:"🧠",col:"ic-blu",name:"Prioritization Engine",trig:"Sprint planning",desc:"RICE-scores your backlog against OKRs and surfaces top items with reasoning per item.",chips:["Backlog","OKRs","RICE"],action:runPrio,lbl:"⚡ Score Backlog",run:"prioritization"},
+                    {ic:"📊",col:"ic-grn",name:"Weekly Digest",trig:"Monday 8am",desc:"Aggregates live project data, tasks and meetings into an executive Monday briefing.",chips:["Projects","Tasks","Meetings"],action:runDigest,lbl:"⚡ Generate Digest",run:"weekly-digest"},
+                    {ic:"🔔",col:"ic-amb",name:"Risk Monitor",trig:"Continuous",desc:"Scans all projects for risk signals, flags blockers, creates alert tasks automatically.",chips:["Projects","Sprints","Blockers"],action:runRisk,lbl:"⚡ Run Scan",run:"risk-monitor"},
                     {ic:"📝",col:"ic-blu",name:"Stakeholder Update",trig:"Every Friday 3pm",desc:"Writes a polished status email tailored to the recipient from live project data.",chips:["Projects","Tasks","OKRs"],action:null,lbl:"⚡ Draft Update",run:"stakeholder-update"},
-                    {ic:"📄",col:"ic-pur",name:"PRD Agent",trig:"On demand",desc:"Takes focus group transcripts, clusters themes, writes structured PRD with user stories.",chips:["Transcripts","Surveys","Research"],action:()=>setPage("prd"),lbl:"▶ Go to PRD Agent",run:null},
                   ].map((ag,i)=>(
                     <div key={i} className="agc">
                       <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:10}}>
@@ -2993,47 +2914,56 @@ export default function PMDashboard(){
                     </div>
                   ))}
                 </div>
-                <div className="card">
-                  <div className="ch"><div className="ct">Stack</div></div>
-                  <div className="cb"><div className="g3" style={{gap:8}}>{[["LLM","Claude API (Sonnet)"],["Orchestration","Supabase Edge Functions"],["Database","Supabase Postgres"],["Auth","Supabase Auth"],["Realtime","Supabase Realtime"],["Integrations","Jira · Gmail · GCal"]].map(([l,v])=>(<div key={l} style={{background:"var(--surf2)",border:"1px solid var(--bdr)",borderRadius:8,padding:"10px 12px"}}><div className="section-lbl" style={{marginBottom:3}}>{l}</div><div className="acc" style={{fontWeight:500,fontSize:12}}>{v}</div></div>))}</div></div>
-                </div>
               </div>
             )}
 
-            {/* PRD */}
-            {page==="prd"&&(
-              <div className="g2">
-                <div className="col">
-                  <div className="card">
-                    <div className="ch"><div className="ct">Input — Research / Focus Group Data</div></div>
-                    <div className="cb">
-                      {prdStatus!=="done"?(<>
-                        <div className="upload-z" style={{marginBottom:12}} onClick={()=>document.getElementById("pf")?.click()}>
-                          <div style={{fontSize:28,marginBottom:8}}>📎</div>
-                          <div style={{fontFamily:"Syne",fontWeight:700,fontSize:13,marginBottom:3}}>Drop files or click to upload</div>
-                          <div style={{fontSize:12,color:"var(--mut)"}}>Supports .txt .csv .docx .pdf</div>
-                          <input id="pf" type="file" style={{display:"none"}} onChange={async(e:any)=>{const f=e.target.files[0];if(f){const t=await f.text();setPrdInput(t);}}}/>
-                        </div>
-                        <div className="section-lbl">Or paste raw text</div>
-                        <textarea className="input" value={prdInput} onChange={e=>setPrdInput(e.target.value)} placeholder={"Paste focus group transcript or survey results...\n\nExample:\n\"Participant 3: Onboarding took 45 minutes...\"\n\"Survey: 18 of 32 said onboarding was #1 pain point...\""} style={{minHeight:180,resize:"vertical" as any,marginBottom:10}}/>
-                        <button onClick={runPRD} disabled={!prdInput.trim()||prdStatus==="processing"} style={{width:"100%",padding:"10px 0",background:prdInput.trim()?"var(--acc)":"var(--bdr)",color:prdInput.trim()?"#000":"var(--mut)",border:"none",borderRadius:8,fontFamily:"Syne",fontWeight:700,fontSize:13,cursor:prdInput.trim()?"pointer":"default"}}>{prdStatus==="processing"?"Analysing...":"⚡ Generate PRD"}</button>
-                        {prdStatus==="processing"&&<div style={{display:"flex",alignItems:"center",gap:10,marginTop:12,fontSize:12,color:"var(--mut)"}}><div className="spin"/>Clustering themes, extracting pain points, writing PRD...</div>}
-                      </>):(<div><div style={{fontSize:12,color:"var(--grn)",marginBottom:10,fontFamily:"DM Mono"}}>✓ Processed {prdInput.split(' ').length} words</div><div style={{display:"flex",flexWrap:"wrap",gap:5,marginBottom:14}}>{prdResult.themes.map((t:any,i:number)=><span key={i} className="tag tag-blu">{t.lbl} <span style={{opacity:0.6}}>×{t.n}</span></span>)}</div><button onClick={()=>{setPrdStatus("idle");setPrdInput("");setPrdResult(null);}} style={{fontSize:11,fontFamily:"DM Mono",padding:"4px 10px",border:"1px solid var(--bdr)",borderRadius:6,background:"transparent",color:"var(--mut)",cursor:"pointer"}}>↺ New input</button></div>)}
+
+            {/* TOKEN ANALYTICS */}
+            {page==="tokens"&&(
+              <div className="col">
+                {tokenLoading&&<div className="loading"><div className="spin"/>Loading token data...</div>}
+                {budgetStatus&&budgetStatus.budget_status!=="ok"&&(
+                  <div className={`infobox ${budgetStatus.budget_status==="critical"?"ib-red":"ib-amb"}`} style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+                    <span>{budgetStatus.budget_status==="critical"?"🚨 Daily budget exceeded":"⚠️ Approaching budget"} · Today: ${parseFloat(budgetStatus.today_cost||0).toFixed(4)} · Week: ${parseFloat(budgetStatus.week_cost||0).toFixed(4)}</span>
+                  </div>
+                )}
+                {costAnomalies.length>0&&<div className="infobox ib-amb" style={{fontSize:11}}>🔍 Cost anomaly: {costAnomalies[0].multiplier}x above 7-day avg on {costAnomalies[0].date}</div>}
+                {!tokenLoading&&(()=>{
+                  const totalTokens=tokenUsage.reduce((s:number,r:any)=>s+(r.total_tokens||0),0);
+                  const totalCost=tokenUsage.reduce((s:number,r:any)=>s+(parseFloat(r.estimated_cost)||0),0);
+                  const todayCost=tokenRollup.filter((r:any)=>r.date===new Date().toISOString().split("T")[0]).reduce((s:number,r:any)=>s+(parseFloat(r.total_cost)||0),0);
+                  const agentSet=new Set(tokenUsage.map((r:any)=>r.agent_name));
+                  return(
+                    <div className="g4">
+                      {[{v:totalTokens.toLocaleString(),l:"Total Tokens",c:"var(--acc)"},{v:`$${totalCost.toFixed(4)}`,l:"Total Cost (USD)",c:"var(--grn)"},{v:`$${todayCost.toFixed(4)}`,l:"Cost Today",c:"var(--amb)"},{v:agentSet.size.toString(),l:"Agents Tracked",c:"var(--pur)"}].map(({v,l,c})=>(
+                        <div key={l} className="kpi"><div className="kpi-v" style={{color:c}}>{v}</div><div className="kpi-l">{l}</div></div>
+                      ))}
                     </div>
+                  );
+                })()}
+                <div className="g2">
+                  <div className="card">
+                    <div className="ch"><div className="ct">Top Agents · Token Usage</div></div>
+                    {tokenUsage.length===0?<div className="empty">No token data yet.</div>:(()=>{
+                      const byAgent=tokenUsage.reduce((acc:any,r:any)=>{const k=r.agent_name;if(!acc[k])acc[k]={agent:k,calls:0,tokens:0,cost:0};acc[k].calls++;acc[k].tokens+=(r.total_tokens||0);acc[k].cost+=(parseFloat(r.estimated_cost)||0);return acc;},{});
+                      const sorted=Object.values(byAgent).sort((a:any,b:any)=>b.tokens-a.tokens);
+                      const max=(sorted[0] as any)?.tokens||1;
+                      return(<div className="cb0" style={{padding:"4px 16px"}}>{sorted.map((ag:any)=>(<div key={ag.agent} style={{display:"flex",alignItems:"center",gap:10,padding:"9px 0",borderBottom:"1px solid var(--bdr)"}}><span style={{width:140,fontSize:12,flexShrink:0}}>{ag.agent}</span><div style={{flex:1,height:6,background:"var(--bdr2)",borderRadius:3,overflow:"hidden"}}><div style={{height:"100%",width:`${(ag.tokens/max)*100}%`,background:"var(--acc)",borderRadius:3}}/></div><span className="mono" style={{fontSize:10,color:"var(--acc)",width:70,textAlign:"right"}}>{ag.tokens.toLocaleString()}</span><span className="mono" style={{fontSize:10,color:"var(--grn)",width:55,textAlign:"right"}}>${ag.cost.toFixed(4)}</span></div>))}</div>);
+                    })()}
+                  </div>
+                  <div className="card">
+                    <div className="ch"><div className="ct">Daily Cost Trend</div></div>
+                    {tokenRollup.length===0?<div className="empty">No rollup data yet.</div>:(()=>{
+                      const byDate=tokenRollup.reduce((acc:any,r:any)=>{const d=r.date;if(!acc[d])acc[d]={date:d,cost:0,tokens:0};acc[d].cost+=(parseFloat(r.total_cost)||0);acc[d].tokens+=(r.total_tokens||0);return acc;},{});
+                      const days=Object.values(byDate).sort((a:any,b:any)=>a.date.localeCompare(b.date)).slice(-14);
+                      const maxCost=Math.max(...days.map((d:any)=>d.cost),0.001);
+                      return(<div className="cb0" style={{padding:"4px 16px"}}>{days.map((d:any)=>(<div key={d.date} style={{display:"flex",alignItems:"center",gap:10,padding:"7px 0",borderBottom:"1px solid var(--bdr)"}}><span className="mono dim" style={{fontSize:10,width:80,flexShrink:0}}>{new Date(d.date).toLocaleDateString("en-US",{month:"short",day:"numeric"})}</span><div style={{flex:1,height:6,background:"var(--bdr2)",borderRadius:3,overflow:"hidden"}}><div style={{height:"100%",width:`${(d.cost/maxCost)*100}%`,background:"var(--grn)",borderRadius:3}}/></div><span className="mono" style={{fontSize:10,color:"var(--grn)",width:60,textAlign:"right"}}>${d.cost.toFixed(4)}</span></div>))}</div>);
+                    })()}
                   </div>
                 </div>
-                <div>
-                  {!prdResult&&prdStatus!=="processing"&&<div className="card" style={{height:"100%",display:"flex",alignItems:"center",justifyContent:"center",flexDirection:"column",gap:10,opacity:0.4}}><div style={{fontSize:36}}>📄</div><div style={{fontFamily:"Syne",fontWeight:700,fontSize:13}}>PRD appears here</div></div>}
-                  {prdStatus==="processing"&&<div className="card" style={{height:"100%",display:"flex",alignItems:"center",justifyContent:"center",flexDirection:"column",gap:12}}><div className="spin" style={{width:32,height:32,borderWidth:3}}/><div style={{fontFamily:"Syne",fontWeight:700}}>Writing PRD...</div></div>}
-                  {prdResult&&(<div className="card">
-                    <div className="ch"><div><div style={{fontFamily:"Syne",fontWeight:800,fontSize:14}}>Product Requirements Document</div><div className="mono dim" style={{fontSize:10}}>AI-generated · {new Date().toLocaleDateString()} · Review before sharing</div></div><span className="tag tag-grn">Draft</span></div>
-                    <div className="prd-sec"><div className="prd-lbl">Problem Statement</div><p style={{fontSize:12,lineHeight:1.7}}>{prdResult.problem}</p></div>
-                    <div className="prd-sec"><div className="prd-lbl">User Stories</div>{prdResult.stories.map((s:string,i:number)=><div key={i} className="story">{s}</div>)}</div>
-                    <div className="prd-sec"><div className="prd-lbl">Acceptance Criteria</div>{prdResult.criteria.map((c:string,i:number)=><div key={i} style={{display:"flex",gap:7,fontSize:12,marginBottom:4,alignItems:"flex-start"}}><span style={{color:"var(--grn)",flexShrink:0}}>✓</span>{c}</div>)}</div>
-                    <div className="prd-sec"><div className="prd-lbl">Success Metrics</div>{prdResult.metrics.map((m:string,i:number)=><div key={i} style={{fontSize:12,padding:"3px 0",borderBottom:i<prdResult.metrics.length-1?"1px solid var(--bdr2)":"none",display:"flex",gap:7}}><div style={{width:3,height:3,borderRadius:"50%",background:"var(--acc)",flexShrink:0,marginTop:7}}/>{m}</div>)}</div>
-                    {prdResult.questions?.length>0&&<div className="prd-sec"><div className="prd-lbl">Open Questions</div>{prdResult.questions.map((q:string,i:number)=><div key={i} style={{fontSize:12,padding:"3px 0",color:"var(--amb)",display:"flex",gap:6}}><span>?</span>{q}</div>)}</div>}
-                    <div style={{padding:"11px 16px",borderTop:"1px solid var(--bdr)"}}><button className="xbtn" onClick={()=>{const md=`# PRD\n\n## Problem\n${prdResult.problem}\n\n## User Stories\n${prdResult.stories.map((s:string)=>`- ${s}`).join("\n")}\n\n## Acceptance Criteria\n${prdResult.criteria.map((c:string)=>`- [ ] ${c}`).join("\n")}\n\n## Success Metrics\n${prdResult.metrics.map((m:string)=>`- ${m}`).join("\n")}`;navigator.clipboard.writeText(md).then(()=>alert("Copied!"));}}>Copy as Markdown</button></div>
-                  </div>)}
+                <div className="card">
+                  <div className="ch"><div className="ct">Workflow Runs</div><button className="btn btn-sm" onClick={loadTokens}>⟳</button></div>
+                  {tokenWorkflows.length===0?<div className="empty">No workflow runs yet.</div>:(<><div className="th-row" style={{gridTemplateColumns:"1fr 80px 80px 80px 60px 90px"}}><span>Workflow</span><span>Agents</span><span>Tokens</span><span>Cost</span><span>Status</span><span>Started</span></div>{tokenWorkflows.map((wf:any)=>(<div key={wf.id} className="tr" style={{gridTemplateColumns:"1fr 80px 80px 80px 60px 90px"}}><div style={{fontWeight:500,fontSize:12}}>{wf.workflow_name}</div><span className="mono dim" style={{fontSize:11}}>{wf.agent_count}</span><span className="mono acc" style={{fontSize:11}}>{(wf.total_tokens||0).toLocaleString()}</span><span className="mono" style={{fontSize:11,color:"var(--grn)"}}>${parseFloat(wf.total_cost||0).toFixed(4)}</span><span className={`tag ${wf.status==="completed"?"tag-grn":wf.status==="failed"?"tag-red":"tag-amb"}`} style={{fontSize:9}}>{wf.status}</span><span className="mono dim" style={{fontSize:10}}>{wf.started_at?new Date(wf.started_at).toLocaleDateString("en-US",{month:"short",day:"numeric"}):"—"}</span></div>))}</>)}
                 </div>
               </div>
             )}
