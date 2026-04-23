@@ -541,7 +541,7 @@ export default function PMDashboard(){
   const [roadmapItems,setRoadmapItems]=useState<any[]>([]);
   const [showAddRoadmap,setShowAddRoadmap]=useState(false);
   const [rmForm,setRmForm]=useState({title:"",project:"",startQ:0,endQ:1,color:"#00d4ff"});
-  const [rmYear,setRmYear]=useState(new Date().getFullYear());
+  const [rmYear,setRmYear]=useState(2025);
 
   // Calendar date for todos
   const [selectedTodoDate,setSelectedTodoDate]=useState(new Date());
@@ -923,7 +923,7 @@ export default function PMDashboard(){
     finally{setAgentRunning(null);}
   };
   const runPrio=async()=>{
-    const items=(prioProjId==="all"?projects:projects.filter(p=>p.id===prioProjId)).map(p=>({title:p.name,description:`Status:${p.status},Progress:${p.progress}%`}));
+    const riceProj=prioProjId==="all"?projects:projects.filter((p:any)=>p.id===prioProjId);const items=riceProj.map((p:any)=>({title:p.name,description:`Status:${p.status},Progress:${p.progress}%`}));
     if(!items.length){setAgentError("No projects to score.");setAgentResultType("error");return;}
     await runAgent("prioritization",{items});loadRice();
   };
@@ -1403,7 +1403,7 @@ export default function PMDashboard(){
                     <div style={{display:"flex",justifyContent:"flex-end"}}><button className="btn btn-primary btn-sm" onClick={()=>setShowAddMoscow(true)}>+ Add Item</button></div>
                     <div className="g2">
                       {[{k:"must",l:"Must Have",c:"var(--red)"},{k:"should",l:"Should Have",c:"var(--amb)"},{k:"could",l:"Could Have",c:"var(--grn)"},{k:"wont",l:"Won't Have",c:"var(--mut)"}].map(({k,l,c})=>{
-                        const items=moscowItems.filter((i:any)=>i.bucket===k&&(prioProjId==="all"||i.project===prioProjId));
+                        const proj=projects.find((p:any)=>p.id===prioProjId);const items=moscowItems.filter((i:any)=>i.bucket===k&&(prioProjId==="all"||i.project===(proj?.name||prioProjId)));
                         return(
                           <div key={k} className="mos-bucket">
                             <div className="mos-hd"><span style={{fontFamily:"Syne",fontWeight:700,fontSize:13,color:c}}>{l}</span><span className="tag tag-dim" style={{fontSize:9}}>{items.length}</span></div>
