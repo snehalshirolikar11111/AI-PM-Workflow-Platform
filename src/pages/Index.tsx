@@ -269,7 +269,7 @@ const S = `
 const NAV = [
   {grp:"Today",        items:[{id:"schedule",ic:"🕐",lbl:"Daily Schedule"},{id:"todos",ic:"☑",lbl:"To-Do List"}]},
   {grp:"Execution",    items:[{id:"tracker",ic:"◎",lbl:"Projects"},{id:"roadmap",ic:"🗺",lbl:"Roadmap"}]},
-  {grp:"AI Agents",    items:[{id:"super",ic:"🔮",lbl:"Super Agent"},{id:"sprint",ic:"⚡",lbl:"Sprint Intelligence"},{id:"release",ic:"🚦",lbl:"Release Readiness"},{id:"research",ic:"🔍",lbl:"Research Agents"}]},
+  {grp:"AI Agents",    items:[{id:"super",ic:"🔮",lbl:"Executive Briefing"},{id:"sprint",ic:"⚡",lbl:"Sprint Intelligence"},{id:"release",ic:"🚦",lbl:"Release Readiness"},{id:"research",ic:"🔍",lbl:"Research Agents"}]},
   {grp:"AI Workflows", items:[{id:"meetings",ic:"✦",lbl:"Meeting Intel"},{id:"prd",ic:"📄",lbl:"PRD Agent"},{id:"priority",ic:"◈",lbl:"Prioritization"},{id:"agents",ic:"⬡",lbl:"All Agents"}]},
   {grp:"Insights",     items:[{id:"optimizer",ic:"⚡",lbl:"Cost Optimizer"},{id:"decisions",ic:"📌",lbl:"Decision Log"},{id:"knowledge",ic:"🧠",lbl:"Knowledge"}]},
   {grp:"Metrics",      items:[{id:"okr",ic:"◎",lbl:"OKR Tracker"},{id:"tokens",ic:"◈",lbl:"Token Analytics"},{id:"outcomes",ic:"🎯",lbl:"Outcomes"},{id:"metrics",ic:"◎",lbl:"Pilot Metrics"}]},
@@ -292,7 +292,7 @@ const PAGE_INFO: Record<string,{title:string;sub:string}> = {
   knowledge:{title:"Knowledge Memory",sub:"Past PRDs · insights · learnings · reusable patterns"},
   outcomes:{title:"Outcome Tracking",sub:"Feature impact post-launch · OKR contribution · business results"},
   optimizer:{title:"Token Cost Optimizer",sub:"Analyze any agent · reduce token spend · model recommendations · caching strategy"},
-  super:{title:"Super Agent",sub:"Multi-source reasoning → PRD + Risks + Prioritization + Exec Summary"},
+  super:{title:"Executive Briefing Agent",sub:"Autonomous multi-source intelligence · tools · cross-agent orchestration · writes back to platform"},
   agents:{title:"All Agents",sub:"All AI-powered automations — overview and quick launch"},
   prd:{title:"PRD Agent",sub:"Focus group data in → structured PRD out in seconds"},
   stakeholders:{title:"Stakeholders",sub:"Influence map with last-contact tracking"},
@@ -599,7 +599,7 @@ export default function PMDashboard(){
   const [superRunning,setSuperRunning]=useState(false);
   const [superResult,setSuperResult]=useState<any>(null);
   const [superError,setSuperError]=useState<string|null>(null);
-  const [superExpanded,setSuperExpanded]=useState<Record<string,boolean>>({exec:true,prd:true,risks:true,prio:true,sources:false,eval:false});
+  const [superExpanded,setSuperExpanded]=useState<Record<string,boolean>>({exec:true,prd:true,risks:true,prio:true,sources:false,eval:false,changed:true,decisions_needed:true,actions_taken:true});
   const [thinkStep,setThinkStep]=useState(0);
 
   /* ── Auth ── */
@@ -911,7 +911,7 @@ export default function PMDashboard(){
   const rrStatusBdr=(s:string)=>s==="green"?"rgba(16,185,129,0.2)":s==="yellow"?"rgba(245,158,11,0.2)":"rgba(239,68,68,0.2)";
 
   /* ── Research Agents ── */
-  const RESEARCH_STEPS=["Running Competitive Analysis Agent (web search)…","Running Market Analysis Agent (web search)…","Running Customer Insights Agent…","Synthesizing across all three agents…"];
+  const RESEARCH_STEPS=["Running Competitive Analysis Agent…","Running Market Analysis Agent (web search)…","Running Customer Insights Agent…","Synthesizing across all three agents…"];
   const runResearch=async()=>{
     if(!researchProduct.trim())return;
     setResearchRunning(true);setResearchResult(null);setResearchError(null);setResearchStep(0);
@@ -2528,6 +2528,17 @@ export default function PMDashboard(){
                   <div className="col">
 
                     {/* Model Routing Decision */}
+                    {/* Portfolio health badge */}
+                    {superResult.portfolio_health&&(
+                      <div style={{display:"flex",alignItems:"center",gap:10,padding:"12px 16px",background:superResult.portfolio_health==="green"?"rgba(16,185,129,0.06)":superResult.portfolio_health==="yellow"?"rgba(245,158,11,0.06)":"rgba(239,68,68,0.06)",border:`1px solid ${superResult.portfolio_health==="green"?"rgba(16,185,129,0.2)":superResult.portfolio_health==="yellow"?"rgba(245,158,11,0.2)":"rgba(239,68,68,0.2)"}`,borderRadius:10,marginBottom:-8}}>
+                        <span style={{fontFamily:"Syne",fontWeight:800,fontSize:18,color:superResult.portfolio_health==="green"?"var(--grn)":superResult.portfolio_health==="yellow"?"var(--amb)":"var(--red)"}}>
+                          {superResult.portfolio_health==="green"?"🟢":superResult.portfolio_health==="yellow"?"🟡":"🔴"} Portfolio: {superResult.portfolio_health.toUpperCase()}
+                        </span>
+                        {superResult.confidence_score&&<span className={confClass(superResult.confidence_score)}>Confidence: {superResult.confidence_score}</span>}
+                        {superResult.actions_taken?.length>0&&<span className="tag tag-grn" style={{fontSize:9,marginLeft:"auto"}}>{superResult.actions_taken.filter((a:any)=>a.status==="success").length} actions taken</span>}
+                      </div>
+                    )}
+
                     {(superResult.task_classification||superResult.model_decision)&&(
                       <div style={{background:"var(--surf2)",border:"1px solid var(--bdr)",borderRadius:10,padding:"12px 16px",display:"flex",gap:20,flexWrap:"wrap",alignItems:"flex-start"}}>
                         {superResult.task_classification&&(
@@ -2592,6 +2603,41 @@ export default function PMDashboard(){
                         </div>
                       )}
                     </div>
+
+                    {/* What Changed + Decisions Needed */}
+                    {(superResult.whats_changed?.length>0||superResult.decisions_needed?.length>0)&&(
+                      <div className="g2">
+                        {superResult.whats_changed?.length>0&&(
+                          <div className="sa-out-sec">
+                            <div className="sa-out-hd" onClick={()=>toggleSuperSec("changed")}>
+                              <div style={{display:"flex",alignItems:"center",gap:10}}><span style={{fontSize:14}}>🔄</span><span style={{fontFamily:"Syne",fontWeight:700,fontSize:13}}>What Changed</span><span className="tag tag-blu" style={{fontSize:9}}>{superResult.whats_changed.length}</span></div>
+                              <span style={{fontSize:13,color:"var(--mut)"}}>{superExpanded.changed?"▾":"▸"}</span>
+                            </div>
+                            {(superExpanded.changed!==false)&&<div className="sa-out-body">{superResult.whats_changed.map((c:string,i:number)=><div key={i} style={{display:"flex",gap:8,padding:"5px 0",borderBottom:"1px solid var(--bdr)",fontSize:12}}><span style={{color:"var(--acc)",flexShrink:0}}>→</span>{c}</div>)}</div>}
+                          </div>
+                        )}
+                        {superResult.decisions_needed?.length>0&&(
+                          <div className="sa-out-sec">
+                            <div className="sa-out-hd" onClick={()=>toggleSuperSec("decisions_needed")}>
+                              <div style={{display:"flex",alignItems:"center",gap:10}}><span style={{fontSize:14}}>⚡</span><span style={{fontFamily:"Syne",fontWeight:700,fontSize:13}}>Decisions Needed</span><span className="tag tag-red" style={{fontSize:9}}>{superResult.decisions_needed.length}</span></div>
+                              <span style={{fontSize:13,color:"var(--mut)"}}>{superExpanded.decisions_needed?"▾":"▸"}</span>
+                            </div>
+                            {(superExpanded.decisions_needed!==false)&&<div className="sa-out-body">{superResult.decisions_needed.map((d:string,i:number)=><div key={i} style={{display:"flex",gap:10,padding:"8px 0",borderBottom:"1px solid var(--bdr)",fontSize:12,alignItems:"flex-start"}}><div style={{width:20,height:20,borderRadius:"50%",background:"rgba(239,68,68,0.1)",border:"1px solid rgba(239,68,68,0.2)",display:"flex",alignItems:"center",justifyContent:"center",fontFamily:"DM Mono",fontSize:10,color:"var(--red)",flexShrink:0}}>{i+1}</div>{d}</div>)}</div>}
+                          </div>
+                        )}
+                      </div>
+                    )}
+
+                    {/* Actions Taken */}
+                    {superResult.actions_taken?.length>0&&(
+                      <div className="sa-out-sec">
+                        <div className="sa-out-hd" onClick={()=>toggleSuperSec("actions_taken")}>
+                          <div style={{display:"flex",alignItems:"center",gap:10}}><span style={{fontSize:14}}>⚡</span><span style={{fontFamily:"Syne",fontWeight:700,fontSize:13}}>Actions Taken Autonomously</span><span className="tag tag-grn" style={{fontSize:9}}>{superResult.actions_taken.filter((a:any)=>a.status==="success").length} completed</span></div>
+                          <span style={{fontSize:13,color:"var(--mut)"}}>{superExpanded.actions_taken?"▾":"▸"}</span>
+                        </div>
+                        {(superExpanded.actions_taken!==false)&&<div className="sa-out-body">{superResult.actions_taken.map((a:any,i:number)=><div key={i} style={{display:"flex",gap:10,padding:"7px 0",borderBottom:"1px solid var(--bdr)",alignItems:"flex-start"}}><span className={`tag ${a.status==="success"?"tag-grn":a.status==="pending"?"tag-amb":"tag-dim"}`} style={{fontSize:9,flexShrink:0}}>{a.status}</span><div><div style={{fontSize:12,fontWeight:500,marginBottom:1}}>{a.action}</div><div style={{fontSize:11,color:"var(--mut)"}}>{a.rationale}</div>{a.tool_used&&<span style={{fontFamily:"DM Mono",fontSize:9,color:"var(--pur)"}}>{a.tool_used}</span>}</div></div>)}</div>}
+                      </div>
+                    )}
 
                     {/* Prioritization */}
                     <div className="sa-out-sec">
