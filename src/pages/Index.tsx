@@ -628,9 +628,13 @@ export default function PMDashboard(){
   /* ── Auth ── */
   useEffect(()=>{
     supabase.auth.getUser().then(({data:{user}})=>setUser(user));
-    const {data:{subscription}}=supabase.auth.onAuthStateChange((_,s)=>setUser(s?.user??null));
+    const {data:{subscription}}=supabase.auth.onAuthStateChange((_,s)=>{
+      setUser(s?.user??null);
+      // Re-fetch RLS-protected tables once auth is confirmed
+      if(s?.user){loadOkrs();loadRice();loadMoscow();loadRoadmap();loadAlign();}
+    });
     return()=>subscription.unsubscribe();
-  },[]);
+  },[loadOkrs,loadRice,loadMoscow,loadRoadmap,loadAlign]);
 
   /* ── Loaders ── */
   const loadTasks=useCallback(async()=>{setTodosLoading(true);const{data}=await supabase.from("tasks").select("*").order("created_at",{ascending:false});if(data)setTodos(data);setTodosLoading(false);},[]);
@@ -658,7 +662,7 @@ export default function PMDashboard(){
   const loadCal=useCallback(async()=>{const{data}=await supabase.from("schedule_blocks").select("*").order("start_time");if(data)setCalEvents(data);},[]);
   const loadAgentRuns=useCallback(async()=>{const{data}=await supabase.from("agent_runs").select("*").order("ran_at",{ascending:false}).limit(20);if(data)setAgentRuns(data);},[]);
   const loadRice=useCallback(async()=>{const{data}=await supabase.from("rice_scores").select("*").order("rice_score",{ascending:false});if(data)setRiceScores(data);},[]);
-  const loadMoscow=useCallback(async()=>{const{data}=await supabase.from("moscow_items").select("*").order("created_at").catch(()=>({data:[]}));if(data)setMoscowItems(data);},[]);
+  const loadMoscow=useCallback(async()=>{const{data,error}=await supabase.from("moscow_items").select("*");if(error)console.error("loadMoscow:",error.message);if(data)setMoscowItems(data);},[]);
   const loadRoadmap=useCallback(async()=>{const{data}=await supabase.from("roadmap_items").select("*").order("start_quarter").catch(()=>({data:[]}));if(data)setRoadmapItems(data);},[]);
   const loadAlign=useCallback(async()=>{const{data}=await supabase.from("okr_alignment").select("*").limit(1).catch(()=>({data:[]}));if(data&&data[0])setOkrAlign(data[0]);},[]);
   const loadDecisions=useCallback(async()=>{const{data}=await supabase.from("decision_log").select("*,projects(name)").order("created_at",{ascending:false}).catch(()=>({data:[]}));if(data)setDecisions(data);},[]);
