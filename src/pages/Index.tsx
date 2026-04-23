@@ -269,7 +269,7 @@ const S = `
 const NAV = [
   {grp:"Today",        items:[{id:"schedule",ic:"🕐",lbl:"Daily Schedule"},{id:"todos",ic:"☑",lbl:"To-Do List"}]},
   {grp:"Execution",    items:[{id:"tracker",ic:"◎",lbl:"Projects"},{id:"roadmap",ic:"🗺",lbl:"Roadmap"}]},
-  {grp:"AI Agents",    items:[{id:"super",ic:"🔮",lbl:"Super Agent"},{id:"release",ic:"🚦",lbl:"Release Readiness"},{id:"research",ic:"🔍",lbl:"Research Agents"}]},
+  {grp:"AI Agents",    items:[{id:"super",ic:"🔮",lbl:"Super Agent"},{id:"sprint",ic:"⚡",lbl:"Sprint Intelligence"},{id:"release",ic:"🚦",lbl:"Release Readiness"},{id:"research",ic:"🔍",lbl:"Research Agents"}]},
   {grp:"AI Workflows", items:[{id:"meetings",ic:"✦",lbl:"Meeting Intel"},{id:"prd",ic:"📄",lbl:"PRD Agent"},{id:"priority",ic:"◈",lbl:"Prioritization"},{id:"agents",ic:"⬡",lbl:"All Agents"}]},
   {grp:"Insights",     items:[{id:"optimizer",ic:"⚡",lbl:"Cost Optimizer"},{id:"decisions",ic:"📌",lbl:"Decision Log"},{id:"knowledge",ic:"🧠",lbl:"Knowledge"}]},
   {grp:"Metrics",      items:[{id:"okr",ic:"◎",lbl:"OKR Tracker"},{id:"tokens",ic:"◈",lbl:"Token Analytics"},{id:"outcomes",ic:"🎯",lbl:"Outcomes"},{id:"metrics",ic:"◎",lbl:"Pilot Metrics"}]},
@@ -285,6 +285,7 @@ const PAGE_INFO: Record<string,{title:string;sub:string}> = {
   priority:{title:"Prioritization",sub:"Choose a framework and project — AI scores your backlog"},
   roadmap:{title:"Roadmap",sub:"Quarterly initiative planning across all projects"},
   okr:{title:"OKR Tracker",sub:"Key results · AI weekly and quarterly insights · outcome alignment"},
+  sprint:{title:"Sprint Intelligence Agent",sub:"Autonomous sprint monitoring · detects risks · creates tasks · drafts alerts · no manual trigger needed"},
   release:{title:"Release Readiness Agent",sub:"Autonomous go/no-go · Jira + risks + stakeholders + OKRs · saves to Decision Log"},
   research:{title:"Research Agents",sub:"3 parallel agents · live web search · competitive, market and customer intelligence"},
   decisions:{title:"Decision Log",sub:"Every decision · rationale · data used · trade-offs · outcome status"},
@@ -521,6 +522,14 @@ export default function PMDashboard(){
 
   // Calendar date for todos
   const [selectedTodoDate,setSelectedTodoDate]=useState(new Date());
+
+  // Sprint Intelligence
+  const [siProject,setSiProject]=useState("");
+  const [siProjectKey,setSiProjectKey]=useState("");
+  const [siRunning,setSiRunning]=useState(false);
+  const [siResult,setSiResult]=useState<any>(null);
+  const [siError,setSiError]=useState<string|null>(null);
+  const [siStep,setSiStep]=useState(0);
 
   // Release Readiness
   const [rrProject,setRrProject]=useState("");
@@ -862,6 +871,26 @@ export default function PMDashboard(){
   /* ── Roadmap ── */
   const saveRm=async()=>{if(!rmForm.title.trim())return;await supabase.from("roadmap_items").insert({...rmForm,year:rmYear,user_id:user?.id}).catch(()=>{});setShowAddRoadmap(false);setRmForm({title:"",project:"",startQ:0,endQ:1,color:"#00d4ff"});loadRoadmap();};
   const deleteRm=async(id:string)=>{await supabase.from("roadmap_items").delete().eq("id",id).catch(()=>{});loadRoadmap();};
+
+  /* ── Sprint Intelligence ── */
+  const SI_STEPS=["Fetching Jira sprint issues…","Analyzing velocity trend across sprints…","Deep-diving blockers and durations…","Checking assignee workload distribution…","Correlating meeting actions with blockers…","Assessing OKR impact of delays…","Running autonomous action tools…","Self-evaluating and finalizing…"];
+  const runSprintIntelligence=async()=>{
+    if(!siProject)return;
+    const proj=projects.find(p=>p.name===siProject);
+    const key=proj?.jira_key||siProjectKey;
+    if(!key){setSiError("This project has no Jira key. Sync Jira or enter a key.");return;}
+    setSiRunning(true);setSiResult(null);setSiError(null);setSiStep(0);
+    const iv=setInterval(()=>setSiStep(s=>Math.min(s+1,SI_STEPS.length-1)),2200);
+    try{
+      const{data,error}=await supabase.functions.invoke("sprint-intelligence-agent",{body:{projectName:siProject,projectKey:key,projectId:proj?.id||null,userId:user?.id}});
+      if(error)throw new Error(error.message);if(data?.error)throw new Error(data.error);
+      setSiResult(data);loadDecisions();loadRiskPreds();loadAgentRuns();loadTasks();
+    }catch(e:any){setSiError(e.message);}
+    finally{clearInterval(iv);setSiStep(SI_STEPS.length-1);setSiRunning(false);}
+  };
+  const siColor=(s:string)=>s==="green"?"var(--grn)":s==="yellow"?"var(--amb)":"var(--red)";
+  const siBg=(s:string)=>s==="green"?"rgba(16,185,129,0.08)":s==="yellow"?"rgba(245,158,11,0.08)":"rgba(239,68,68,0.08)";
+  const siBdr=(s:string)=>s==="green"?"rgba(16,185,129,0.2)":s==="yellow"?"rgba(245,158,11,0.2)":"rgba(239,68,68,0.2)";
 
   /* ── Release Readiness ── */
   const RR_STEPS=["Checking Jira issues and P0s…","Analyzing blockers and bug trends…","Checking stakeholder coverage…","Scanning meeting action items…","Checking OKR alignment and risk predictions…","Running self-evaluation loop…","Generating go/no-go recommendation…"];
@@ -1622,6 +1651,205 @@ export default function PMDashboard(){
 
 
 
+
+
+            {/* SPRINT INTELLIGENCE */}
+            {page==="sprint"&&(
+              <div className="col">
+
+                {/* Input */}
+                <div className="card">
+                  <div className="ch">
+                    <div>
+                      <div style={{fontFamily:"Syne",fontWeight:800,fontSize:16}}>⚡ Sprint Intelligence Agent</div>
+                      <div style={{fontSize:12,color:"var(--mut)",marginTop:3}}>Autonomous — investigates, detects risks, creates tasks, and drafts alerts without manual prompting</div>
+                    </div>
+                  </div>
+                  <div className="cb">
+                    <div className="form-grid" style={{marginBottom:10}}>
+                      <div className="form-row">
+                        <label className="form-label">Project</label>
+                        <select className="input select" value={siProject} onChange={e=>{setSiProject(e.target.value);const p=projects.find(x=>x.name===e.target.value);setSiProjectKey(p?.jira_key||"");}}>
+                          <option value="">Select project...</option>
+                          {projects.map(p=><option key={p.id} value={p.name}>{p.name} {p.jira_key?`(${p.jira_key})`:""}</option>)}
+                        </select>
+                      </div>
+                      <div className="form-row">
+                        <label className="form-label">Jira Project Key (auto-filled)</label>
+                        <input className="input" value={siProjectKey} onChange={e=>setSiProjectKey(e.target.value)} placeholder="e.g. ANA, ZTS, WAI"/>
+                      </div>
+                    </div>
+                    {/* What the agent does */}
+                    <div style={{display:"flex",gap:6,flexWrap:"wrap",marginBottom:12}}>
+                      {["Checks sprint completion","Analyzes velocity trend","Deep-dives blockers","Detects overload","Correlates meeting actions","Assesses OKR impact","Creates tasks autonomously","Drafts stakeholder alerts"].map(l=>(
+                        <span key={l} style={{fontFamily:"DM Mono",fontSize:9,padding:"3px 9px",borderRadius:100,background:"rgba(0,212,255,0.07)",border:"1px solid rgba(0,212,255,0.15)",color:"var(--acc)"}}>{l}</span>
+                      ))}
+                    </div>
+                    {siError&&<div className="infobox ib-red" style={{marginBottom:10}}>⚠️ {siError}</div>}
+                    <button style={{width:"100%",padding:13,background:siRunning||!siProject?"var(--bdr)":"linear-gradient(90deg,var(--amb),var(--acc))",border:"none",borderRadius:9,fontFamily:"Syne",fontWeight:800,fontSize:14,color:siRunning||!siProject?"var(--mut)":"#000",cursor:siRunning||!siProject?"not-allowed":"pointer",display:"flex",alignItems:"center",justifyContent:"center",gap:10}} onClick={runSprintIntelligence} disabled={siRunning||!siProject}>
+                      {siRunning?<><span className="spin" style={{width:16,height:16,borderWidth:2,borderTopColor:"#000",borderColor:"rgba(0,0,0,0.2)"}}/>Investigating...</>:"⚡ Run Sprint Intelligence"}
+                    </button>
+                  </div>
+                </div>
+
+                {/* Thinking */}
+                {siRunning&&(
+                  <div className="sa-thinking">
+                    <div style={{fontFamily:"Syne",fontWeight:700,fontSize:13,marginBottom:4}}>Agent investigating and acting autonomously…</div>
+                    {SI_STEPS.map((step,i)=>(
+                      <div key={i} className="sa-think-step">
+                        <div className={`sa-think-dot ${i<siStep?"sa-think-done":i===siStep?"sa-think-active":"sa-think-wait"}`}/>
+                        <span style={{color:i<siStep?"var(--grn)":i===siStep?"var(--acc)":"var(--mut)"}}>{step}</span>
+                        {i<siStep&&<span style={{marginLeft:"auto",fontFamily:"DM Mono",fontSize:9,color:"var(--grn)"}}>✓</span>}
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                {/* Result */}
+                {siResult&&!siRunning&&(()=>{
+                  const health=siResult.sprint_health||"yellow";
+                  return(
+                    <div className="col">
+
+                      {/* Health banner */}
+                      <div style={{background:siBg(health),border:`1px solid ${siBdr(health)}`,borderRadius:14,padding:"20px 24px"}}>
+                        <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",flexWrap:"wrap",gap:12}}>
+                          <div>
+                            <div style={{fontFamily:"Syne",fontWeight:800,fontSize:26,color:siColor(health),marginBottom:6}}>
+                              {health==="green"?"🟢":health==="yellow"?"🟡":"🔴"} Sprint Health: {health.toUpperCase()}
+                            </div>
+                            {/* Key metrics strip */}
+                            {siResult.key_metrics&&(
+                              <div style={{display:"flex",gap:20,flexWrap:"wrap"}}>
+                                {[
+                                  ["Completion",siResult.key_metrics.completion_rate,"var(--acc)"],
+                                  ["Blockers",siResult.key_metrics.blockers,siResult.key_metrics.blockers>2?"var(--red)":"var(--amb)"],
+                                  ["Velocity",siResult.key_metrics.velocity_direction||siResult.key_metrics.carryover_trend,"var(--mut)"],
+                                  ["Bug Trend",siResult.key_metrics.bug_trend,"var(--mut)"],
+                                  ["Scope Changes",siResult.key_metrics.scope_changes,"var(--mut)"],
+                                ].map(([l,v,c])=>v!==undefined&&v!==null&&<div key={l as string}><div style={{fontFamily:"DM Mono",fontSize:10,color:"var(--mut)",marginBottom:2}}>{l}</div><div style={{fontFamily:"Syne",fontWeight:700,fontSize:13,color:c as string}}>{String(v)}</div></div>)}
+                              </div>
+                            )}
+                          </div>
+                          <div style={{display:"flex",flexDirection:"column",gap:6,alignItems:"flex-end"}}>
+                            <span className={`tag ${siResult.confidence_score==="high"?"tag-grn":siResult.confidence_score==="medium"?"tag-amb":"tag-red"}`} style={{fontSize:9}}>Confidence: {siResult.confidence_score}</span>
+                            <div style={{fontSize:10,color:"var(--grn)",fontFamily:"DM Mono"}}>✓ Saved to Decision Log</div>
+                            <div style={{fontSize:10,color:"var(--mut)",fontFamily:"DM Mono"}}>{siResult.assessed_at?new Date(siResult.assessed_at).toLocaleString():""}</div>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Actions taken (the agent actually did things) */}
+                      {siResult.actions_taken?.length>0&&(
+                        <div className="card">
+                          <div className="ch">
+                            <div className="ct">⚡ Actions Taken Autonomously</div>
+                            <span className="tag tag-grn" style={{fontSize:9}}>{siResult.actions_taken.length} actions</span>
+                          </div>
+                          <div className="cb">
+                            {siResult.actions_taken.map((a:any,i:number)=>(
+                              <div key={i} style={{display:"flex",gap:10,padding:"9px 0",borderBottom:"1px solid var(--bdr)",alignItems:"flex-start"}}>
+                                <span className={`tag ${a.status==="success"?"tag-grn":a.status==="skipped"?"tag-dim":"tag-amb"}`} style={{fontSize:9,flexShrink:0}}>{a.status}</span>
+                                <div style={{flex:1}}>
+                                  <div style={{fontSize:12,fontWeight:500,marginBottom:2}}>{a.action}</div>
+                                  <div style={{fontSize:11,color:"var(--mut)"}}>{a.rationale}</div>
+                                  {a.tool_used&&<span style={{fontFamily:"DM Mono",fontSize:9,color:"var(--pur)"}}>{a.tool_used} → {a.target}</span>}
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Risks + recommendations */}
+                      <div className="g2">
+                        {siResult.risks_detected?.length>0&&(
+                          <div className="card">
+                            <div className="ch"><div className="ct">Risks Detected</div></div>
+                            <div className="cb">
+                              {siResult.risks_detected.map((r:any,i:number)=>(
+                                <div key={i} style={{padding:"8px 0",borderBottom:"1px solid var(--bdr)"}}>
+                                  <div style={{display:"flex",gap:6,marginBottom:3}}>
+                                    <span className={`tag ${r.severity==="high"?"tag-red":r.severity==="medium"?"tag-amb":"tag-dim"}`} style={{fontSize:9}}>{r.severity}</span>
+                                    <span style={{fontFamily:"DM Mono",fontSize:9,color:"var(--mut)"}}>{r.type}</span>
+                                  </div>
+                                  <div style={{fontSize:12,fontWeight:500,marginBottom:2}}>{r.description}</div>
+                                  {r.root_cause&&<div style={{fontSize:11,color:"var(--acc)"}}>Root cause: {r.root_cause}</div>}
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+                        {siResult.recommended_actions?.length>0&&(
+                          <div className="card">
+                            <div className="ch"><div className="ct">Recommended Actions</div></div>
+                            <div className="cb">
+                              {siResult.recommended_actions.map((a:string,i:number)=>(
+                                <div key={i} style={{display:"flex",gap:10,padding:"8px 0",borderBottom:"1px solid var(--bdr)",fontSize:12,alignItems:"flex-start"}}>
+                                  <div style={{width:20,height:20,borderRadius:"50%",background:"rgba(245,158,11,0.1)",border:"1px solid rgba(245,158,11,0.2)",display:"flex",alignItems:"center",justifyContent:"center",fontFamily:"DM Mono",fontSize:10,color:"var(--amb)",flexShrink:0}}>{i+1}</div>
+                                  {a}
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Stakeholder alert if drafted */}
+                      {siResult.stakeholder_alert?.generated&&(
+                        <div className="card" style={{border:"1px solid rgba(239,68,68,0.2)"}}>
+                          <div className="ch">
+                            <div className="ct" style={{color:"var(--red)"}}>🚨 Stakeholder Alert Drafted</div>
+                            <span className="tag tag-dim" style={{fontSize:9}}>Not auto-sent — review first</span>
+                          </div>
+                          <div className="cb">
+                            <div style={{fontSize:12,marginBottom:6}}><strong>Recipients:</strong> {siResult.stakeholder_alert.recipients}</div>
+                            <div style={{fontSize:12,color:"var(--mut)"}}>{siResult.stakeholder_alert.summary}</div>
+                            <div style={{display:"flex",gap:6,marginTop:10}}>
+                              <button className="btn btn-primary btn-sm" onClick={()=>{runSHUpdate("",siResult.project);}}>Send via Stakeholder Agent</button>
+                              <button className="btn btn-sm" onClick={()=>navigator.clipboard.writeText(siResult.stakeholder_alert.summary||"").then(()=>alert("Copied!"))}>Copy Draft</button>
+                            </div>
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Self evaluation + sources */}
+                      <div className="g2">
+                        {siResult.data_sources?.length>0&&(
+                          <div className="card">
+                            <div className="ch"><div className="ct">Data Sources</div></div>
+                            <div className="cb">
+                              {siResult.data_sources.map((s:any,i:number)=>(
+                                <div key={i} style={{display:"flex",gap:8,padding:"5px 0",borderBottom:"1px solid var(--bdr)",fontSize:11}}>
+                                  <span className="tag tag-pur" style={{fontSize:9,flexShrink:0}}>{s.source}</span>
+                                  <span style={{color:"var(--mut)"}}>{s.summary}</span>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+                        {siResult.self_evaluation&&(
+                          <div className="infobox ib-blue" style={{fontSize:11,alignSelf:"flex-start"}}>
+                            <strong className="acc">Self-Eval:</strong> {siResult.self_evaluation.improvements_made||siResult.self_evaluation.critique}
+                          </div>
+                        )}
+                      </div>
+
+                    </div>
+                  );
+                })()}
+
+                {/* Empty state */}
+                {!siResult&&!siRunning&&(
+                  <div className="card" style={{padding:32,textAlign:"center",opacity:0.5}}>
+                    <div style={{fontSize:40,marginBottom:10}}>⚡</div>
+                    <div style={{fontFamily:"Syne",fontWeight:700,fontSize:15,marginBottom:6}}>Select a project and run</div>
+                    <div style={{fontSize:12,color:"var(--mut)",maxWidth:400,margin:"0 auto"}}>The agent autonomously fetches sprint data, analyzes velocity trends, diagnoses blockers, detects overload, creates tasks, and drafts stakeholder alerts — all without manual prompting.</div>
+                  </div>
+                )}
+              </div>
+            )}
 
             {/* RELEASE READINESS */}
             {page==="release"&&(
