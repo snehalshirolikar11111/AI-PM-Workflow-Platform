@@ -269,8 +269,8 @@ const S = `
 const NAV = [
   {grp:"Today",        items:[{id:"schedule",ic:"🕐",lbl:"Daily Schedule"},{id:"todos",ic:"☑",lbl:"To-Do List"}]},
   {grp:"Execution",    items:[{id:"tracker",ic:"◎",lbl:"Projects"},{id:"roadmap",ic:"🗺",lbl:"Roadmap"}]},
-  {grp:"AI Agents",    items:[{id:"super",ic:"🔮",lbl:"Executive Briefing"},{id:"sprint",ic:"⚡",lbl:"Sprint Intelligence"},{id:"release",ic:"🚦",lbl:"Release Readiness"},{id:"research",ic:"🔍",lbl:"Research Agents"},{id:"prd",ic:"📄",lbl:"PRD Agent"}]},
-  {grp:"AI Workflows", items:[{id:"meetings",ic:"✦",lbl:"Meeting Intel"},{id:"priority",ic:"◈",lbl:"Prioritization"},{id:"agents",ic:"⬡",lbl:"All Agents"}]},
+  {grp:"AI Agents",    items:[{id:"super",ic:"🔮",lbl:"Executive Briefing"},{id:"sprint",ic:"⚡",lbl:"Sprint Intelligence"},{id:"release",ic:"🚦",lbl:"Release Readiness"},{id:"research",ic:"🔍",lbl:"Research Agents"}]},
+  {grp:"AI Workflows", items:[{id:"meetings",ic:"✦",lbl:"Meeting Intel"},{id:"prd",ic:"📄",lbl:"PRD Agent"},{id:"priority",ic:"◈",lbl:"Prioritization"},{id:"agents",ic:"⬡",lbl:"All Agents"}]},
   {grp:"Insights",     items:[{id:"optimizer",ic:"⚡",lbl:"Cost Optimizer"},{id:"decisions",ic:"📌",lbl:"Decision Log"},{id:"knowledge",ic:"🧠",lbl:"Knowledge"}]},
   {grp:"Metrics",      items:[{id:"okr",ic:"◎",lbl:"OKR Tracker"},{id:"tokens",ic:"◈",lbl:"Token Analytics"},{id:"outcomes",ic:"🎯",lbl:"Outcomes"},{id:"metrics",ic:"◎",lbl:"Pilot Metrics"}]},
   {grp:"People",       items:[{id:"stakeholders",ic:"◉",lbl:"Stakeholders"}]},
@@ -294,7 +294,7 @@ const PAGE_INFO: Record<string,{title:string;sub:string}> = {
   optimizer:{title:"Token Cost Optimizer",sub:"Analyze any agent · reduce token spend · model recommendations · caching strategy"},
   super:{title:"Executive Briefing Agent",sub:"Autonomous multi-source intelligence · tools · cross-agent orchestration · writes back to platform"},
   agents:{title:"All Agents",sub:"All AI-powered automations — overview and quick launch"},
-  prd:{title:"PRD Agent",sub:"Autonomous · web search · OKR alignment · competitive context · saves to knowledge base"},
+  prd:{title:"PRD Agent",sub:"Focus group data in → structured PRD out in seconds"},
   stakeholders:{title:"Stakeholders",sub:"Influence map with last-contact tracking"},
   metrics:{title:"Pilot Metrics",sub:"Adoption funnel · time saved · agent engagement"},
   tokens:{title:"Token Analytics",sub:"Cost per agent · daily trends · anomaly detection · FinOps"},
@@ -480,10 +480,6 @@ export default function PMDashboard(){
 
   // PRD
   const [prdInput,setPrdInput]=useState("");
-  const [prdProductName,setPrdProductName]=useState("");
-  const [prdProjectName,setPrdProjectName]=useState("");
-  const [prdAgentResult,setPrdAgentResult]=useState<any>(null);
-  const [prdAgentStep,setPrdAgentStep]=useState(0);
   const [prdStatus,setPrdStatus]=useState("idle");
   const [prdResult,setPrdResult]=useState<any>(null);
 
@@ -833,22 +829,13 @@ export default function PMDashboard(){
   const togglePriv=async(key:string)=>{const n={...privTogs,[key]:!(privTogs as any)[key]};setPrivTogs(n);await supabase.from("user_settings").upsert({user_id:user?.id,persistent_memory:n.persist,agent_learning:n.learn,session_only:n.session,audit_log:n.audit});};
 
   /* ── PRD ── */
-  const PRD_STEPS=["Aggregating internal focus group data…","Fetching competitive context and research…","Searching web for market signals…","Checking OKR alignment…","Checking RICE scores…","Identifying stakeholders…","Writing PRD with self-evaluation…","Saving to knowledge base…"];
   const runPRD=async()=>{
-    if(!prdInput.trim()&&!prdProductName.trim())return;
-    setPrdStatus("processing");setPrdAgentResult(null);setPrdAgentStep(0);
-    const iv=setInterval(()=>setPrdAgentStep(s=>Math.min(s+1,PRD_STEPS.length-1)),2500);
+    if(!prdInput.trim())return;
+    setPrdStatus("processing");
     try{
-      const{data}=await supabase.functions.invoke("prd-agent",{body:{text:prdInput,productName:prdProductName,projectName:prdProjectName,userId:user?.id}});
-      clearInterval(iv);setPrdAgentStep(PRD_STEPS.length-1);
-      if(data?.error)throw new Error(data.error);
-      if(data?.prd){
-        setPrdAgentResult(data);
-        const prd=data.prd;
-        setPrdResult({themes:[],problem:prd.problem_statement||"",stories:prd.user_stories||[],criteria:prd.acceptance_criteria||[],metrics:(prd.success_metrics||[]).map((m:any)=>`${m.metric}: ${m.baseline} → ${m.target}`),questions:prd.open_questions||[]});
-        setPrdStatus("done");loadKnowledge();loadDecisions();loadAgentRuns();
-      }
-    }catch(e:any){clearInterval(iv);setPrdStatus("idle");alert("PRD Agent failed: "+e.message);}
+      const{data}=await supabase.functions.invoke("prd-agent",{body:{text:prdInput}});
+      if(data){setPrdResult({themes:data.themes?.map((t:any)=>({lbl:t.label,n:t.frequency}))||[],problem:data.problem_statement||"",stories:data.user_stories?.map((s:any)=>`As a ${s.role}, I want ${s.goal} so that ${s.outcome}.`)||[],criteria:data.acceptance_criteria||[],metrics:data.success_metrics?.map((m:any)=>`${m.metric}: ${m.baseline} → ${m.target}`)||[],questions:data.open_questions||[]});setPrdStatus("done");}
+    }catch{setPrdStatus("idle");alert("PRD Agent failed.");}
   };
 
   /* ── Agent runners ── */
@@ -2680,123 +2667,123 @@ export default function PMDashboard(){
                       )}
                     </div>
 
-        
-            {/* PRD */}
-            {page==="prd"&&(
-              <div className="g2">
-                <div className="col">
-                  <div className="card">
-                    <div className="ch">
-                      <div>
-                        <div style={{fontFamily:"Syne",fontWeight:800,fontSize:15}}>📄 Autonomous PRD Agent</div>
-                        <div style={{fontSize:11,color:"var(--mut)",marginTop:2}}>Searches web · checks OKRs · reads competitive intel · saves to knowledge base</div>
+                    {/* PRD */}
+                    <div className="sa-out-sec">
+                      <div className="sa-out-hd" onClick={()=>toggleSuperSec("prd")}>
+                        <div style={{display:"flex",alignItems:"center",gap:10}}><span style={{fontSize:16}}>📄</span><span style={{fontFamily:"Syne",fontWeight:700,fontSize:14}}>Product Requirements</span></div>
+                        <div style={{display:"flex",gap:6}}><button className="btn btn-sm" onClick={e=>{e.stopPropagation();const prd=superResult.prd;if(prd)navigator.clipboard.writeText(`# PRD\n\n## Problem\n${prd.problem}\n\n## Goals\n${prd.goals}\n\n## Users\n${prd.users}\n\n## Requirements\n${(prd.requirements||[]).map((r:string)=>`- ${r}`).join("\n")}\n\n## Metrics\n${(prd.metrics||[]).map((m:string)=>`- ${m}`).join("\n")}\n\n## Constraints\n${(prd.constraints||[]).map((c:string)=>`- ${c}`).join("\n")}\n\n## Open Questions\n${(prd.open_questions||[]).map((q:string)=>`- ${q}`).join("\n")}`).then(()=>alert("Copied!"));}}>Copy MD</button><span style={{fontSize:13,color:"var(--mut)",lineHeight:"24px"}}>{superExpanded.prd?"▾":"▸"}</span></div>
                       </div>
-                    </div>
-                    <div className="cb">
-                      <div className="col" style={{gap:10}}>
-                        <div className="form-row">
-                          <label className="form-label">Product / Feature Name</label>
-                          <input className="input" value={prdProductName} onChange={e=>setPrdProductName(e.target.value)} placeholder="e.g. AI Alert Suppression Engine"/>
-                        </div>
-                        <div className="form-row">
-                          <label className="form-label">Link to Project (optional)</label>
-                          <select className="input select" value={prdProjectName} onChange={e=>setPrdProjectName(e.target.value)}>
-                            <option value="">None</option>{projects.map(p=><option key={p.id} value={p.name}>{p.name}</option>)}
-                          </select>
-                        </div>
-                        <div className="upload-z" style={{marginBottom:0}} onClick={()=>document.getElementById("pf")?.click()}>
-                          <div style={{fontSize:24,marginBottom:6}}>📎</div>
-                          <div style={{fontFamily:"Syne",fontWeight:700,fontSize:12,marginBottom:2}}>Drop files or click</div>
-                          <div style={{fontSize:11,color:"var(--mut)"}}>Supports .txt .csv .docx</div>
-                          <input id="pf" type="file" style={{display:"none"}} onChange={async(e:any)=>{const f=e.target.files[0];if(f){const t=await f.text();setPrdInput(t);}}}/>
-                        </div>
-                        <div className="form-row">
-                          <label className="form-label">Or paste raw text</label>
-                          <textarea className="input" value={prdInput} onChange={e=>setPrdInput(e.target.value)} placeholder={"Paste focus group transcript, survey results, or feature brief...\n\nLeave blank — agent will use internal data if a project is selected."} style={{minHeight:120,resize:"vertical" as any}}/>
-                        </div>
-                        <div style={{display:"flex",gap:5,flexWrap:"wrap"}}>
-                          {["Web search","OKR alignment","Competitive context","RICE scores","Stakeholder mapping","Saves to knowledge base"].map(l=>(
-                            <span key={l} style={{fontFamily:"DM Mono",fontSize:9,padding:"3px 8px",borderRadius:100,background:"rgba(124,58,237,0.07)",border:"1px solid rgba(124,58,237,0.15)",color:"var(--pur)"}}>{l}</span>
-                          ))}
-                        </div>
-                        <button onClick={runPRD} disabled={(!prdInput.trim()&&!prdProductName.trim())||prdStatus==="processing"}
-                          style={{width:"100%",padding:12,background:(!prdInput.trim()&&!prdProductName.trim())||prdStatus==="processing"?"var(--bdr)":"linear-gradient(90deg,var(--pur),var(--acc))",border:"none",borderRadius:9,fontFamily:"Syne",fontWeight:800,fontSize:14,color:(!prdInput.trim()&&!prdProductName.trim())||prdStatus==="processing"?"var(--mut)":"#000",cursor:(!prdInput.trim()&&!prdProductName.trim())||prdStatus==="processing"?"not-allowed":"pointer",display:"flex",alignItems:"center",justifyContent:"center",gap:10}}>
-                          {prdStatus==="processing"?<><span className="spin" style={{width:15,height:15,borderWidth:2,borderTopColor:"#000",borderColor:"rgba(0,0,0,0.2)"}}/>Generating...</>:"📄 Generate PRD Autonomously"}
-                        </button>
-                      </div>
-                    </div>
-                  </div>
-                  {prdStatus==="processing"&&(
-                    <div className="sa-thinking">
-                      <div style={{fontFamily:"Syne",fontWeight:700,fontSize:13,marginBottom:4}}>Investigating and writing PRD…</div>
-                      {PRD_STEPS.map((step,i)=>(
-                        <div key={i} className="sa-think-step">
-                          <div className={`sa-think-dot ${i<prdAgentStep?"sa-think-done":i===prdAgentStep?"sa-think-active":"sa-think-wait"}`}/>
-                          <span style={{color:i<prdAgentStep?"var(--grn)":i===prdAgentStep?"var(--acc)":"var(--mut)"}}>{step}</span>
-                          {i<prdAgentStep&&<span style={{marginLeft:"auto",fontFamily:"DM Mono",fontSize:9,color:"var(--grn)"}}>✓</span>}
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </div>
-                <div>
-                  {!prdResult&&prdStatus!=="processing"&&(
-                    <div className="card" style={{height:"100%",display:"flex",alignItems:"center",justifyContent:"center",flexDirection:"column",gap:10,opacity:0.4}}>
-                      <div style={{fontSize:36}}>📄</div>
-                      <div style={{fontFamily:"Syne",fontWeight:700,fontSize:13}}>PRD appears here</div>
-                      <div style={{fontSize:11,color:"var(--mut)",textAlign:"center",maxWidth:240}}>Enter a product name or paste focus group data</div>
-                    </div>
-                  )}
-                  {prdStatus==="processing"&&(
-                    <div className="card" style={{height:"100%",display:"flex",alignItems:"center",justifyContent:"center",flexDirection:"column",gap:12}}>
-                      <div className="spin" style={{width:32,height:32,borderWidth:3}}/><div style={{fontFamily:"Syne",fontWeight:700}}>Writing PRD…</div>
-                    </div>
-                  )}
-                  {prdResult&&prdStatus==="done"&&(
-                    <div className="col">
-                      {prdAgentResult&&(
-                        <div style={{display:"flex",gap:8,flexWrap:"wrap",padding:"10px 14px",background:"var(--surf2)",border:"1px solid var(--bdr)",borderRadius:9,alignItems:"center"}}>
-                          <span className={prdAgentResult.confidence_score==="High"?"confidence-high":prdAgentResult.confidence_score==="Medium"?"confidence-medium":"confidence-low"}>Confidence: {prdAgentResult.confidence_score}</span>
-                          {prdAgentResult.okr_alignment?.length>0&&<span className="tag tag-grn" style={{fontSize:9}}>✓ OKR aligned</span>}
-                          {prdAgentResult.competitive_context&&<span className="tag tag-pur" style={{fontSize:9}}>✓ Competitive context</span>}
-                          {prdAgentResult.market_signals&&<span className="tag tag-blu" style={{fontSize:9}}>✓ Market signals</span>}
-                          {prdAgentResult.actions_taken?.filter((a:any)=>a.status==="success").length>0&&<span className="tag tag-grn" style={{fontSize:9,marginLeft:"auto"}}>{prdAgentResult.actions_taken.filter((a:any)=>a.status==="success").length} actions taken</span>}
-                          <button className="btn btn-sm" onClick={()=>{setPrdStatus("idle");setPrdInput("");setPrdResult(null);setPrdAgentResult(null);setPrdProductName("");setPrdProjectName("");}}>↺ New PRD</button>
+                      {superExpanded.prd&&superResult.prd&&(
+                        <div className="sa-out-body">
+                          <div className="g2" style={{gap:14}}>
+                            {[{k:"problem",l:"Problem Statement"},{k:"goals",l:"Goals"},{k:"users",l:"User Segments"}].map(({k,l})=>(
+                              <div key={k} className="sa-field">
+                                <div className="sa-lbl">{l}</div>
+                                <div className="sa-val">{(superResult.prd as any)[k]||<span style={{color:"var(--mut)"}}>—</span>}</div>
+                              </div>
+                            ))}
+                          </div>
+                          <div className="g2" style={{gap:14,marginTop:12}}>
+                            {[{k:"requirements",l:"Requirements"},{k:"metrics",l:"Success Metrics"},{k:"constraints",l:"Constraints"},{k:"open_questions",l:"Open Questions"}].map(({k,l})=>{
+                              const items=(superResult.prd as any)[k]||[];
+                              return(
+                                <div key={k} className="sa-field">
+                                  <div className="sa-lbl">{l}</div>
+                                  {Array.isArray(items)?<div className="sa-list">{items.map((it:string,j:number)=><div key={j} style={{display:"flex",gap:8,fontSize:12,padding:"3px 0",borderBottom:"1px solid var(--bdr)",color:"var(--txt)"}}><span style={{color:k==="open_questions"?"var(--amb)":k==="constraints"?"var(--red)":"var(--grn)",flexShrink:0}}>{k==="open_questions"?"?":k==="constraints"?"⚠":"✓"}</span>{it}</div>)}</div>:<div className="sa-val">{items}</div>}
+                                </div>
+                              );
+                            })}
+                          </div>
                         </div>
                       )}
-                      <div className="card">
-                        <div className="ch">
-                          <div>
-                            <div style={{fontFamily:"Syne",fontWeight:800,fontSize:14}}>{prdAgentResult?.prd?.title||"Product Requirements Document"}</div>
-                            <div className="mono dim" style={{fontSize:10}}>v{prdAgentResult?.prd?.version||"1.0"} · Draft · {new Date().toLocaleDateString()} · Review before sharing</div>
-                          </div>
-                          <div style={{display:"flex",gap:6}}>
-                            <span className="tag tag-dim">Draft</span>
-                            <button className="btn btn-sm" onClick={()=>{const txt=`PRD: ${prdAgentResult?.prd?.title||"PRD"}\n\nProblem: ${prdResult.problem}\n\nUser Stories:\n${(prdResult.stories||[]).join("\n")}\n\nAcceptance Criteria:\n${(prdResult.criteria||[]).map((c:string)=>"- "+c).join("\n")}\n\nSuccess Metrics:\n${(prdResult.metrics||[]).join("\n")}`;navigator.clipboard.writeText(txt).then(()=>alert("Copied!"));}}>Copy</button>
-                          </div>
+                    </div>
+
+                    {/* Risks */}
+                    <div className="sa-out-sec">
+                      <div className="sa-out-hd" onClick={()=>toggleSuperSec("risks")}>
+                        <div style={{display:"flex",alignItems:"center",gap:10}}><span style={{fontSize:16}}>🔔</span><span style={{fontFamily:"Syne",fontWeight:700,fontSize:14}}>Risks</span><span className="tag tag-red" style={{fontSize:9}}>{superResult.risks?.filter((r:any)=>r.severity==="Critical"||r.severity==="High").length||0} critical/high</span></div>
+                        <span style={{fontSize:13,color:"var(--mut)"}}>{superExpanded.risks?"▾":"▸"}</span>
+                      </div>
+                      {superExpanded.risks&&superResult.risks?.length>0&&(
+                        <div className="sa-out-body">
+                          {[...superResult.risks].sort((a:any,b:any)=>{const ord:any={Critical:0,High:1,Medium:2,Low:3};return(ord[a.severity]??4)-(ord[b.severity]??4);}).map((risk:any,i:number)=>(
+                            <div key={i} className={`sa-risk-card ${saRiskClass(risk.severity)}`}>
+                              <div style={{flexShrink:0,marginTop:2}}>
+                                <span style={{fontFamily:"DM Mono",fontSize:9,color:saRiskColor(risk.severity),background:`${saRiskColor(risk.severity)}15`,border:`1px solid ${saRiskColor(risk.severity)}30`,padding:"2px 7px",borderRadius:100}}>{risk.severity}</span>
+                              </div>
+                              <div style={{flex:1}}>
+                                <div style={{display:"flex",gap:6,alignItems:"center",marginBottom:4}}>
+                                  <span style={{fontFamily:"Syne",fontWeight:700,fontSize:12}}>{risk.description}</span>
+                                  <span className="tag tag-dim" style={{fontSize:9}}>{risk.type}</span>
+                                </div>
+                                <div style={{fontSize:11,color:"var(--acc)"}}>→ {risk.mitigation}</div>
+                              </div>
+                            </div>
+                          ))}
                         </div>
-                        <div className="prd-sec"><div className="prd-lbl">Problem Statement</div><p style={{fontSize:12,lineHeight:1.8}}>{prdResult.problem}</p></div>
-                        {prdAgentResult?.okr_alignment?.length>0&&(
-                          <div className="prd-sec"><div className="prd-lbl">OKR Alignment</div>
-                            {prdAgentResult.okr_alignment.map((o:any,i:number)=>(
-                              <div key={i} style={{display:"flex",gap:8,fontSize:12,padding:"4px 0",borderBottom:"1px solid var(--bdr2)"}}><span style={{color:"var(--grn)",flexShrink:0}}>◎</span><div><strong>{o.objective}</strong><div style={{fontSize:11,color:"var(--acc)"}}>{o.contribution}</div></div></div>
+                      )}
+                    </div>
+
+                    {/* Data Sources */}
+                    <div className="sa-out-sec">
+                      <div className="sa-out-hd" onClick={()=>toggleSuperSec("sources")}>
+                        <div style={{display:"flex",alignItems:"center",gap:10}}><span style={{fontSize:14}}>⚡</span><span style={{fontFamily:"Syne",fontWeight:700,fontSize:13}}>Data Sources</span><span className="tag tag-grn" style={{fontSize:9}}>{superResult.data_sources?.length||0} agents</span>{superResult.data_gaps?.length>0&&<span className="tag tag-amb" style={{fontSize:9}}>{superResult.data_gaps.length} gaps</span>}</div>
+                        <span style={{fontSize:13,color:"var(--mut)"}}>{superExpanded.sources?"▾":"▸"}</span>
+                      </div>
+                      {superExpanded.sources&&(
+                        <div className="sa-out-body">
+                          {superResult.data_sources?.map((ds:any,i:number)=>(
+                            <div key={i} style={{display:"flex",gap:10,padding:"7px 0",borderBottom:"1px solid var(--bdr)",fontSize:12}}>
+                              <span className="tag tag-pur" style={{fontSize:9,flexShrink:0,alignSelf:"flex-start",marginTop:2}}>{ds.agent}</span>
+                              <span style={{color:"var(--mut)"}}>{ds.summary}</span>
+                            </div>
+                          ))}
+                          {superResult.data_gaps?.length>0&&(
+                            <div style={{marginTop:12}}>
+                              <div className="section-lbl" style={{marginBottom:6}}>Data Gaps</div>
+                              {superResult.data_gaps.map((gap:string,i:number)=>(
+                                <div key={i} style={{display:"flex",gap:7,fontSize:11,padding:"4px 0",color:"var(--amb)"}}><span>⚠</span>{gap}</div>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Self Evaluation */}
+                    {superResult.self_evaluation&&(
+                      <div className="sa-out-sec">
+                        <div className="sa-out-hd" onClick={()=>toggleSuperSec("eval")}>
+                          <div style={{display:"flex",alignItems:"center",gap:10}}><span style={{fontSize:14}}>🔍</span><span style={{fontFamily:"Syne",fontWeight:700,fontSize:13}}>Self-Evaluation</span><span className={superResult.self_evaluation.hallucination_check==="passed"?"tag tag-grn":"tag tag-red"} style={{fontSize:9}}>Hallucination: {superResult.self_evaluation.hallucination_check}</span></div>
+                          <span style={{fontSize:13,color:"var(--mut)"}}>{superExpanded.eval?"▾":"▸"}</span>
+                        </div>
+                        {superExpanded.eval&&(
+                          <div className="sa-out-body">
+                            {[["Data grounding",superResult.self_evaluation.data_grounding],["Hallucination check",superResult.self_evaluation.hallucination_check],["Improvements made",superResult.self_evaluation.improvements_made]].map(([l,v])=>(
+                              <div key={l} style={{display:"flex",justifyContent:"space-between",padding:"7px 0",borderBottom:"1px solid var(--bdr)",fontSize:12}}>
+                                <span className="dim">{l}</span>
+                                <span style={{color:"var(--acc)",fontFamily:"DM Mono",fontSize:11,maxWidth:300,textAlign:"right"}}>{v}</span>
+                              </div>
                             ))}
                           </div>
                         )}
-                        {prdAgentResult?.competitive_context&&<div className="prd-sec"><div className="prd-lbl">Competitive Context</div><div style={{fontSize:12,lineHeight:1.7}}>{prdAgentResult.competitive_context}</div></div>}
-                        <div className="prd-sec"><div className="prd-lbl">User Stories</div>{(prdAgentResult?.prd?.user_stories||prdResult.stories||[]).map((s:string,i:number)=><div key={i} className="story">{s}</div>)}</div>
-                        <div className="prd-sec"><div className="prd-lbl">Acceptance Criteria</div>{(prdAgentResult?.prd?.acceptance_criteria||prdResult.criteria||[]).map((c:string,i:number)=>(<div key={i} style={{display:"flex",gap:7,fontSize:12,marginBottom:5,alignItems:"flex-start",padding:"4px 8px",background:"rgba(16,185,129,0.04)",borderRadius:6,border:"1px solid rgba(16,185,129,0.12)"}}><span style={{color:"var(--grn)",flexShrink:0}}>✓</span>{c}</div>))}</div>
-                        <div className="prd-sec"><div className="prd-lbl">Success Metrics</div>{(prdResult.metrics||[]).map((m:string,i:number)=><div key={i} style={{fontSize:12,padding:"4px 0",borderBottom:"1px solid var(--bdr2)",display:"flex",gap:7}}><div style={{width:3,height:3,borderRadius:"50%",background:"var(--acc)",flexShrink:0,marginTop:7}}/>{m}</div>)}</div>
-                        {(prdAgentResult?.prd?.constraints||[]).length>0&&<div className="prd-sec"><div className="prd-lbl">Constraints</div>{prdAgentResult.prd.constraints.map((c:string,i:number)=><div key={i} style={{fontSize:12,display:"flex",gap:7,padding:"3px 0"}}><span style={{color:"var(--amb)"}}>⚠</span>{c}</div>)}</div>}
-                        {(prdResult.questions||[]).length>0&&<div className="prd-sec"><div className="prd-lbl">Open Questions</div>{(prdResult.questions||[]).map((q:string,i:number)=><div key={i} style={{fontSize:12,padding:"3px 0",color:"var(--amb)",display:"flex",gap:6}}><span>?</span>{q}</div>)}</div>}
-                        {prdAgentResult?.recommended_reviewers?.length>0&&<div className="prd-sec"><div className="prd-lbl">Reviewers</div><div style={{display:"flex",gap:6,flexWrap:"wrap"}}>{prdAgentResult.recommended_reviewers.map((r:string,i:number)=><span key={i} className="tag tag-pur" style={{fontSize:10}}>{r}</span>)}</div></div>}
                       </div>
-                    </div>
-                  )}
-                </div>
+                    )}
+
+                  </div>
+                )}
+
+                {/* Empty state */}
+                {!superResult&&!superRunning&&!superError&&(
+                  <div className="card" style={{padding:32,textAlign:"center",opacity:0.5}}>
+                    <div style={{fontSize:48,marginBottom:12}}>🔮</div>
+                    <div style={{fontFamily:"Syne",fontWeight:700,fontSize:16,marginBottom:6}}>Structured output appears here</div>
+                    <div style={{fontSize:12,color:"var(--mut)",maxWidth:380,margin:"0 auto"}}>Enter a request above or leave blank for a full portfolio brief. The agent will fetch real data from all sources and return PRD + Risks + Prioritization + Exec Summary.</div>
+                  </div>
+                )}
+
               </div>
             )}
-
 
 
             {/* TOKEN ANALYTICS */}
