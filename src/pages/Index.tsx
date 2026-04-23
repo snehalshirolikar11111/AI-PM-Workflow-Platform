@@ -681,7 +681,7 @@ export default function PMDashboard(){
       .on("postgres_changes",{event:"*",schema:"public",table:"schedule_blocks"},()=>loadCal())
       .on("postgres_changes",{event:"*",schema:"public",table:"agent_runs"},()=>loadAgentRuns())
       .subscribe();
-    return()=>supabase.removeChannel(ch);
+    return()=>{void supabase.removeChannel(ch);};
   },[loadProjects,loadIntegrations,loadJira,loadTasks,loadCal,loadAgentRuns]);
 
   /* ── Auto-sync ── */
