@@ -1,5 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { supabase } from "@/integrations/supabase/client";
+import type { ReactElement } from "react";
+
 
 const S = `
   @import url('https://fonts.googleapis.com/css2?family=Syne:wght@700;800&family=DM+Mono:wght@400;500&family=DM+Sans:ital,wght@0,300;0,400;0,500;1,400&display=swap');
@@ -367,7 +369,7 @@ function MiniCalendar({selectedDate,onSelect,eventDates=[]}:{selectedDate:Date;o
   while(cells.length<42)cells.push({date:new Date(y,m+1,cells.length-dim-firstDay+1),other:true});
 
   // Mini compact grid
-  const miniItems=[];
+  const miniItems: ReactElement[] = [];
   for(let d=1;d<=dim;d++){
     const date=new Date(y,m,d);
     const isTod=fmt(date)===fmt(today),isSel=fmt(date)===fmt(selectedDate),hasEv=eventDates.includes(fmt(date));
