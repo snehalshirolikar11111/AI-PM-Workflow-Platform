@@ -2795,7 +2795,7 @@ export default function PMDashboard(){
                         {prdAgentResult?.okr_alignment?.length>0&&(
                           <div className="prd-sec">
                             <div className="prd-lbl">OKR Alignment</div>
-                            {prdAgentResult.okr_alignment.map((o:any,i:number)=>(
+                            {(prdAgentResult?.okr_alignment||[]).map((o:any,i:number)=>(
                               <div key={i} style={{display:"flex",gap:8,fontSize:12,padding:"4px 0",borderBottom:"1px solid var(--bdr2)"}}>
                                 <span style={{color:"var(--grn)",flexShrink:0}}>◎</span>
                                 <div><strong style={{color:"var(--txt)"}}>{o.objective}</strong>{o.key_result&&<> · {o.key_result}</>}<div style={{fontSize:11,color:"var(--acc)"}}>{o.contribution}</div></div>
@@ -2828,7 +2828,7 @@ export default function PMDashboard(){
                         <div className="prd-sec">
                           <div className="prd-lbl">Success Metrics</div>
                           {(prdAgentResult?.prd?.success_metrics||[]).length>0
-                            ?(prdAgentResult.prd.success_metrics.map((m:any,i:number)=>(
+                            ?(prdAgentResult?.prd?.success_metrics||[]).map((m:any,i:number)=>(
                               <div key={i} style={{display:"flex",gap:10,fontSize:12,padding:"5px 0",borderBottom:"1px solid var(--bdr2)",alignItems:"flex-start"}}>
                                 <div style={{width:4,height:4,borderRadius:"50%",background:"var(--acc)",flexShrink:0,marginTop:6}}/>
                                 <div><strong>{typeof m==="string"?m:m.metric}</strong>{typeof m==="object"&&<> · Baseline: {m.baseline} → Target: {m.target}{m.okr_kr&&<span className="mono" style={{color:"var(--grn)",fontSize:10}}> ({m.okr_kr})</span>}</>}</div>
@@ -2840,7 +2840,7 @@ export default function PMDashboard(){
                         {(prdAgentResult?.prd?.constraints||[]).length>0&&(
                           <div className="prd-sec">
                             <div className="prd-lbl">Constraints</div>
-                            {prdAgentResult.prd.constraints.map((c:string,i:number)=><div key={i} style={{fontSize:12,display:"flex",gap:7,padding:"3px 0",color:"var(--txt)"}}><span style={{color:"var(--amb)"}}>⚠</span>{c}</div>)}
+                            {(prdAgentResult?.prd?.constraints||[]).map((c:string,i:number)=><div key={i} style={{fontSize:12,display:"flex",gap:7,padding:"3px 0",color:"var(--txt)"}}><span style={{color:"var(--amb)"}}>⚠</span>{c}</div>)}
                           </div>
                         )}
 
@@ -2890,7 +2890,7 @@ export default function PMDashboard(){
                   {[
                     {ic:"🔮",col:"ic-pur",name:"Executive Briefing",trig:"On demand",desc:"Multi-source reasoning engine — tools, cross-agent orchestration, writes to decision log and creates tasks.",chips:["Projects","Jira","OKRs","Meetings"],action:()=>setPage("super"),lbl:"▶ Open Agent",run:null},
                     {ic:"⚡",col:"ic-amb",name:"Sprint Intelligence",trig:"On demand / Sprint review",desc:"Autonomous sprint monitoring — detects blockers, velocity decay, creates tasks, drafts stakeholder alerts.",chips:["Jira","OKRs","Meetings","Tasks"],action:()=>setPage("sprint"),lbl:"▶ Open Agent",run:null},
-                    {ic:"🚦",col:"ic-red",name:"Release Readiness",trig:"Before every release",desc:"Multi-source go/no-go — Jira P0s, risk log, stakeholder coverage, OKR contribution.",chips:["Jira","Risks","Stakeholders","OKRs"],action:()=>setPage("release"),lbl:"▶ Open Agent",run:null},
+                    {ic:"🚦",col:"ic-amb",name:"Release Readiness",trig:"Before every release",desc:"Multi-source go/no-go — Jira P0s, risk log, stakeholder coverage, OKR contribution.",chips:["Jira","Risks","Stakeholders","OKRs"],action:()=>setPage("release"),lbl:"▶ Open Agent",run:null},
                     {ic:"🔍",col:"ic-blu",name:"Research Agents",trig:"On demand",desc:"3 parallel agents (Competitive, Market, Customer) with live web search — synthesizes investment brief.",chips:["Web Search","Competitive","Market","Customer"],action:()=>setPage("research"),lbl:"▶ Open Agent",run:null},
                     {ic:"📄",col:"ic-pur",name:"Autonomous PRD Agent",trig:"On demand",desc:"Searches web, checks OKRs, reads competitive intel, generates PRD with acceptance criteria and success metrics.",chips:["Web Search","OKRs","Jira","Knowledge"],action:()=>setPage("prd"),lbl:"▶ Open Agent",run:null},
                     {ic:"🙋",col:"ic-grn",name:"Meeting Scribe",trig:"After every meeting",desc:"Paste transcript → extracts decisions, action items with owners and due dates, creates tasks automatically.",chips:["Transcript","Tasks","Calendar"],action:()=>setPage("meetings"),lbl:"▶ Go to Meetings",run:null},
