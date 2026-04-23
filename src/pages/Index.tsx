@@ -270,7 +270,7 @@ const NAV = [
   {grp:"Today",        items:[{id:"schedule",ic:"🕐",lbl:"Daily Schedule"},{id:"todos",ic:"☑",lbl:"To-Do List"}]},
   {grp:"Execution",    items:[{id:"tracker",ic:"◎",lbl:"Projects"},{id:"roadmap",ic:"🗺",lbl:"Roadmap"}]},
   {grp:"AI Agents",    items:[{id:"super",ic:"🔮",lbl:"Executive Briefing"},{id:"sprint",ic:"⚡",lbl:"Sprint Intelligence"},{id:"release",ic:"🚦",lbl:"Release Readiness"},{id:"research",ic:"🔍",lbl:"Research Agents"},{id:"prd",ic:"📄",lbl:"PRD Agent"}]},
-  {grp:"AI Workflows", items:[{id:"meetings",ic:"✦",lbl:"Meeting Intel"},{id:"priority",ic:"◈",lbl:"Prioritization"},{id:"agents",ic:"⬡",lbl:"All Agents"}]},
+  {grp:"AI Workflows", items:[{id:"meetings",ic:"✦",lbl:"Meeting Intel"},{id:"priority",ic:"◈",lbl:"Prioritization"},{id:"digest",ic:"📊",lbl:"Weekly Digest"},{id:"risk",ic:"🔔",lbl:"Risk Monitor"},{id:"update",ic:"📝",lbl:"Stakeholder Update"}]},
   {grp:"Insights",     items:[{id:"optimizer",ic:"⚡",lbl:"Cost Optimizer"},{id:"decisions",ic:"📌",lbl:"Decision Log"},{id:"knowledge",ic:"🧠",lbl:"Knowledge"}]},
   {grp:"Metrics",      items:[{id:"okr",ic:"◎",lbl:"OKR Tracker"},{id:"tokens",ic:"◈",lbl:"Token Analytics"},{id:"outcomes",ic:"🎯",lbl:"Outcomes"},{id:"metrics",ic:"◎",lbl:"Pilot Metrics"}]},
   {grp:"People",       items:[{id:"stakeholders",ic:"◉",lbl:"Stakeholders"}]},
@@ -294,6 +294,9 @@ const PAGE_INFO: Record<string,{title:string;sub:string}> = {
   optimizer:{title:"Token Cost Optimizer",sub:"Analyze any agent · reduce token spend · model recommendations · caching strategy"},
   super:{title:"Executive Briefing Agent",sub:"Autonomous multi-source intelligence · tools · cross-agent orchestration · writes back to platform"},
   agents:{title:"All Agents",sub:"All AI-powered automations — overview and quick launch"},
+  digest:{title:"Weekly Digest",sub:"AI-generated briefing — delivery, OKRs, risks, decisions · enriched with live platform data"},
+  risk:{title:"Risk Monitor",sub:"Proactive risk detection across all projects · saves predictions · surfaces escalation paths"},
+  update:{title:"Stakeholder Update",sub:"Audience-aware status email · tone selection · built from live project data"},
   prd:{title:"PRD Agent",sub:"Focus group data in → structured PRD out in seconds"},
   stakeholders:{title:"Stakeholders",sub:"Influence map with last-contact tracking"},
   metrics:{title:"Pilot Metrics",sub:"Adoption funnel · time saved · agent engagement"},
@@ -493,6 +496,22 @@ export default function PMDashboard(){
   const [agentResultType,setAgentResultType]=useState<string|null>(null);
   const [agentError,setAgentError]=useState<string|null>(null);
   const [updateInput,setUpdateInput]=useState({show:false,name:"",role:""});
+  // Dedicated page state — Weekly Digest
+  const [digestRunning,setDigestRunning]=useState(false);
+  const [digestResult,setDigestResult]=useState<any>(null);
+  const [digestError,setDigestError]=useState<string|null>(null);
+  const [digestFocus,setDigestFocus]=useState("all");
+  // Dedicated page state — Risk Monitor
+  const [riskRunning,setRiskRunning]=useState(false);
+  const [riskResult,setRiskResult]=useState<any>(null);
+  const [riskError,setRiskError]=useState<string|null>(null);
+  const [riskProjFilter,setRiskProjFilter]=useState("all");
+  // Dedicated page state — Stakeholder Update
+  const [updateRunning,setUpdateRunning]=useState(false);
+  const [updateResult,setUpdateResult]=useState<any>(null);
+  const [updateError,setUpdateError]=useState<string|null>(null);
+  const [updateRecipientId,setUpdateRecipientId]=useState("");
+  const [updateTone,setUpdateTone]=useState("executive");
 
   // Integrations
   const [integrations,setIntegrations]=useState<any[]>([]);
@@ -865,6 +884,49 @@ export default function PMDashboard(){
   const runDigest=()=>runAgent("weekly-digest",{});
   const runRisk=async()=>{await runAgent("risk-monitor",{});loadProjects();loadTasks();};
   const runSHUpdate=(name:string,role:string)=>{setUpdateInput({show:false,name:"",role:""});runAgent("stakeholder-update",{recipientName:name||undefined,recipientRole:role||undefined});};
+  /* ── Dedicated page runners ── */
+  const runDigestPage=async()=>{
+    setDigestRunning(true);setDigestResult(null);setDigestError(null);
+    try{
+      const okrSummary=okrs.map(o=>({objective:o.objective,progress:o.overall_pct,at_risk:(o.krs||[]).filter((k:any)=>k.status==="at-risk").length}));
+      const recentDecisions=decisions.slice(0,5).map((d:any)=>({title:d.title,decision:d.decision,date:d.created_at}));
+      const projSnapshot=projects.map(p=>({name:p.name,status:p.status,progress:p.progress,owner:p.owner}));
+      const activeRisks=riskPredictions.slice(0,5).map((r:any)=>({type:r.risk_type,prediction:r.prediction,confidence:r.confidence}));
+      const{data,error}=await supabase.functions.invoke("weekly-digest",{body:{focusArea:digestFocus,projects:projSnapshot,okrSummary,recentDecisions,activeRisks,userId:user?.id}});
+      if(error)throw new Error(error.message);
+      if(data?.error)throw new Error(data.error);
+      setDigestResult(data);loadAgentRuns();
+    }catch(e:any){setDigestError(e.message);}
+    finally{setDigestRunning(false);}
+  };
+  const runRiskPage=async()=>{
+    setRiskRunning(true);setRiskResult(null);setRiskError(null);
+    try{
+      const projCtx=(riskProjFilter==="all"?projects:projects.filter((p:any)=>p.id===riskProjFilter)).map(p=>({name:p.name,status:p.status,progress:p.progress,jira_key:p.jira_key,owner:p.owner}));
+      const jiraCtx=jiraIssues.filter(i=>riskProjFilter==="all"||projCtx.some((p:any)=>p.jira_key===i.project_key)).map(i=>({key:i.jira_key,summary:i.summary,status:i.status,priority:i.priority,issue_type:i.issue_type})).slice(0,40);
+      const existingRisks=riskPredictions.slice(0,5).map((r:any)=>({type:r.risk_type,prediction:r.prediction}));
+      const{data,error}=await supabase.functions.invoke("risk-monitor",{body:{projectFilter:riskProjFilter,projectContext:projCtx,jiraContext:jiraCtx,existingRisks,userId:user?.id}});
+      if(error)throw new Error(error.message);
+      if(data?.error)throw new Error(data.error);
+      setRiskResult(data);loadProjects();loadTasks();loadRiskPreds();loadAgentRuns();
+    }catch(e:any){setRiskError(e.message);}
+    finally{setRiskRunning(false);}
+  };
+  const runUpdatePage=async()=>{
+    setUpdateRunning(true);setUpdateResult(null);setUpdateError(null);
+    try{
+      const sh=stakeholders.find((s:any)=>s.id===updateRecipientId);
+      const projCtx=projects.slice(0,8).map(p=>({name:p.name,status:p.status,progress:p.progress,owner:p.owner,due_date:p.due_date}));
+      const recentDecisions=decisions.slice(0,3).map((d:any)=>({title:d.title,decision:d.decision}));
+      const okrProgress=okrs.slice(0,3).map(o=>({objective:o.objective,progress:o.overall_pct}));
+      const{data,error}=await supabase.functions.invoke("stakeholder-update",{body:{recipientName:sh?.name||"Leadership",recipientRole:sh?.role||"Executive",recipientEmail:sh?.email,tone:updateTone,projects:projCtx,recentDecisions,okrProgress,userId:user?.id}});
+      if(error)throw new Error(error.message);
+      if(data?.error)throw new Error(data.error);
+      setUpdateResult(data);loadAgentRuns();
+    }catch(e:any){setUpdateError(e.message);}
+    finally{setUpdateRunning(false);}
+  };
+
   const closeResult=()=>{setAgentResult(null);setAgentResultType(null);setAgentError(null);};
 
   /* ── OKR Alignment ── */
@@ -3047,6 +3109,262 @@ export default function PMDashboard(){
                     <div style={{padding:"11px 16px",borderTop:"1px solid var(--bdr)"}}><button className="xbtn" onClick={()=>{const md=`# PRD\n\n## Problem\n${prdResult.problem}\n\n## User Stories\n${prdResult.stories.map((s:string)=>`- ${s}`).join("\n")}\n\n## Acceptance Criteria\n${prdResult.criteria.map((c:string)=>`- [ ] ${c}`).join("\n")}\n\n## Success Metrics\n${prdResult.metrics.map((m:string)=>`- ${m}`).join("\n")}`;navigator.clipboard.writeText(md).then(()=>alert("Copied!"));}}>Copy as Markdown</button></div>
                   </div>)}
                 </div>
+              </div>
+            )}
+
+
+            {/* WEEKLY DIGEST */}
+            {page==="digest"&&(
+              <div className="col">
+                <div className="card">
+                  <div className="ch">
+                    <div>
+                      <div style={{fontFamily:"Syne",fontWeight:800,fontSize:16}}>📊 Weekly Digest</div>
+                      <div style={{fontSize:12,color:"var(--mut)",marginTop:3}}>Enriched with live project data, OKR progress, recent decisions and active risks before generation</div>
+                    </div>
+                  </div>
+                  <div className="cb">
+                    <div className="form-grid" style={{marginBottom:12}}>
+                      <div className="form-row">
+                        <label className="form-label">Focus Area</label>
+                        <select className="input select" value={digestFocus} onChange={e=>setDigestFocus(e.target.value)}>
+                          <option value="all">Full Portfolio</option>
+                          <option value="delivery">Delivery & Risks</option>
+                          <option value="okrs">OKR Progress</option>
+                          <option value="priorities">Top Priorities</option>
+                          <option value="decisions">Decisions & Actions</option>
+                        </select>
+                      </div>
+                      <div className="form-row">
+                        <label className="form-label">Context auto-loaded from platform</label>
+                        <div style={{display:"flex",gap:6,flexWrap:"wrap",paddingTop:8}}>
+                          {[projects.length+" projects",okrs.length+" OKRs",decisions.slice(0,5).length+" decisions",riskPredictions.length+" risks"].map((l,i)=><span key={i} className="tag tag-blu" style={{fontSize:9}}>{l}</span>)}
+                        </div>
+                      </div>
+                    </div>
+                    {digestError&&<div className="infobox ib-red" style={{marginBottom:10}}>⚠️ {digestError}</div>}
+                    <button style={{width:"100%",padding:13,background:digestRunning?"var(--bdr)":"linear-gradient(90deg,var(--grn),var(--acc))",border:"none",borderRadius:9,fontFamily:"Syne",fontWeight:800,fontSize:14,color:"#000",cursor:digestRunning?"not-allowed":"pointer",display:"flex",alignItems:"center",justifyContent:"center",gap:10}} onClick={runDigestPage} disabled={digestRunning}>
+                      {digestRunning?<><span className="spin" style={{width:16,height:16,borderWidth:2,borderTopColor:"#000",borderColor:"rgba(0,0,0,0.2)"}}/>Generating digest...</>:"📊 Generate Weekly Digest"}
+                    </button>
+                  </div>
+                </div>
+                {!digestResult&&!digestRunning&&(
+                  <div className="card" style={{padding:32,textAlign:"center",opacity:0.5}}>
+                    <div style={{fontSize:40,marginBottom:10}}>📊</div>
+                    <div style={{fontFamily:"Syne",fontWeight:700,fontSize:15,marginBottom:6}}>Digest appears here</div>
+                    <div style={{fontSize:12,color:"var(--mut)",maxWidth:340,margin:"0 auto"}}>The agent reads all your live project data, OKRs, decisions, and active risks before writing — not a generic template.</div>
+                  </div>
+                )}
+                {digestResult&&(
+                  <div className="col">
+                    {digestResult.headline&&(
+                      <div style={{background:"linear-gradient(135deg,rgba(16,185,129,0.1),rgba(0,212,255,0.07))",border:"1px solid rgba(16,185,129,0.2)",borderRadius:14,padding:"18px 22px"}}>
+                        <div style={{fontFamily:"Syne",fontWeight:800,fontSize:20,color:"var(--grn)",marginBottom:4}}>{digestResult.headline}</div>
+                        {digestResult.summary&&<div style={{fontSize:13,color:"var(--txt)",lineHeight:1.7}}>{digestResult.summary}</div>}
+                      </div>
+                    )}
+                    <div className="g2">
+                      {digestResult.whats_on_track?.length>0&&(
+                        <div className="card">
+                          <div className="ch"><div style={{fontFamily:"Syne",fontWeight:700,fontSize:13,color:"var(--grn)"}}>🟢 On Track</div><span className="tag tag-grn" style={{fontSize:9}}>{digestResult.whats_on_track.length}</span></div>
+                          <div className="cb">{digestResult.whats_on_track.map((item:string,i:number)=><div key={i} style={{fontSize:12,display:"flex",gap:7,padding:"5px 0",borderBottom:"1px solid var(--bdr)"}}><span style={{color:"var(--grn)",flexShrink:0}}>✓</span>{item}</div>)}</div>
+                        </div>
+                      )}
+                      {digestResult.whats_at_risk?.length>0&&(
+                        <div className="card">
+                          <div className="ch"><div style={{fontFamily:"Syne",fontWeight:700,fontSize:13,color:"var(--red)"}}>🔴 At Risk</div><span className="tag tag-red" style={{fontSize:9}}>{digestResult.whats_at_risk.length}</span></div>
+                          <div className="cb">{digestResult.whats_at_risk.map((item:string,i:number)=><div key={i} style={{fontSize:12,display:"flex",gap:7,padding:"5px 0",borderBottom:"1px solid var(--bdr)"}}><span style={{color:"var(--red)",flexShrink:0}}>⚠</span>{item}</div>)}</div>
+                        </div>
+                      )}
+                    </div>
+                    {digestResult.top_3_priorities?.length>0&&(
+                      <div className="card">
+                        <div className="ch"><div className="ct">Top Priorities This Week</div></div>
+                        <div className="cb">{digestResult.top_3_priorities.map((item:string,i:number)=>(
+                          <div key={i} style={{display:"flex",gap:12,padding:"9px 0",borderBottom:"1px solid var(--bdr)",alignItems:"flex-start"}}>
+                            <div style={{width:24,height:24,borderRadius:"50%",background:"rgba(0,212,255,0.1)",border:"1px solid rgba(0,212,255,0.2)",display:"flex",alignItems:"center",justifyContent:"center",fontFamily:"DM Mono",fontWeight:700,fontSize:11,color:"var(--acc)",flexShrink:0}}>{"#"+(i+1)}</div>
+                            <span style={{fontSize:12,lineHeight:1.6}}>{item}</span>
+                          </div>
+                        ))}</div>
+                      </div>
+                    )}
+                    {digestResult.key_decisions?.length>0&&(
+                      <div className="card">
+                        <div className="ch"><div className="ct">Decisions Made</div></div>
+                        <div className="cb">{digestResult.key_decisions.map((d:string,i:number)=><div key={i} style={{fontSize:12,display:"flex",gap:7,padding:"5px 0",borderBottom:"1px solid var(--bdr)"}}><span style={{color:"var(--pur)",flexShrink:0}}>◈</span>{d}</div>)}</div>
+                      </div>
+                    )}
+                    <div style={{display:"flex",gap:8}}>
+                      <button className="btn btn-sm" onClick={()=>navigator.clipboard.writeText((digestResult.headline||"")+"\n\n"+(digestResult.summary||"")).then(()=>alert("Copied!"))}>Copy Summary</button>
+                      <button className="btn btn-sm" onClick={()=>{setUpdateRecipientId("");setPage("update");}}>Send as Stakeholder Update</button>
+                      <button className="btn btn-sm" onClick={()=>setDigestResult(null)}>↺ Regenerate</button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* RISK MONITOR */}
+            {page==="risk"&&(
+              <div className="col">
+                <div className="card">
+                  <div className="ch">
+                    <div>
+                      <div style={{fontFamily:"Syne",fontWeight:800,fontSize:16}}>🔔 Risk Monitor</div>
+                      <div style={{fontSize:12,color:"var(--mut)",marginTop:3}}>Scans Jira issues, sprint blockers, bug trends and OKR gaps · saves predictions · surfaces escalation paths</div>
+                    </div>
+                  </div>
+                  <div className="cb">
+                    <div className="form-grid" style={{marginBottom:12}}>
+                      <div className="form-row">
+                        <label className="form-label">Project Filter</label>
+                        <select className="input select" value={riskProjFilter} onChange={e=>setRiskProjFilter(e.target.value)}>
+                          <option value="all">All Projects</option>
+                          {projects.map((p:any)=><option key={p.id} value={p.id}>{p.name}</option>)}
+                        </select>
+                      </div>
+                      <div className="form-row">
+                        <label className="form-label">Jira issues loaded</label>
+                        <div style={{paddingTop:8,display:"flex",gap:6,flexWrap:"wrap"}}>
+                          {[jiraIssues.filter((i:any)=>(i.status||"").toLowerCase().includes("block")).length+" blockers",jiraIssues.filter((i:any)=>i.issue_type==="Bug"&&i.priority==="high").length+" high bugs",riskPredictions.length+" active predictions"].map((l,i)=><span key={i} className={`tag ${i===0&&parseInt(l)>0?"tag-red":i===1&&parseInt(l)>0?"tag-amb":"tag-dim"}`} style={{fontSize:9}}>{l}</span>)}
+                        </div>
+                      </div>
+                    </div>
+                    {riskError&&<div className="infobox ib-red" style={{marginBottom:10}}>⚠️ {riskError}</div>}
+                    <button style={{width:"100%",padding:13,background:riskRunning?"var(--bdr)":"linear-gradient(90deg,#ef4444,#f59e0b)",border:"none",borderRadius:9,fontFamily:"Syne",fontWeight:800,fontSize:14,color:"#000",cursor:riskRunning?"not-allowed":"pointer",display:"flex",alignItems:"center",justifyContent:"center",gap:10}} onClick={runRiskPage} disabled={riskRunning}>
+                      {riskRunning?<><span className="spin" style={{width:16,height:16,borderWidth:2,borderTopColor:"#000",borderColor:"rgba(0,0,0,0.2)"}}/>Scanning risks...</>:"🔔 Run Risk Scan"}
+                    </button>
+                  </div>
+                </div>
+                {!riskResult&&!riskRunning&&riskPredictions.length>0&&(
+                  <div className="card">
+                    <div className="ch"><div className="ct">Active Risk Predictions</div><span className="tag tag-red" style={{fontSize:9}}>{riskPredictions.length} active</span></div>
+                    <div className="cb">{riskPredictions.slice(0,5).map((r:any,i:number)=>(
+                      <div key={i} style={{padding:"9px 0",borderBottom:"1px solid var(--bdr)"}}>
+                        <div style={{display:"flex",gap:6,marginBottom:3}}>
+                          <span className={`tag ${r.confidence>70?"tag-red":r.confidence>40?"tag-amb":"tag-dim"}`} style={{fontSize:9}}>{r.risk_type?.replace("_"," ")}</span>
+                          <span className="mono dim" style={{fontSize:9}}>{r.confidence}% confidence</span>
+                        </div>
+                        <div style={{fontSize:12,marginBottom:2}}>{r.prediction}</div>
+                        {r.recommended_action&&<div style={{fontSize:11,color:"var(--acc)"}}>{"→ "+r.recommended_action}</div>}
+                      </div>
+                    ))}</div>
+                  </div>
+                )}
+                {!riskResult&&!riskRunning&&riskPredictions.length===0&&(
+                  <div className="card" style={{padding:32,textAlign:"center",opacity:0.5}}>
+                    <div style={{fontSize:40,marginBottom:10}}>🔔</div>
+                    <div style={{fontFamily:"Syne",fontWeight:700,fontSize:15,marginBottom:6}}>Run a risk scan</div>
+                    <div style={{fontSize:12,color:"var(--mut)",maxWidth:360,margin:"0 auto"}}>Analyzes Jira blockers, bug trends, velocity decay and OKR gaps. Saves predictions to the platform for Sprint and Release agents to read.</div>
+                  </div>
+                )}
+                {riskRunning&&<div className="card" style={{padding:28,textAlign:"center"}}><div className="spin" style={{width:28,height:28,borderWidth:3,margin:"0 auto 12px"}}/><div style={{fontFamily:"Syne",fontWeight:700}}>Scanning all projects for risk signals...</div></div>}
+                {riskResult&&(
+                  <div className="col">
+                    <div style={{background:riskResult.overall_health==="green"?"rgba(16,185,129,0.08)":riskResult.overall_health==="amber"?"rgba(245,158,11,0.08)":"rgba(239,68,68,0.08)",border:"1px solid "+(riskResult.overall_health==="green"?"rgba(16,185,129,0.2)":riskResult.overall_health==="amber"?"rgba(245,158,11,0.2)":"rgba(239,68,68,0.2)"),borderRadius:14,padding:"18px 22px",display:"flex",justifyContent:"space-between",alignItems:"center",flexWrap:"wrap",gap:12}}>
+                      <div style={{fontFamily:"Syne",fontWeight:800,fontSize:22,color:riskResult.overall_health==="green"?"var(--grn)":riskResult.overall_health==="amber"?"var(--amb)":"var(--red)"}}>
+                        {riskResult.overall_health==="green"?"🟢":riskResult.overall_health==="amber"?"🟡":"🔴"} Portfolio Health: {(riskResult.overall_health||"unknown").toUpperCase()}
+                      </div>
+                      <span className="tag tag-dim" style={{fontSize:9}}>{riskResult.alerts?.length||0} risk signals found</span>
+                    </div>
+                    {riskResult.alerts?.length>0?(
+                      <div className="col">
+                        {riskResult.alerts.map((a:any,i:number)=>(
+                          <div key={i} className="card" style={{padding:"14px 16px",borderLeft:"3px solid "+(a.risk_level==="high"?"var(--red)":a.risk_level==="medium"?"var(--amb)":"var(--grn)")}}>
+                            <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:6}}>
+                              <div style={{fontFamily:"Syne",fontWeight:700,fontSize:13}}>{a.project||"Portfolio"}</div>
+                              <span className={`tag ${a.risk_level==="high"?"tag-red":a.risk_level==="medium"?"tag-amb":"tag-grn"}`} style={{fontSize:9}}>{a.risk_level||"medium"}</span>
+                            </div>
+                            <div style={{fontSize:12,marginBottom:6}}>{a.reason}</div>
+                            {a.suggested_action&&<div style={{fontSize:12,color:"var(--acc)",display:"flex",gap:6}}><span>{"→"}</span>{a.suggested_action}</div>}
+                          </div>
+                        ))}
+                      </div>
+                    ):<div className="infobox ib-grn">{"✓ No critical risks detected across your portfolio."}</div>}
+                    <div style={{display:"flex",gap:8}}>
+                      <button className="btn btn-sm" onClick={()=>setRiskResult(null)}>↺ Re-scan</button>
+                      <button className="btn btn-sm" onClick={()=>setPage("sprint")}>View Sprint Intelligence</button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* STAKEHOLDER UPDATE */}
+            {page==="update"&&(
+              <div className="col">
+                <div className="card">
+                  <div className="ch">
+                    <div>
+                      <div style={{fontFamily:"Syne",fontWeight:800,fontSize:16}}>📝 Stakeholder Update</div>
+                      <div style={{fontSize:12,color:"var(--mut)",marginTop:3}}>Audience-aware status email · built from live project data, decisions and OKR progress</div>
+                    </div>
+                  </div>
+                  <div className="cb">
+                    <div className="form-grid" style={{marginBottom:10}}>
+                      <div className="form-row">
+                        <label className="form-label">Recipient</label>
+                        <select className="input select" value={updateRecipientId} onChange={e=>setUpdateRecipientId(e.target.value)}>
+                          <option value="">Custom recipient...</option>
+                          {stakeholders.filter((s:any)=>s.influence>=3).map((s:any)=><option key={s.id} value={s.id}>{s.name} — {s.role}</option>)}
+                        </select>
+                      </div>
+                      <div className="form-row">
+                        <label className="form-label">Tone</label>
+                        <select className="input select" value={updateTone} onChange={e=>setUpdateTone(e.target.value)}>
+                          <option value="executive">Executive — concise, outcome-focused</option>
+                          <option value="technical">Technical — detail-rich, metric-heavy</option>
+                          <option value="partner">Partner — relationship-first, collaborative</option>
+                          <option value="board">Board — strategic, KPI-driven</option>
+                        </select>
+                      </div>
+                    </div>
+                    {!updateRecipientId&&(
+                      <div className="form-grid" style={{marginBottom:10}}>
+                        <div className="form-row"><label className="form-label">Name</label><input className="input" value={updateInput.name} onChange={e=>setUpdateInput(p=>({...p,name:e.target.value}))} placeholder="Recipient name"/></div>
+                        <div className="form-row"><label className="form-label">Role</label><input className="input" value={updateInput.role} onChange={e=>setUpdateInput(p=>({...p,role:e.target.value}))} placeholder="e.g. CPO"/></div>
+                      </div>
+                    )}
+                    <div style={{display:"flex",gap:6,flexWrap:"wrap",marginBottom:12}}>
+                      {[projects.length+" projects included",decisions.slice(0,3).length+" recent decisions",okrs.length+" OKRs"].map((l,i)=><span key={i} className="tag tag-dim" style={{fontSize:9}}>{l}</span>)}
+                    </div>
+                    {updateError&&<div className="infobox ib-red" style={{marginBottom:10}}>⚠️ {updateError}</div>}
+                    <button style={{width:"100%",padding:13,background:updateRunning?"var(--bdr)":"linear-gradient(90deg,var(--pur),var(--acc))",border:"none",borderRadius:9,fontFamily:"Syne",fontWeight:800,fontSize:14,color:"#000",cursor:updateRunning?"not-allowed":"pointer",display:"flex",alignItems:"center",justifyContent:"center",gap:10}} onClick={runUpdatePage} disabled={updateRunning}>
+                      {updateRunning?<><span className="spin" style={{width:16,height:16,borderWidth:2,borderTopColor:"#000",borderColor:"rgba(0,0,0,0.2)"}}/>Drafting update...</>:"📝 Draft Stakeholder Update"}
+                    </button>
+                  </div>
+                </div>
+                {!updateResult&&!updateRunning&&(
+                  <div className="card" style={{padding:32,textAlign:"center",opacity:0.5}}>
+                    <div style={{fontSize:40,marginBottom:10}}>📝</div>
+                    <div style={{fontFamily:"Syne",fontWeight:700,fontSize:15,marginBottom:6}}>Update draft appears here</div>
+                    <div style={{fontSize:12,color:"var(--mut)",maxWidth:360,margin:"0 auto"}}>Select a recipient from your stakeholders list. The agent reads live project data, OKRs, and decisions before writing — not a fill-in template.</div>
+                  </div>
+                )}
+                {updateRunning&&<div className="card" style={{padding:28,textAlign:"center"}}><div className="spin" style={{width:28,height:28,borderWidth:3,margin:"0 auto 12px"}}/><div style={{fontFamily:"Syne",fontWeight:700}}>Drafting personalized update...</div></div>}
+                {updateResult&&(
+                  <div className="col">
+                    <div style={{display:"flex",gap:8,flexWrap:"wrap",alignItems:"center",padding:"10px 14px",background:"var(--surf2)",border:"1px solid var(--bdr)",borderRadius:9}}>
+                      <span className="tag tag-grn" style={{fontSize:9}}>Draft ready</span>
+                      <span className="tag tag-dim" style={{fontSize:9}}>{updateTone} tone</span>
+                      {updateRecipientId&&stakeholders.find((s:any)=>s.id===updateRecipientId)&&<span className="tag tag-pur" style={{fontSize:9}}>{stakeholders.find((s:any)=>s.id===updateRecipientId)?.name}</span>}
+                      <button className="btn btn-sm" style={{marginLeft:"auto"}} onClick={()=>setUpdateResult(null)}>↺ Redraft</button>
+                    </div>
+                    <div className="card">
+                      <div className="ch">
+                        <div>
+                          <div style={{fontFamily:"DM Mono",fontSize:9,color:"var(--mut)",marginBottom:3}}>SUBJECT</div>
+                          <div style={{fontFamily:"Syne",fontWeight:700,fontSize:14}}>{updateResult.subject||"Status Update"}</div>
+                        </div>
+                        <div style={{display:"flex",gap:6}}>
+                          <button className="btn btn-sm" onClick={()=>navigator.clipboard.writeText("Subject: "+(updateResult.subject||"")+"\n\n"+(updateResult.body||"")).then(()=>alert("Copied!"))}>Copy Email</button>
+                          {updateResult.subject&&<a href={"mailto:"+(stakeholders.find((s:any)=>s.id===updateRecipientId)?.email||"")+"?subject="+encodeURIComponent(updateResult.subject||"")+"&body="+encodeURIComponent(updateResult.body||"")} className="btn btn-sm btn-primary">Open in Mail</a>}
+                        </div>
+                      </div>
+                      <div style={{padding:"16px 18px",fontSize:13,lineHeight:1.9,whiteSpace:"pre-line",color:"var(--txt)"}}>{updateResult.body}</div>
+                    </div>
+                  </div>
+                )}
               </div>
             )}
 
