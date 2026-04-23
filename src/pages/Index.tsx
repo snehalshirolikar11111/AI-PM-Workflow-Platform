@@ -751,7 +751,28 @@ export default function PMDashboard(){
     }
   };
   const syncGmail=async()=>{setSyncingInt("gmail");const{data,error}=await supabase.functions.invoke("gmail-sync",{body:{action:"pull"}});setSyncingInt(null);if(error){alert("Gmail: "+error.message);return;}await Promise.all([loadGmail(),loadTasks(),loadIntegrations()]);alert(`Gmail: ${data?.synced||0} synced`);};
-  const syncCal=async(date?:string)=>{setSyncingInt("calendar");const{data,error}=await supabase.functions.invoke("calendar-sync",{body:{date}});setSyncingInt(null);if(error){alert("Calendar: "+error.message);return;}await Promise.all([loadCal(),loadIntegrations()]);return data?.events||[];};
+  const syncCal=async(date?:string)=>{
+    setSyncingInt("calendar");
+    try{
+      const{data,error}=await supabase.functions.invoke("calendar-sync",{body:{date}});
+      // Use data even if upsert error — function still returns events
+      if(data?.events?.length>0||data?.events){
+        await Promise.all([loadCal(),loadIntegrations()]);
+        setSyncingInt(null);
+        return data.events||[];
+      }
+      if(error&&!data){
+        setSyncingInt(null);
+        alert("Calendar sync error: "+error.message);
+        return [];
+      }
+      await Promise.all([loadCal(),loadIntegrations()]);
+    }catch(e:any){
+      console.error("syncCal error:",e);
+    }
+    setSyncingInt(null);
+    return [];
+  };
   const createCalEvent=async()=>{
     if(!calForm.title.trim()||!calForm.startTime)return;
     setSyncingInt("cal-create");
@@ -3111,7 +3132,7 @@ export default function PMDashboard(){
                         <div className="section-lbl">Or paste raw text</div>
                         <textarea className="input" value={prdInput} onChange={e=>setPrdInput(e.target.value)} placeholder={"Paste focus group transcript or survey results...\n\nExample:\n\"Participant 3: Onboarding took 45 minutes...\"\n\"Survey: 18 of 32 said onboarding was #1 pain point...\""} style={{minHeight:180,resize:"vertical" as any,marginBottom:10}}/>
                         <button onClick={runPRD} disabled={(!prdInput.trim()&&!prdProductName.trim())||prdStatus==="processing"} style={{width:"100%",padding:"10px 0",background:prdInput.trim()?"var(--acc)":"var(--bdr)",color:prdInput.trim()?"#000":"var(--mut)",border:"none",borderRadius:8,fontFamily:"Syne",fontWeight:700,fontSize:13,cursor:prdInput.trim()?"pointer":"default"}}>{prdStatus==="processing"?"Analysing...":"⚡ Generate PRD"}</button>
-                        {prdStatus==="processing"&&<div style={{marginTop:10}}>{PRD_STEPS.map((s,i)=><div key={i} style={{fontSize:11,padding:"2px 0",color:i<prdAgentStep?"var(--grn)":i===prdAgentStep?"var(--acc)":"var(--mut)"}}>{i<prdAgentStep?"\u2713 ":i===prdAgentStep?"... ":"  "}{s}</div>)}</div>}
+                        {prdStatus==="processing"&&<div style={{marginTop:10}}}>{PRD_STEPS.map((s,i)=><div key={i} style={{fontSize:11,padding:"2px 0",color:i<prdAgentStep?"var(--grn)":i===prdAgentStep?"var(--acc)":"var(--mut)"}}>{i<prdAgentStep?"\u2713 ":i===prdAgentStep?"... ":"  "}{s}</div>)}</div>}
                       </>):(<div><div style={{fontSize:12,color:"var(--grn)",marginBottom:10,fontFamily:"DM Mono"}}>✓ Processed {prdInput.split(' ').length} words</div><div style={{display:"flex",flexWrap:"wrap",gap:5,marginBottom:14}}>{prdResult.themes.map((t:any,i:number)=><span key={i} className="tag tag-blu">{t.lbl} <span style={{opacity:0.6}}>×{t.n}</span></span>)}</div><button onClick={()=>{setPrdStatus("idle");setPrdInput("");setPrdResult(null);setPrdAgentResult(null);setPrdProductName("");setPrdProjectName("");}} style={{fontSize:11,fontFamily:"DM Mono",padding:"4px 10px",border:"1px solid var(--bdr)",borderRadius:6,background:"transparent",color:"var(--mut)",cursor:"pointer"}}>↺ New input</button></div>)}
                     </div>
                   </div>
