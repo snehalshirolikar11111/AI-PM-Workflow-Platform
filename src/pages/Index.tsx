@@ -294,7 +294,7 @@ const PAGE_INFO: Record<string,{title:string;sub:string}> = {
   optimizer:{title:"Token Cost Optimizer",sub:"Analyze any agent · reduce token spend · model recommendations · caching strategy"},
   super:{title:"Executive Briefing Agent",sub:"Autonomous multi-source intelligence · tools · cross-agent orchestration · writes back to platform"},
   agents:{title:"All Agents",sub:"All AI-powered automations — overview and quick launch"},
-  prd:{title:"PRD Agent",sub:"Autonomous · web search · OKR alignment · competitive context · RICE scores · saves to knowledge base"},
+  prd:{title:"PRD Agent",sub:"Autonomous · web search · OKR alignment · competitive context · saves to knowledge base"},
   stakeholders:{title:"Stakeholders",sub:"Influence map with last-contact tracking"},
   metrics:{title:"Pilot Metrics",sub:"Adoption funnel · time saved · agent engagement"},
   tokens:{title:"Token Analytics",sub:"Cost per agent · daily trends · anomaly detection · FinOps"},
@@ -833,19 +833,17 @@ export default function PMDashboard(){
   const togglePriv=async(key:string)=>{const n={...privTogs,[key]:!(privTogs as any)[key]};setPrivTogs(n);await supabase.from("user_settings").upsert({user_id:user?.id,persistent_memory:n.persist,agent_learning:n.learn,session_only:n.session,audit_log:n.audit});};
 
   /* ── PRD ── */
-  const PRD_STEPS=["Aggregating internal focus group data…","Fetching competitive context and research…","Searching web for market signals and benchmarks…","Checking OKR alignment…","Checking RICE scores and effort estimates…","Identifying stakeholders for review…","Writing PRD with self-evaluation loop…","Saving to knowledge base and decision log…"];
+  const PRD_STEPS=["Aggregating internal focus group data…","Fetching competitive context and research…","Searching web for market signals…","Checking OKR alignment…","Checking RICE scores…","Identifying stakeholders…","Writing PRD with self-evaluation…","Saving to knowledge base…"];
   const runPRD=async()=>{
     if(!prdInput.trim()&&!prdProductName.trim())return;
     setPrdStatus("processing");setPrdAgentResult(null);setPrdAgentStep(0);
     const iv=setInterval(()=>setPrdAgentStep(s=>Math.min(s+1,PRD_STEPS.length-1)),2500);
     try{
-      const proj=projects.find(p=>p.name===prdProjectName);
       const{data}=await supabase.functions.invoke("prd-agent",{body:{text:prdInput,productName:prdProductName,projectName:prdProjectName,userId:user?.id}});
       clearInterval(iv);setPrdAgentStep(PRD_STEPS.length-1);
       if(data?.error)throw new Error(data.error);
       if(data?.prd){
         setPrdAgentResult(data);
-        // Also set legacy prdResult for backward compat display
         const prd=data.prd;
         setPrdResult({themes:[],problem:prd.problem_statement||"",stories:prd.user_stories||[],criteria:prd.acceptance_criteria||[],metrics:(prd.success_metrics||[]).map((m:any)=>`${m.metric}: ${m.baseline} → ${m.target}`),questions:prd.open_questions||[]});
         setPrdStatus("done");loadKnowledge();loadDecisions();loadAgentRuns();
@@ -1109,7 +1107,7 @@ export default function PMDashboard(){
                     <div className="ch"><div className="ct">Day Summary</div></div>
                     <div className="cb">
                       {[[calendarEvents.filter((e:any)=>e.block_type==="meet").length,"Meetings"],[calendarEvents.length,"Events"],[calendarEvents.filter((e:any)=>e.meet_link).length,"With Meet"],[calendarEvents.filter((e:any)=>e.block_type==="deep").length,"Focus"]].map(([v,l])=>(
-                        <div key={l} style={{display:"flex",justifyContent:"space-between",padding:"6px 0",borderBottom:"1px solid var(--bdr)",fontSize:12}}><span className="dim">{l}</span><span className="mono acc" style={{fontSize:11}}>{v}</span></div>
+                        <div key={l as string} style={{display:"flex",justifyContent:"space-between",padding:"6px 0",borderBottom:"1px solid var(--bdr)",fontSize:12}}><span className="dim">{l}</span><span className="mono acc" style={{fontSize:11}}>{v}</span></div>
                       ))}
                     </div>
                   </div>
@@ -1144,7 +1142,7 @@ export default function PMDashboard(){
                 </div>
                 <div className="col">
                   <div className="card"><div className="ch"><div className="ct">Browse by Date</div></div><div className="cb"><MiniCalendar selectedDate={selectedTodoDate} onSelect={setSelectedTodoDate} eventDates={scheduledDates}/><div style={{marginTop:8,fontSize:11,color:"var(--mut)"}}>Dots = scheduled tasks</div></div></div>
-                  <div className="card"><div className="ch"><div className="ct">Overview</div></div><div className="cb">{[["Total",todos.length],["Open",todos.filter((t:any)=>t.status==="open").length],["Done",todos.filter((t:any)=>t.status==="done").length],["High priority",todos.filter((t:any)=>t.priority==="high"&&t.status==="open").length],["Scheduled",todos.filter((t:any)=>t.scheduled_date&&t.scheduled_date>todayStr).length],["From Jira",todos.filter((t:any)=>t.source==="jira").length],["From Meetings",todos.filter((t:any)=>t.source==="meeting-scribe").length]].map(([l,v])=>(<div key={l} style={{display:"flex",justifyContent:"space-between",padding:"6px 0",borderBottom:"1px solid var(--bdr)",fontSize:12}}><span className="dim">{l}</span><span className="mono acc" style={{fontSize:11}}>{v}</span></div>))}</div></div>
+                  <div className="card"><div className="ch"><div className="ct">Overview</div></div><div className="cb">{[["Total",todos.length],["Open",todos.filter((t:any)=>t.status==="open").length],["Done",todos.filter((t:any)=>t.status==="done").length],["High priority",todos.filter((t:any)=>t.priority==="high"&&t.status==="open").length],["Scheduled",todos.filter((t:any)=>t.scheduled_date&&t.scheduled_date>todayStr).length],["From Jira",todos.filter((t:any)=>t.source==="jira").length],["From Meetings",todos.filter((t:any)=>t.source==="meeting-scribe").length]].map(([l,v])=>(<div key={l as string} style={{display:"flex",justifyContent:"space-between",padding:"6px 0",borderBottom:"1px solid var(--bdr)",fontSize:12}}><span className="dim">{l}</span><span className="mono acc" style={{fontSize:11}}>{v}</span></div>))}</div></div>
                 </div>
               </div>
             )}
@@ -1197,7 +1195,7 @@ export default function PMDashboard(){
                             {pIssues.length>0&&(
                               <div style={{display:"flex",gap:20,padding:"10px 0",borderBottom:"1px solid var(--bdr)",marginBottom:10}}>
                                 {[[pIssues.length,"Issues","var(--acc)"],[blockers,"Blockers",blockers>0?"var(--red)":"var(--grn)"],[bugs,"High Bugs",bugs>0?"var(--red)":"var(--grn)"],[`${completion}%`,"Complete",completion>=60?"var(--grn)":completion>=30?"var(--amb)":"var(--red)"]].map(([v,l,c])=>(
-                                  <div key={l} style={{textAlign:"center"}}><div style={{fontFamily:"Syne",fontWeight:800,fontSize:18,color:c}}>{v}</div><div style={{fontSize:10,color:"var(--mut)"}}>{l}</div></div>
+                                  <div key={l as string} style={{textAlign:"center"}}><div style={{fontFamily:"Syne",fontWeight:800,fontSize:18,color:c as string}}>{v}</div><div style={{fontSize:10,color:"var(--mut)"}}>{l}</div></div>
                                 ))}
                               </div>
                             )}
@@ -1508,11 +1506,11 @@ export default function PMDashboard(){
                     </div>
                     <div className="form-row" style={{marginBottom:10}}>
                       <label className="form-label">System Prompt (paste or describe)</label>
-                      <textarea className="input" value={optPrompt} onChange={e=>setOptPrompt(e.target.value)} style={{minHeight:100,resize:"vertical"}} placeholder={"Paste the agent's system prompt here.\n\nLeave blank to analyze based on live token_usage DB stats for the selected agent."}/>
+                      <textarea className="input" value={optPrompt} onChange={e=>setOptPrompt(e.target.value)} style={{minHeight:100,resize:"vertical" as any}} placeholder={"Paste the agent's system prompt here.\n\nLeave blank to analyze based on live token_usage DB stats for the selected agent."}/>
                     </div>
                     <div className="form-row" style={{marginBottom:14}}>
                       <label className="form-label">Memory / Context Injected (optional)</label>
-                      <textarea className="input" value={optMemory} onChange={e=>setOptMemory(e.target.value)} style={{minHeight:60,resize:"vertical"}} placeholder="Paste any memory or context block injected into this agent..."/>
+                      <textarea className="input" value={optMemory} onChange={e=>setOptMemory(e.target.value)} style={{minHeight:60,resize:"vertical" as any}} placeholder="Paste any memory or context block injected into this agent..."/>
                     </div>
                     {optError&&<div className="infobox ib-red" style={{marginBottom:10}}>{optError}</div>}
                     <button style={{width:"100%",padding:13,background:"linear-gradient(90deg,var(--acc),var(--grn))",border:"none",borderRadius:9,fontFamily:"Syne",fontWeight:800,fontSize:14,color:"#000",cursor:optRunning?"not-allowed":"pointer",opacity:optRunning?0.6:1,display:"flex",alignItems:"center",justifyContent:"center",gap:10}} onClick={runOptimizer} disabled={optRunning}>
@@ -1743,7 +1741,7 @@ export default function PMDashboard(){
                                   ["Velocity",siResult.key_metrics.velocity_direction||siResult.key_metrics.carryover_trend,"var(--mut)"],
                                   ["Bug Trend",siResult.key_metrics.bug_trend,"var(--mut)"],
                                   ["Scope Changes",siResult.key_metrics.scope_changes,"var(--mut)"],
-                                ].map(([l,v,c])=>v!==undefined&&v!==null&&<div key={l}><div style={{fontFamily:"DM Mono",fontSize:10,color:"var(--mut)",marginBottom:2}}>{l}</div><div style={{fontFamily:"Syne",fontWeight:700,fontSize:13,color:c}}>{String(v)}</div></div>)}
+                                ].map(([l,v,c])=>v!==undefined&&v!==null&&<div key={l as string}><div style={{fontFamily:"DM Mono",fontSize:10,color:"var(--mut)",marginBottom:2}}>{l}</div><div style={{fontFamily:"Syne",fontWeight:700,fontSize:13,color:c as string}}>{String(v)}</div></div>)}
                               </div>
                             )}
                           </div>
@@ -2223,7 +2221,7 @@ export default function PMDashboard(){
                         <div className="col">
                           <div className="g3">
                             {[["TAM",ma.market_size?.TAM,"var(--acc)"],["SAM",ma.market_size?.SAM,"var(--pur)"],["SOM",ma.market_size?.SOM,"var(--grn)"]].map(([l,v,c])=>(
-                              <div key={l} className="kpi"><div className="kpi-v" style={{color:c,fontSize:22}}>{v||"DATA GAP"}</div><div className="kpi-l">{l as string}</div>{ma.market_size?.source&&l==="TAM"&&<div style={{fontSize:9,color:"var(--mut)",marginTop:2,fontFamily:"DM Mono"}}>{ma.market_size.source}</div>}</div>
+                              <div key={l} className="kpi"><div className="kpi-v" style={{color:c as string,fontSize:22}}>{v||"DATA GAP"}</div><div className="kpi-l">{l as string}</div>{ma.market_size?.source&&l==="TAM"&&<div style={{fontSize:9,color:"var(--mut)",marginTop:2,fontFamily:"DM Mono"}}>{ma.market_size.source}</div>}</div>
                             ))}
                           </div>
                           <div style={{display:"flex",gap:8,alignItems:"center"}}>
@@ -2491,7 +2489,7 @@ export default function PMDashboard(){
                   <div className="ch"><div className="ct">Your Request (optional)</div></div>
                   <div className="cb">
                     <div className="col" style={{gap:10}}>
-                      <textarea className="input" value={superRequest} onChange={e=>setSuperRequest(e.target.value)} placeholder={"Leave blank for a full portfolio brief, or ask something specific:\n\n• What are the biggest risks this sprint?\n• Prioritize my backlog for Q2 against OKRs\n• Generate a PRD for the top-scored initiative\n• What decisions need exec attention this week?"} style={{minHeight:100,resize:"vertical"}}/>
+                      <textarea className="input" value={superRequest} onChange={e=>setSuperRequest(e.target.value)} placeholder={"Leave blank for a full portfolio brief, or ask something specific:\n\n• What are the biggest risks this sprint?\n• Prioritize my backlog for Q2 against OKRs\n• Generate a PRD for the top-scored initiative\n• What decisions need exec attention this week?"} style={{minHeight:100,resize:"vertical" as any}}/>
                       <div style={{display:"flex",gap:10,alignItems:"center",flexWrap:"wrap"}}>
                         <div className="form-row" style={{flex:"none"}}>
                           <label className="form-label" style={{marginBottom:4}}>Focus Area</label>
@@ -2686,7 +2684,6 @@ export default function PMDashboard(){
             {/* PRD */}
             {page==="prd"&&(
               <div className="g2">
-                {/* Input panel */}
                 <div className="col">
                   <div className="card">
                     <div className="ch">
@@ -2699,7 +2696,7 @@ export default function PMDashboard(){
                       <div className="col" style={{gap:10}}>
                         <div className="form-row">
                           <label className="form-label">Product / Feature Name</label>
-                          <input className="input" value={prdProductName} onChange={e=>setPrdProductName(e.target.value)} placeholder="e.g. AI Alert Suppression Engine for NOC teams"/>
+                          <input className="input" value={prdProductName} onChange={e=>setPrdProductName(e.target.value)} placeholder="e.g. AI Alert Suppression Engine"/>
                         </div>
                         <div className="form-row">
                           <label className="form-label">Link to Project (optional)</label>
@@ -2715,9 +2712,8 @@ export default function PMDashboard(){
                         </div>
                         <div className="form-row">
                           <label className="form-label">Or paste raw text</label>
-                          <textarea className="input" value={prdInput} onChange={e=>setPrdInput(e.target.value)} placeholder={"Paste focus group transcript, survey results, or feature brief...\n\nLeave blank — agent will use internal data from your platform if a project is selected."} style={{minHeight:140,resize:"vertical"}}/>
+                          <textarea className="input" value={prdInput} onChange={e=>setPrdInput(e.target.value)} placeholder={"Paste focus group transcript, survey results, or feature brief...\n\nLeave blank — agent will use internal data if a project is selected."} style={{minHeight:120,resize:"vertical" as any}}/>
                         </div>
-                        {/* What the agent does */}
                         <div style={{display:"flex",gap:5,flexWrap:"wrap"}}>
                           {["Web search","OKR alignment","Competitive context","RICE scores","Stakeholder mapping","Saves to knowledge base"].map(l=>(
                             <span key={l} style={{fontFamily:"DM Mono",fontSize:9,padding:"3px 8px",borderRadius:100,background:"rgba(124,58,237,0.07)",border:"1px solid rgba(124,58,237,0.15)",color:"var(--pur)"}}>{l}</span>
@@ -2730,8 +2726,6 @@ export default function PMDashboard(){
                       </div>
                     </div>
                   </div>
-
-                  {/* Thinking steps */}
                   {prdStatus==="processing"&&(
                     <div className="sa-thinking">
                       <div style={{fontFamily:"Syne",fontWeight:700,fontSize:13,marginBottom:4}}>Investigating and writing PRD…</div>
@@ -2745,14 +2739,12 @@ export default function PMDashboard(){
                     </div>
                   )}
                 </div>
-
-                {/* Output panel */}
                 <div>
                   {!prdResult&&prdStatus!=="processing"&&(
                     <div className="card" style={{height:"100%",display:"flex",alignItems:"center",justifyContent:"center",flexDirection:"column",gap:10,opacity:0.4}}>
                       <div style={{fontSize:36}}>📄</div>
                       <div style={{fontFamily:"Syne",fontWeight:700,fontSize:13}}>PRD appears here</div>
-                      <div style={{fontSize:11,color:"var(--mut)",textAlign:"center",maxWidth:240}}>Enter a product name or paste focus group data — the agent investigates before writing</div>
+                      <div style={{fontSize:11,color:"var(--mut)",textAlign:"center",maxWidth:240}}>Enter a product name or paste focus group data</div>
                     </div>
                   )}
                   {prdStatus==="processing"&&(
@@ -2762,117 +2754,42 @@ export default function PMDashboard(){
                   )}
                   {prdResult&&prdStatus==="done"&&(
                     <div className="col">
-                      {/* Agent context strip */}
                       {prdAgentResult&&(
-                        <div style={{display:"flex",gap:10,flexWrap:"wrap",padding:"10px 14px",background:"var(--surf2)",border:"1px solid var(--bdr)",borderRadius:9,alignItems:"center"}}>
+                        <div style={{display:"flex",gap:8,flexWrap:"wrap",padding:"10px 14px",background:"var(--surf2)",border:"1px solid var(--bdr)",borderRadius:9,alignItems:"center"}}>
                           <span className={prdAgentResult.confidence_score==="High"?"confidence-high":prdAgentResult.confidence_score==="Medium"?"confidence-medium":"confidence-low"}>Confidence: {prdAgentResult.confidence_score}</span>
                           {prdAgentResult.okr_alignment?.length>0&&<span className="tag tag-grn" style={{fontSize:9}}>✓ OKR aligned</span>}
                           {prdAgentResult.competitive_context&&<span className="tag tag-pur" style={{fontSize:9}}>✓ Competitive context</span>}
                           {prdAgentResult.market_signals&&<span className="tag tag-blu" style={{fontSize:9}}>✓ Market signals</span>}
-                          {prdAgentResult.effort_estimate&&<span className="tag tag-amb" style={{fontSize:9}}>Effort: {prdAgentResult.effort_estimate}</span>}
                           {prdAgentResult.actions_taken?.filter((a:any)=>a.status==="success").length>0&&<span className="tag tag-grn" style={{fontSize:9,marginLeft:"auto"}}>{prdAgentResult.actions_taken.filter((a:any)=>a.status==="success").length} actions taken</span>}
                           <button className="btn btn-sm" onClick={()=>{setPrdStatus("idle");setPrdInput("");setPrdResult(null);setPrdAgentResult(null);setPrdProductName("");setPrdProjectName("");}}>↺ New PRD</button>
                         </div>
                       )}
-
                       <div className="card">
                         <div className="ch">
                           <div>
                             <div style={{fontFamily:"Syne",fontWeight:800,fontSize:14}}>{prdAgentResult?.prd?.title||"Product Requirements Document"}</div>
-                            <div className="mono dim" style={{fontSize:10}}>v{prdAgentResult?.prd?.version||"1.0"} · {prdAgentResult?.prd?.status||"Draft"} · {new Date().toLocaleDateString()} · Review before sharing</div>
+                            <div className="mono dim" style={{fontSize:10}}>v{prdAgentResult?.prd?.version||"1.0"} · Draft · {new Date().toLocaleDateString()} · Review before sharing</div>
                           </div>
                           <div style={{display:"flex",gap:6}}>
                             <span className="tag tag-dim">Draft</span>
-                            <button className="btn btn-sm" onClick={()=>{const prd=prdAgentResult?.prd||{};const md=`# ${prd.title||"PRD"}\n\n## Problem Statement\n${prd.problem_statement||prdResult.problem}\n\n## Goals\n${(prd.goals||[]).map((g:string)=>`- ${g}`).join("\n")}\n\n## User Stories\n${(prd.user_stories||prdResult.stories||[]).map((s:string)=>`- ${s}`).join("\n")}\n\n## Acceptance Criteria\n${(prd.acceptance_criteria||prdResult.criteria||[]).map((c:string)=>`- [ ] ${c}`).join("\n")}\n\n## Success Metrics\n${(prd.success_metrics||[]).map((m:any)=>typeof m==="string"?`- ${m}`:`- ${m.metric}: ${m.baseline} → ${m.target} (${m.okr_kr||""})`).join("\n")}\n\n## Constraints\n${(prd.constraints||[]).map((c:string)=>`- ${c}`).join("\n")}\n\n## Out of Scope\n${(prd.out_of_scope||[]).map((o:string)=>`- ${o}`).join("\n")}\n\n## Open Questions\n${(prd.open_questions||prdResult.questions||[]).map((q:string)=>`- ${q}`).join("\n")}`;navigator.clipboard.writeText(md).then(()=>alert("Copied!"));}}>Copy MD</button>
+                            <button className="btn btn-sm" onClick={()=>{const txt=`PRD: ${prdAgentResult?.prd?.title||"PRD"}\n\nProblem: ${prdResult.problem}\n\nUser Stories:\n${(prdResult.stories||[]).join("\n")}\n\nAcceptance Criteria:\n${(prdResult.criteria||[]).map((c:string)=>"- "+c).join("\n")}\n\nSuccess Metrics:\n${(prdResult.metrics||[]).join("\n")}`;navigator.clipboard.writeText(txt).then(()=>alert("Copied!"));}}>Copy</button>
                           </div>
                         </div>
-
-                        <div className="prd-sec">
-                          <div className="prd-lbl">Problem Statement</div>
-                          <p style={{fontSize:12,lineHeight:1.8}}>{prdAgentResult?.prd?.problem_statement||prdResult.problem}</p>
-                        </div>
-
+                        <div className="prd-sec"><div className="prd-lbl">Problem Statement</div><p style={{fontSize:12,lineHeight:1.8}}>{prdResult.problem}</p></div>
                         {prdAgentResult?.okr_alignment?.length>0&&(
-                          <div className="prd-sec">
-                            <div className="prd-lbl">OKR Alignment</div>
-                            {(prdAgentResult?.okr_alignment||[]).map((o:any,i:number)=>(
-                              <div key={i} style={{display:"flex",gap:8,fontSize:12,padding:"4px 0",borderBottom:"1px solid var(--bdr2)"}}>
-                                <span style={{color:"var(--grn)",flexShrink:0}}>◎</span>
-                                <div><strong style={{color:"var(--txt)"}}>{o.objective}</strong>{o.key_result&&<> · {o.key_result}</>}<div style={{fontSize:11,color:"var(--acc)"}}>{o.contribution}</div></div>
-                              </div>
+                          <div className="prd-sec"><div className="prd-lbl">OKR Alignment</div>
+                            {prdAgentResult.okr_alignment.map((o:any,i:number)=>(
+                              <div key={i} style={{display:"flex",gap:8,fontSize:12,padding:"4px 0",borderBottom:"1px solid var(--bdr2)"}}><span style={{color:"var(--grn)",flexShrink:0}}>◎</span><div><strong>{o.objective}</strong><div style={{fontSize:11,color:"var(--acc)"}}>{o.contribution}</div></div></div>
                             ))}
                           </div>
                         )}
-
-                        {prdAgentResult?.competitive_context&&(
-                          <div className="prd-sec">
-                            <div className="prd-lbl">Competitive Context</div>
-                            <div style={{fontSize:12,lineHeight:1.7,color:"var(--txt)"}}>{prdAgentResult.competitive_context}</div>
-                          </div>
-                        )}
-
-                        <div className="prd-sec">
-                          <div className="prd-lbl">User Stories</div>
-                          {(prdAgentResult?.prd?.user_stories||prdResult.stories||[]).map((s:string,i:number)=><div key={i} className="story">{s}</div>)}
-                        </div>
-
-                        <div className="prd-sec">
-                          <div className="prd-lbl">Acceptance Criteria</div>
-                          {(prdAgentResult?.prd?.acceptance_criteria||prdResult.criteria||[]).map((c:string,i:number)=>(
-                            <div key={i} style={{display:"flex",gap:7,fontSize:12,marginBottom:5,alignItems:"flex-start",padding:"4px 8px",background:"rgba(16,185,129,0.04)",borderRadius:6,border:"1px solid rgba(16,185,129,0.12)"}}>
-                              <span style={{color:"var(--grn)",flexShrink:0,marginTop:1}}>✓</span>{c}
-                            </div>
-                          ))}
-                        </div>
-
-                        <div className="prd-sec">
-                          <div className="prd-lbl">Success Metrics</div>
-                          {(prdAgentResult?.prd?.success_metrics||[]).length>0
-                            ?(prdAgentResult?.prd?.success_metrics||[]).map((m:any,i:number)=>(
-                              <div key={i} style={{display:"flex",gap:10,fontSize:12,padding:"5px 0",borderBottom:"1px solid var(--bdr2)",alignItems:"flex-start"}}>
-                                <div style={{width:4,height:4,borderRadius:"50%",background:"var(--acc)",flexShrink:0,marginTop:6}}/>
-                                <div><strong>{typeof m==="string"?m:m.metric}</strong>{typeof m==="object"&&<> · Baseline: {m.baseline} → Target: {m.target}{m.okr_kr&&<span className="mono" style={{color:"var(--grn)",fontSize:10}}> ({m.okr_kr})</span>}</>}</div>
-                              </div>
-                            )))
-                            :(prdResult.metrics||[]).map((m:string,i:number)=><div key={i} style={{fontSize:12,padding:"4px 0",borderBottom:"1px solid var(--bdr2)",display:"flex",gap:7}}><div style={{width:3,height:3,borderRadius:"50%",background:"var(--acc)",flexShrink:0,marginTop:7}}/>{m}</div>)}
-                        </div>
-
-                        {(prdAgentResult?.prd?.constraints||[]).length>0&&(
-                          <div className="prd-sec">
-                            <div className="prd-lbl">Constraints</div>
-                            {(prdAgentResult?.prd?.constraints||[]).map((c:string,i:number)=><div key={i} style={{fontSize:12,display:"flex",gap:7,padding:"3px 0",color:"var(--txt)"}}><span style={{color:"var(--amb)"}}>⚠</span>{c}</div>)}
-                          </div>
-                        )}
-
-                        {(prdAgentResult?.prd?.out_of_scope||[]).length>0&&(
-                          <div className="prd-sec">
-                            <div className="prd-lbl">Out of Scope</div>
-                            {prdAgentResult.prd.out_of_scope.map((o:string,i:number)=><div key={i} style={{fontSize:12,display:"flex",gap:7,padding:"3px 0",color:"var(--mut)"}}><span style={{color:"var(--red)"}}>✕</span>{o}</div>)}
-                          </div>
-                        )}
-
-                        {(prdAgentResult?.prd?.open_questions||prdResult.questions||[]).length>0&&(
-                          <div className="prd-sec">
-                            <div className="prd-lbl">Open Questions</div>
-                            {(prdAgentResult?.prd?.open_questions||prdResult.questions||[]).map((q:string,i:number)=><div key={i} style={{fontSize:12,padding:"3px 0",color:"var(--amb)",display:"flex",gap:6}}><span>?</span>{q}</div>)}
-                          </div>
-                        )}
-
-                        {prdAgentResult?.recommended_reviewers?.length>0&&(
-                          <div className="prd-sec">
-                            <div className="prd-lbl">Recommended Reviewers</div>
-                            <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
-                              {prdAgentResult.recommended_reviewers.map((r:string,i:number)=><span key={i} className="tag tag-pur" style={{fontSize:10}}>{r}</span>)}
-                            </div>
-                          </div>
-                        )}
-
-                        {prdAgentResult?.self_evaluation&&(
-                          <div className="prd-sec">
-                            <div className="prd-lbl">Self-Evaluation</div>
-                            <div style={{fontSize:11,color:"var(--acc)"}}>{prdAgentResult.self_evaluation.improvements_made}</div>
-                          </div>
-                        )}
+                        {prdAgentResult?.competitive_context&&<div className="prd-sec"><div className="prd-lbl">Competitive Context</div><div style={{fontSize:12,lineHeight:1.7}}>{prdAgentResult.competitive_context}</div></div>}
+                        <div className="prd-sec"><div className="prd-lbl">User Stories</div>{(prdAgentResult?.prd?.user_stories||prdResult.stories||[]).map((s:string,i:number)=><div key={i} className="story">{s}</div>)}</div>
+                        <div className="prd-sec"><div className="prd-lbl">Acceptance Criteria</div>{(prdAgentResult?.prd?.acceptance_criteria||prdResult.criteria||[]).map((c:string,i:number)=>(<div key={i} style={{display:"flex",gap:7,fontSize:12,marginBottom:5,alignItems:"flex-start",padding:"4px 8px",background:"rgba(16,185,129,0.04)",borderRadius:6,border:"1px solid rgba(16,185,129,0.12)"}}><span style={{color:"var(--grn)",flexShrink:0}}>✓</span>{c}</div>))}</div>
+                        <div className="prd-sec"><div className="prd-lbl">Success Metrics</div>{(prdResult.metrics||[]).map((m:string,i:number)=><div key={i} style={{fontSize:12,padding:"4px 0",borderBottom:"1px solid var(--bdr2)",display:"flex",gap:7}}><div style={{width:3,height:3,borderRadius:"50%",background:"var(--acc)",flexShrink:0,marginTop:7}}/>{m}</div>)}</div>
+                        {(prdAgentResult?.prd?.constraints||[]).length>0&&<div className="prd-sec"><div className="prd-lbl">Constraints</div>{prdAgentResult.prd.constraints.map((c:string,i:number)=><div key={i} style={{fontSize:12,display:"flex",gap:7,padding:"3px 0"}}><span style={{color:"var(--amb)"}}>⚠</span>{c}</div>)}</div>}
+                        {(prdResult.questions||[]).length>0&&<div className="prd-sec"><div className="prd-lbl">Open Questions</div>{(prdResult.questions||[]).map((q:string,i:number)=><div key={i} style={{fontSize:12,padding:"3px 0",color:"var(--amb)",display:"flex",gap:6}}><span>?</span>{q}</div>)}</div>}
+                        {prdAgentResult?.recommended_reviewers?.length>0&&<div className="prd-sec"><div className="prd-lbl">Reviewers</div><div style={{display:"flex",gap:6,flexWrap:"wrap"}}>{prdAgentResult.recommended_reviewers.map((r:string,i:number)=><span key={i} className="tag tag-pur" style={{fontSize:10}}>{r}</span>)}</div></div>}
                       </div>
                     </div>
                   )}
@@ -2881,23 +2798,18 @@ export default function PMDashboard(){
             )}
 
 
-
             {/* AGENTS */}
             {page==="agents"&&(
               <div className="col">
                 {agentError&&<div className="infobox ib-red" style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}><span>⚠️ {agentError}</span><button className="btn btn-sm" onClick={()=>setAgentError(null)}>✕</button></div>}
                 <div className="ga">
                   {[
-                    {ic:"🔮",col:"ic-pur",name:"Executive Briefing",trig:"On demand",desc:"Multi-source reasoning engine — tools, cross-agent orchestration, writes to decision log and creates tasks.",chips:["Projects","Jira","OKRs","Meetings"],action:()=>setPage("super"),lbl:"▶ Open Agent",run:null},
-                    {ic:"⚡",col:"ic-amb",name:"Sprint Intelligence",trig:"On demand / Sprint review",desc:"Autonomous sprint monitoring — detects blockers, velocity decay, creates tasks, drafts stakeholder alerts.",chips:["Jira","OKRs","Meetings","Tasks"],action:()=>setPage("sprint"),lbl:"▶ Open Agent",run:null},
-                    {ic:"🚦",col:"ic-amb",name:"Release Readiness",trig:"Before every release",desc:"Multi-source go/no-go — Jira P0s, risk log, stakeholder coverage, OKR contribution.",chips:["Jira","Risks","Stakeholders","OKRs"],action:()=>setPage("release"),lbl:"▶ Open Agent",run:null},
-                    {ic:"🔍",col:"ic-blu",name:"Research Agents",trig:"On demand",desc:"3 parallel agents (Competitive, Market, Customer) with live web search — synthesizes investment brief.",chips:["Web Search","Competitive","Market","Customer"],action:()=>setPage("research"),lbl:"▶ Open Agent",run:null},
-                    {ic:"📄",col:"ic-pur",name:"Autonomous PRD Agent",trig:"On demand",desc:"Searches web, checks OKRs, reads competitive intel, generates PRD with acceptance criteria and success metrics.",chips:["Web Search","OKRs","Jira","Knowledge"],action:()=>setPage("prd"),lbl:"▶ Open Agent",run:null},
-                    {ic:"🙋",col:"ic-grn",name:"Meeting Scribe",trig:"After every meeting",desc:"Paste transcript → extracts decisions, action items with owners and due dates, creates tasks automatically.",chips:["Transcript","Tasks","Calendar"],action:()=>setPage("meetings"),lbl:"▶ Go to Meetings",run:null},
-                    {ic:"🧠",col:"ic-blu",name:"Prioritization Engine",trig:"Sprint planning",desc:"RICE-scores your backlog against OKRs and surfaces top items with reasoning per item.",chips:["Backlog","OKRs","RICE"],action:runPrio,lbl:"⚡ Score Backlog",run:"prioritization"},
-                    {ic:"📊",col:"ic-grn",name:"Weekly Digest",trig:"Monday 8am",desc:"Aggregates live project data, tasks and meetings into an executive Monday briefing.",chips:["Projects","Tasks","Meetings"],action:runDigest,lbl:"⚡ Generate Digest",run:"weekly-digest"},
-                    {ic:"🔔",col:"ic-amb",name:"Risk Monitor",trig:"Continuous",desc:"Scans all projects for risk signals, flags blockers, creates alert tasks automatically.",chips:["Projects","Sprints","Blockers"],action:runRisk,lbl:"⚡ Run Scan",run:"risk-monitor"},
+                    {ic:"🎙️",col:"ic-pur",name:"Meeting Scribe",trig:"After every meeting",desc:"Extracts decisions, action items with owners and due dates, and pushes to To-Do automatically.",chips:["Transcript","Calendar","Jira"],action:()=>setPage("meetings"),lbl:"▶ Go to Meetings",run:null},
+                    {ic:"🧠",col:"ic-blu",name:"Prioritization",trig:"Sprint planning",desc:"RICE-scores your backlog against Q2 OKRs. Surfaces top items with reasoning per item.",chips:["Backlog","OKRs","Capacity"],action:runPrio,lbl:`⚡ Score (${projects.length})`,run:"prioritization"},
+                    {ic:"📊",col:"ic-grn",name:"Weekly Digest",trig:"Every Monday 8am",desc:"Aggregates live project data, tasks and meetings into an executive Monday briefing.",chips:["Projects","Tasks","Meetings"],action:runDigest,lbl:"⚡ Generate Digest",run:"weekly-digest"},
+                    {ic:"🔔",col:"ic-amb",name:"Risk Monitor",trig:"Continuous",desc:"Scans all projects for risk signals, flags blockers, creates alert tasks automatically.",chips:["Projects","Sprints","Blockers"],action:runRisk,lbl:"⚡ Run Risk Scan",run:"risk-monitor"},
                     {ic:"📝",col:"ic-blu",name:"Stakeholder Update",trig:"Every Friday 3pm",desc:"Writes a polished status email tailored to the recipient from live project data.",chips:["Projects","Tasks","OKRs"],action:null,lbl:"⚡ Draft Update",run:"stakeholder-update"},
+                    {ic:"📄",col:"ic-pur",name:"PRD Agent",trig:"On demand",desc:"Takes focus group transcripts, clusters themes, writes structured PRD with user stories.",chips:["Transcripts","Surveys","Research"],action:()=>setPage("prd"),lbl:"▶ Go to PRD Agent",run:null},
                   ].map((ag,i)=>(
                     <div key={i} className="agc">
                       <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:10}}>
@@ -2914,56 +2826,47 @@ export default function PMDashboard(){
                     </div>
                   ))}
                 </div>
+                <div className="card">
+                  <div className="ch"><div className="ct">Stack</div></div>
+                  <div className="cb"><div className="g3" style={{gap:8}}>{[["LLM","Claude API (Sonnet)"],["Orchestration","Supabase Edge Functions"],["Database","Supabase Postgres"],["Auth","Supabase Auth"],["Realtime","Supabase Realtime"],["Integrations","Jira · Gmail · GCal"]].map(([l,v])=>(<div key={l} style={{background:"var(--surf2)",border:"1px solid var(--bdr)",borderRadius:8,padding:"10px 12px"}}><div className="section-lbl" style={{marginBottom:3}}>{l}</div><div className="acc" style={{fontWeight:500,fontSize:12}}>{v}</div></div>))}</div></div>
+                </div>
               </div>
             )}
 
-
-            {/* TOKEN ANALYTICS */}
-            {page==="tokens"&&(
-              <div className="col">
-                {tokenLoading&&<div className="loading"><div className="spin"/>Loading token data...</div>}
-                {budgetStatus&&budgetStatus.budget_status!=="ok"&&(
-                  <div className={`infobox ${budgetStatus.budget_status==="critical"?"ib-red":"ib-amb"}`} style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
-                    <span>{budgetStatus.budget_status==="critical"?"🚨 Daily budget exceeded":"⚠️ Approaching budget"} · Today: ${parseFloat(budgetStatus.today_cost||0).toFixed(4)} · Week: ${parseFloat(budgetStatus.week_cost||0).toFixed(4)}</span>
-                  </div>
-                )}
-                {costAnomalies.length>0&&<div className="infobox ib-amb" style={{fontSize:11}}>🔍 Cost anomaly: {costAnomalies[0].multiplier}x above 7-day avg on {costAnomalies[0].date}</div>}
-                {!tokenLoading&&(()=>{
-                  const totalTokens=tokenUsage.reduce((s:number,r:any)=>s+(r.total_tokens||0),0);
-                  const totalCost=tokenUsage.reduce((s:number,r:any)=>s+(parseFloat(r.estimated_cost)||0),0);
-                  const todayCost=tokenRollup.filter((r:any)=>r.date===new Date().toISOString().split("T")[0]).reduce((s:number,r:any)=>s+(parseFloat(r.total_cost)||0),0);
-                  const agentSet=new Set(tokenUsage.map((r:any)=>r.agent_name));
-                  return(
-                    <div className="g4">
-                      {[{v:totalTokens.toLocaleString(),l:"Total Tokens",c:"var(--acc)"},{v:`$${totalCost.toFixed(4)}`,l:"Total Cost (USD)",c:"var(--grn)"},{v:`$${todayCost.toFixed(4)}`,l:"Cost Today",c:"var(--amb)"},{v:agentSet.size.toString(),l:"Agents Tracked",c:"var(--pur)"}].map(({v,l,c})=>(
-                        <div key={l} className="kpi"><div className="kpi-v" style={{color:c}}>{v}</div><div className="kpi-l">{l}</div></div>
-                      ))}
+            {/* PRD */}
+            {page==="prd"&&(
+              <div className="g2">
+                <div className="col">
+                  <div className="card">
+                    <div className="ch"><div className="ct">Input — Research / Focus Group Data</div></div>
+                    <div className="cb">
+                      {prdStatus!=="done"?(<>
+                        <div className="upload-z" style={{marginBottom:12}} onClick={()=>document.getElementById("pf")?.click()}>
+                          <div style={{fontSize:28,marginBottom:8}}>📎</div>
+                          <div style={{fontFamily:"Syne",fontWeight:700,fontSize:13,marginBottom:3}}>Drop files or click to upload</div>
+                          <div style={{fontSize:12,color:"var(--mut)"}}>Supports .txt .csv .docx .pdf</div>
+                          <input id="pf" type="file" style={{display:"none"}} onChange={async(e:any)=>{const f=e.target.files[0];if(f){const t=await f.text();setPrdInput(t);}}}/>
+                        </div>
+                        <div className="section-lbl">Or paste raw text</div>
+                        <textarea className="input" value={prdInput} onChange={e=>setPrdInput(e.target.value)} placeholder={"Paste focus group transcript or survey results...\n\nExample:\n\"Participant 3: Onboarding took 45 minutes...\"\n\"Survey: 18 of 32 said onboarding was #1 pain point...\""} style={{minHeight:180,resize:"vertical" as any,marginBottom:10}}/>
+                        <button onClick={runPRD} disabled={!prdInput.trim()||prdStatus==="processing"} style={{width:"100%",padding:"10px 0",background:prdInput.trim()?"var(--acc)":"var(--bdr)",color:prdInput.trim()?"#000":"var(--mut)",border:"none",borderRadius:8,fontFamily:"Syne",fontWeight:700,fontSize:13,cursor:prdInput.trim()?"pointer":"default"}}>{prdStatus==="processing"?"Analysing...":"⚡ Generate PRD"}</button>
+                        {prdStatus==="processing"&&<div style={{display:"flex",alignItems:"center",gap:10,marginTop:12,fontSize:12,color:"var(--mut)"}}><div className="spin"/>Clustering themes, extracting pain points, writing PRD...</div>}
+                      </>):(<div><div style={{fontSize:12,color:"var(--grn)",marginBottom:10,fontFamily:"DM Mono"}}>✓ Processed {prdInput.split(' ').length} words</div><div style={{display:"flex",flexWrap:"wrap",gap:5,marginBottom:14}}>{prdResult.themes.map((t:any,i:number)=><span key={i} className="tag tag-blu">{t.lbl} <span style={{opacity:0.6}}>×{t.n}</span></span>)}</div><button onClick={()=>{setPrdStatus("idle");setPrdInput("");setPrdResult(null);}} style={{fontSize:11,fontFamily:"DM Mono",padding:"4px 10px",border:"1px solid var(--bdr)",borderRadius:6,background:"transparent",color:"var(--mut)",cursor:"pointer"}}>↺ New input</button></div>)}
                     </div>
-                  );
-                })()}
-                <div className="g2">
-                  <div className="card">
-                    <div className="ch"><div className="ct">Top Agents · Token Usage</div></div>
-                    {tokenUsage.length===0?<div className="empty">No token data yet.</div>:(()=>{
-                      const byAgent=tokenUsage.reduce((acc:any,r:any)=>{const k=r.agent_name;if(!acc[k])acc[k]={agent:k,calls:0,tokens:0,cost:0};acc[k].calls++;acc[k].tokens+=(r.total_tokens||0);acc[k].cost+=(parseFloat(r.estimated_cost)||0);return acc;},{});
-                      const sorted=Object.values(byAgent).sort((a:any,b:any)=>b.tokens-a.tokens);
-                      const max=(sorted[0] as any)?.tokens||1;
-                      return(<div className="cb0" style={{padding:"4px 16px"}}>{sorted.map((ag:any)=>(<div key={ag.agent} style={{display:"flex",alignItems:"center",gap:10,padding:"9px 0",borderBottom:"1px solid var(--bdr)"}}><span style={{width:140,fontSize:12,flexShrink:0}}>{ag.agent}</span><div style={{flex:1,height:6,background:"var(--bdr2)",borderRadius:3,overflow:"hidden"}}><div style={{height:"100%",width:`${(ag.tokens/max)*100}%`,background:"var(--acc)",borderRadius:3}}/></div><span className="mono" style={{fontSize:10,color:"var(--acc)",width:70,textAlign:"right"}}>{ag.tokens.toLocaleString()}</span><span className="mono" style={{fontSize:10,color:"var(--grn)",width:55,textAlign:"right"}}>${ag.cost.toFixed(4)}</span></div>))}</div>);
-                    })()}
-                  </div>
-                  <div className="card">
-                    <div className="ch"><div className="ct">Daily Cost Trend</div></div>
-                    {tokenRollup.length===0?<div className="empty">No rollup data yet.</div>:(()=>{
-                      const byDate=tokenRollup.reduce((acc:any,r:any)=>{const d=r.date;if(!acc[d])acc[d]={date:d,cost:0,tokens:0};acc[d].cost+=(parseFloat(r.total_cost)||0);acc[d].tokens+=(r.total_tokens||0);return acc;},{});
-                      const days=Object.values(byDate).sort((a:any,b:any)=>a.date.localeCompare(b.date)).slice(-14);
-                      const maxCost=Math.max(...days.map((d:any)=>d.cost),0.001);
-                      return(<div className="cb0" style={{padding:"4px 16px"}}>{days.map((d:any)=>(<div key={d.date} style={{display:"flex",alignItems:"center",gap:10,padding:"7px 0",borderBottom:"1px solid var(--bdr)"}}><span className="mono dim" style={{fontSize:10,width:80,flexShrink:0}}>{new Date(d.date).toLocaleDateString("en-US",{month:"short",day:"numeric"})}</span><div style={{flex:1,height:6,background:"var(--bdr2)",borderRadius:3,overflow:"hidden"}}><div style={{height:"100%",width:`${(d.cost/maxCost)*100}%`,background:"var(--grn)",borderRadius:3}}/></div><span className="mono" style={{fontSize:10,color:"var(--grn)",width:60,textAlign:"right"}}>${d.cost.toFixed(4)}</span></div>))}</div>);
-                    })()}
                   </div>
                 </div>
-                <div className="card">
-                  <div className="ch"><div className="ct">Workflow Runs</div><button className="btn btn-sm" onClick={loadTokens}>⟳</button></div>
-                  {tokenWorkflows.length===0?<div className="empty">No workflow runs yet.</div>:(<><div className="th-row" style={{gridTemplateColumns:"1fr 80px 80px 80px 60px 90px"}}><span>Workflow</span><span>Agents</span><span>Tokens</span><span>Cost</span><span>Status</span><span>Started</span></div>{tokenWorkflows.map((wf:any)=>(<div key={wf.id} className="tr" style={{gridTemplateColumns:"1fr 80px 80px 80px 60px 90px"}}><div style={{fontWeight:500,fontSize:12}}>{wf.workflow_name}</div><span className="mono dim" style={{fontSize:11}}>{wf.agent_count}</span><span className="mono acc" style={{fontSize:11}}>{(wf.total_tokens||0).toLocaleString()}</span><span className="mono" style={{fontSize:11,color:"var(--grn)"}}>${parseFloat(wf.total_cost||0).toFixed(4)}</span><span className={`tag ${wf.status==="completed"?"tag-grn":wf.status==="failed"?"tag-red":"tag-amb"}`} style={{fontSize:9}}>{wf.status}</span><span className="mono dim" style={{fontSize:10}}>{wf.started_at?new Date(wf.started_at).toLocaleDateString("en-US",{month:"short",day:"numeric"}):"—"}</span></div>))}</>)}
+                <div>
+                  {!prdResult&&prdStatus!=="processing"&&<div className="card" style={{height:"100%",display:"flex",alignItems:"center",justifyContent:"center",flexDirection:"column",gap:10,opacity:0.4}}><div style={{fontSize:36}}>📄</div><div style={{fontFamily:"Syne",fontWeight:700,fontSize:13}}>PRD appears here</div></div>}
+                  {prdStatus==="processing"&&<div className="card" style={{height:"100%",display:"flex",alignItems:"center",justifyContent:"center",flexDirection:"column",gap:12}}><div className="spin" style={{width:32,height:32,borderWidth:3}}/><div style={{fontFamily:"Syne",fontWeight:700}}>Writing PRD...</div></div>}
+                  {prdResult&&(<div className="card">
+                    <div className="ch"><div><div style={{fontFamily:"Syne",fontWeight:800,fontSize:14}}>Product Requirements Document</div><div className="mono dim" style={{fontSize:10}}>AI-generated · {new Date().toLocaleDateString()} · Review before sharing</div></div><span className="tag tag-grn">Draft</span></div>
+                    <div className="prd-sec"><div className="prd-lbl">Problem Statement</div><p style={{fontSize:12,lineHeight:1.7}}>{prdResult.problem}</p></div>
+                    <div className="prd-sec"><div className="prd-lbl">User Stories</div>{prdResult.stories.map((s:string,i:number)=><div key={i} className="story">{s}</div>)}</div>
+                    <div className="prd-sec"><div className="prd-lbl">Acceptance Criteria</div>{prdResult.criteria.map((c:string,i:number)=><div key={i} style={{display:"flex",gap:7,fontSize:12,marginBottom:4,alignItems:"flex-start"}}><span style={{color:"var(--grn)",flexShrink:0}}>✓</span>{c}</div>)}</div>
+                    <div className="prd-sec"><div className="prd-lbl">Success Metrics</div>{prdResult.metrics.map((m:string,i:number)=><div key={i} style={{fontSize:12,padding:"3px 0",borderBottom:i<prdResult.metrics.length-1?"1px solid var(--bdr2)":"none",display:"flex",gap:7}}><div style={{width:3,height:3,borderRadius:"50%",background:"var(--acc)",flexShrink:0,marginTop:7}}/>{m}</div>)}</div>
+                    {prdResult.questions?.length>0&&<div className="prd-sec"><div className="prd-lbl">Open Questions</div>{prdResult.questions.map((q:string,i:number)=><div key={i} style={{fontSize:12,padding:"3px 0",color:"var(--amb)",display:"flex",gap:6}}><span>?</span>{q}</div>)}</div>}
+                    <div style={{padding:"11px 16px",borderTop:"1px solid var(--bdr)"}}><button className="xbtn" onClick={()=>{const md=`# PRD\n\n## Problem\n${prdResult.problem}\n\n## User Stories\n${prdResult.stories.map((s:string)=>`- ${s}`).join("\n")}\n\n## Acceptance Criteria\n${prdResult.criteria.map((c:string)=>`- [ ] ${c}`).join("\n")}\n\n## Success Metrics\n${prdResult.metrics.map((m:string)=>`- ${m}`).join("\n")}`;navigator.clipboard.writeText(md).then(()=>alert("Copied!"));}}>Copy as Markdown</button></div>
+                  </div>)}
                 </div>
               </div>
             )}
@@ -2972,7 +2875,7 @@ export default function PMDashboard(){
             {page==="stakeholders"&&(
               <div className="col">
                 <div style={{display:"flex",gap:8,flexWrap:"wrap",alignItems:"center"}}>
-                  {shProjects.map(p=><button key={p} onClick={()=>setShFilter(String(p))} style={{fontFamily:"DM Mono",fontSize:10,padding:"4px 12px",borderRadius:100,cursor:"pointer",border:`1px solid ${shFilter===p?"var(--acc)":"var(--bdr)"}`,background:shFilter===p?"rgba(0,212,255,0.07)":"var(--surf)",color:shFilter===p?"var(--acc)":"var(--mut)"}}>{p}</button>)}
+                  {shProjects.map(p=><button key={p as string} onClick={()=>setShFilter(p as string)} style={{fontFamily:"DM Mono",fontSize:10,padding:"4px 12px",borderRadius:100,cursor:"pointer",border:`1px solid ${shFilter===p?"var(--acc)":"var(--bdr)"}`,background:shFilter===p?"rgba(0,212,255,0.07)":"var(--surf)",color:shFilter===p?"var(--acc)":"var(--mut)"}}>{p}</button>)}
                   <div style={{marginLeft:"auto",display:"flex",gap:8}}>
                     <span style={{fontFamily:"DM Mono",fontSize:10,padding:"4px 10px",borderRadius:100,background:"var(--surf)",border:"1px solid var(--bdr)",color:"var(--red)"}}>{filteredSh.filter((s:any)=>contactAge(s.last_contacted_at)==="stale").length} overdue</span>
                     <button className="btn btn-primary btn-sm" onClick={openAddSh}>+ Add</button>
@@ -3099,16 +3002,16 @@ export default function PMDashboard(){
             <div className="form-row" style={{gridColumn:"1/-1"}}><label className="form-label">Project Name</label><input className="input" value={projForm.name} onChange={e=>setProjForm(p=>({...p,name:e.target.value}))} autoFocus placeholder="e.g. Mobile Onboarding V2"/></div>
             <div className="form-row"><label className="form-label">Owner</label><input className="input" value={projForm.owner} onChange={e=>setProjForm(p=>({...p,owner:e.target.value}))} placeholder="Ana + Raj"/></div>
             <div className="form-row"><label className="form-label">Status</label><select className="input select" value={projForm.status} onChange={e=>setProjForm(p=>({...p,status:e.target.value}))}><option value="planning">Planning</option><option value="on-track">On Track</option><option value="at-risk">At Risk</option><option value="delayed">Delayed</option></select></div>
-            <div className="form-row"><label className="form-label">Progress (%)</label><input className="input" type="number" min="0" max="100" value={projForm.progress} onChange={e=>setProjForm(p=>({...p,progress:e.target.value}))}/></div>
+            <div className="form-row"><label className="form-label">Progress (%)</label><input className="input" type="number" min="0" max="100" value={projForm.progress} onChange={e=>setProjForm(p=>({...p,progress:e.target.value as any}))}/></div>
             <div className="form-row"><label className="form-label">Priority</label><select className="input select" value={projForm.priority} onChange={e=>setProjForm(p=>({...p,priority:e.target.value}))}><option value="high">High</option><option value="med">Medium</option><option value="low">Low</option></select></div>
             <div className="form-row"><label className="form-label">Due Date</label><input className="input" type="date" value={projForm.due_date} onChange={e=>setProjForm(p=>({...p,due_date:e.target.value}))}/></div>
-            <div className="form-row" style={{gridColumn:"1/-1"}}><label className="form-label">User Research Summary (optional)</label><textarea className="input" value={projForm.research_summary} onChange={e=>setProjForm(p=>({...p,research_summary:e.target.value}))} style={{minHeight:70,resize:"vertical"}} placeholder="Key user research findings, pain points, themes..."/></div>
-            <div className="form-row" style={{gridColumn:"1/-1"}}><label className="form-label">Competitive Intelligence Summary (optional)</label><textarea className="input" value={projForm.competitive_summary} onChange={e=>setProjForm(p=>({...p,competitive_summary:e.target.value}))} style={{minHeight:70,resize:"vertical"}} placeholder="Competitor positioning, feature gaps, market signals..."/></div>
+            <div className="form-row" style={{gridColumn:"1/-1"}}><label className="form-label">User Research Summary (optional)</label><textarea className="input" value={projForm.research_summary} onChange={e=>setProjForm(p=>({...p,research_summary:e.target.value}))} style={{minHeight:70,resize:"vertical" as any}} placeholder="Key user research findings, pain points, themes..."/></div>
+            <div className="form-row" style={{gridColumn:"1/-1"}}><label className="form-label">Competitive Intelligence Summary (optional)</label><textarea className="input" value={projForm.competitive_summary} onChange={e=>setProjForm(p=>({...p,competitive_summary:e.target.value}))} style={{minHeight:70,resize:"vertical" as any}} placeholder="Competitor positioning, feature gaps, market signals..."/></div>
           </div>
           <div className="form-actions"><button className="btn" onClick={()=>setShowAddProj(false)}>Cancel</button><button className="btn btn-primary" onClick={saveProject}>{editProj?"Save Changes":"Add Project"}</button></div>
         </Modal>)}
 
-        {showAddMeet&&(<Modal title="New Meeting" onClose={()=>setShowAddMeet(false)} wide><div className="form-row"><label className="form-label">Title</label><input className="input" value={meetForm.title} onChange={e=>setMeetForm(p=>({...p,title:e.target.value}))} autoFocus placeholder="Sprint Planning — Mobile Team"/></div><div className="form-row"><label className="form-label">Date & Time (optional)</label><input className="input" type="datetime-local" value={meetForm.meeting_time} onChange={e=>setMeetForm(p=>({...p,meeting_time:e.target.value}))}/></div><div className="form-row"><label className="form-label">Paste Transcript</label><textarea className="input" value={meetForm.raw_transcript} onChange={e=>setMeetForm(p=>({...p,raw_transcript:e.target.value}))} placeholder="Paste transcript here. AI will extract action items, decisions and owners automatically..." style={{minHeight:160,resize:"vertical"}}/></div><div className="form-actions"><button className="btn" onClick={()=>setShowAddMeet(false)}>Cancel</button><button className="btn btn-primary" onClick={saveMeeting} disabled={meetProcessing}>{meetProcessing?<><span className="spin" style={{width:13,height:13,borderWidth:1.5,display:"inline-block",verticalAlign:"middle",marginRight:6}}/>Processing...</>:meetForm.raw_transcript.trim()?"Save & Extract with AI":"Save Meeting"}</button></div></Modal>)}
+        {showAddMeet&&(<Modal title="New Meeting" onClose={()=>setShowAddMeet(false)} wide><div className="form-row"><label className="form-label">Title</label><input className="input" value={meetForm.title} onChange={e=>setMeetForm(p=>({...p,title:e.target.value}))} autoFocus placeholder="Sprint Planning — Mobile Team"/></div><div className="form-row"><label className="form-label">Date & Time (optional)</label><input className="input" type="datetime-local" value={meetForm.meeting_time} onChange={e=>setMeetForm(p=>({...p,meeting_time:e.target.value}))}/></div><div className="form-row"><label className="form-label">Paste Transcript</label><textarea className="input" value={meetForm.raw_transcript} onChange={e=>setMeetForm(p=>({...p,raw_transcript:e.target.value}))} placeholder="Paste transcript here. AI will extract action items, decisions and owners automatically..." style={{minHeight:160,resize:"vertical" as any}}/></div><div className="form-actions"><button className="btn" onClick={()=>setShowAddMeet(false)}>Cancel</button><button className="btn btn-primary" onClick={saveMeeting} disabled={meetProcessing}>{meetProcessing?<><span className="spin" style={{width:13,height:13,borderWidth:1.5,display:"inline-block",verticalAlign:"middle",marginRight:6}}/>Processing...</>:meetForm.raw_transcript.trim()?"Save & Extract with AI":"Save Meeting"}</button></div></Modal>)}
 
         {editingAction&&(<Modal title="Edit Action Item" onClose={()=>setEditingAction(null)}><div className="form-row"><label className="form-label">Action</label><input className="input" value={actionForm.text} onChange={e=>setActionForm(p=>({...p,text:e.target.value}))} autoFocus/></div><div className="form-grid"><div className="form-row"><label className="form-label">Owner</label><input className="input" value={actionForm.owner} onChange={e=>setActionForm(p=>({...p,owner:e.target.value}))} placeholder="Person responsible"/></div><div className="form-row"><label className="form-label">Priority</label><select className="input select" value={actionForm.priority} onChange={e=>setActionForm(p=>({...p,priority:e.target.value}))}><option value="high">High</option><option value="med">Medium</option><option value="low">Low</option></select></div><div className="form-row"><label className="form-label">Due Date</label><input className="input" type="date" value={actionForm.due_date} onChange={e=>setActionForm(p=>({...p,due_date:e.target.value}))}/></div></div><div className="form-actions"><button className="btn" onClick={()=>setEditingAction(null)}>Cancel</button><button className="btn btn-primary" onClick={saveActionEdit}>Save</button></div></Modal>)}
 
@@ -3116,7 +3019,419 @@ export default function PMDashboard(){
 
         {showAddSh&&(<Modal title={editSh?"Edit Stakeholder":"Add Stakeholder"} onClose={()=>setShowAddSh(false)}><div className="form-grid"><div className="form-row"><label className="form-label">Full Name</label><input className="input" value={shForm.name} onChange={e=>setShForm(p=>({...p,name:e.target.value}))} autoFocus placeholder="Sarah Mitchell"/></div><div className="form-row"><label className="form-label">Role</label><input className="input" value={shForm.role} onChange={e=>setShForm(p=>({...p,role:e.target.value}))} placeholder="Chief Product Officer"/></div><div className="form-row" style={{gridColumn:"1/-1"}}><label className="form-label">Email</label><input className="input" type="email" value={shForm.email} onChange={e=>setShForm(p=>({...p,email:e.target.value}))} placeholder="s.mitchell@company.com"/></div><div className="form-row"><label className="form-label">Type</label><select className="input select" value={shForm.type} onChange={e=>setShForm(p=>({...p,type:e.target.value}))}>{["Internal — Executive","Internal — Engineering","Internal — Design","Internal — GTM","Internal — ML","External — Client"].map(t=><option key={t}>{t}</option>)}</select></div><div className="form-row"><label className="form-label">Influence (1–5)</label><select className="input select" value={shForm.influence} onChange={e=>setShForm(p=>({...p,influence:parseInt(e.target.value)}))}>{[1,2,3,4,5].map(n=><option key={n} value={n}>{n}</option>)}</select></div><div className="form-row"><label className="form-label">Color</label><div style={{display:"flex",gap:6,flexWrap:"wrap"}}>{["#00d4ff","#7c3aed","#10b981","#f59e0b","#ef4444","#ec4899"].map(c=><div key={c} onClick={()=>setShForm(p=>({...p,color:c}))} style={{width:22,height:22,borderRadius:6,background:c,cursor:"pointer",border:shForm.color===c?"2px solid #fff":"2px solid transparent"}}/>)}</div></div></div><div className="form-actions"><button className="btn" onClick={()=>setShowAddSh(false)}>Cancel</button><button className="btn btn-primary" onClick={saveSh}>{editSh?"Save Changes":"Add Stakeholder"}</button></div></Modal>)}
 
-        {showCreateJira&&(<Modal title="Create Jira Issue" onClose={()=>setShowCreateJira(false)}><div className="form-grid"><div className="form-row" style={{gridColumn:"1/-1"}}><label className="form-label">Summary</label><input className="input" value={jiraForm.summary} onChange={e=>setJiraForm(p=>({...p,summary:e.target.value}))} autoFocus placeholder="Issue summary..."/></div><div className="form-row"><label className="form-label">Project Key</label><input className="input" value={jiraForm.projectKey} onChange={e=>setJiraForm(p=>({...p,projectKey:e.target.value}))} placeholder="PM"/></div><div className="form-row"><label className="form-label">Issue Type</label><select className="input select" value={jiraForm.issueType} onChange={e=>setJiraForm(p=>({...p,issueType:e.target.value}))}><option>Task</option><option>Story</option><option>Bug</option><option>Epic</option></select></div><div className="form-row"><label className="form-label">Priority</label><select className="input select" value={jiraForm.priority} onChange={e=>setJiraForm(p=>({...p,priority:e.target.value}))}><option value="high">High</option><option value="med">Medium</option><option value="low">Low</option></select></div><div className="form-row" style={{gridColumn:"1/-1"}}><label className="form-label">Description</label><textarea className="input" value={jiraForm.description} onChange={e=>setJiraForm(p=>({...p,description:e.target.value}))} style={{minHeight:80,resize:"vertical"}} placeholder="Describe the issue..."/></div></div><div className="form-actions"><button className="btn" onClick={()=>setShowCreateJira(false)}>Cancel</button><button className="btn btn-primary" onClick={createJira} disabled={syncingInt==="jira-c"}>{syncingInt==="jira-c"?"Creating...":"Create in Jira"}</button></div></Modal>)}
+        {showCreateJira&&(<Modal title="Create Jira Issue" onClose={()=>setShowCreateJira(false)}><div className="form-grid"><div className="form-row" style={{gridColumn:"1/-1"}}><label className="form-label">Summary</label><input className="input" value={jiraForm.summary} onChange={e=>setJiraForm(p=>({...p,summary:e.target.value}))} autoFocus placeholder="Issue summary..."/></div><div className="form-row"><label className="form-label">Project Key</label><input className="input" value={jiraForm.projectKey} onChange={e=>setJiraForm(p=>({...p,projectKey:e.target.value}))} placeholder="PM"/></div><div className="form-row"><label className="form-label">Issue Type</label><select className="input select" value={jiraForm.issueType} onChange={e=>setJiraForm(p=>({...p,issueType:e.target.value}))}><option>Task</option><option>Story</option><option>Bug</option><option>Epic</option></select></div><div className="form-row"><label className="form-label">Priority</label><select className="input select" value={jiraForm.priority} onChange={e=>setJiraForm(p=>({...p,priority:e.target.value}))}><option value="high">High</option><option value="med">Medium</option><option value="low">Low</option></select></div><div className="form-row" style={{gridColumn:"1/-1"}}><label className="form-label">Description</label><textarea className="input" value={jiraForm.description} onChange={e=>setJiraForm(p=>({...p,description:e.target.value}))} style={{minHeight:80,resize:"vertical" as any}} placeholder="Describe the issue..."/></div></div><div className="form-actions"><button className="btn" onClick={()=>setShowCreateJira(false)}>Cancel</button><button className="btn btn-primary" onClick={createJira} disabled={syncingInt==="jira-c"}>{syncingInt==="jira-c"?"Creating...":"Create in Jira"}</button></div></Modal>)}
+
+        {showAddCal&&(<Modal title="Add Calendar Event" onClose={()=>setShowAddCal(false)}><div className="form-grid"><div className="form-row" style={{gridColumn:"1/-1"}}><label className="form-label">Title</label><input className="input" value={calForm.title} onChange={e=>setCalForm(p=>({...p,title:e.target.value}))} autoFocus placeholder="Sprint Planning — Mobile Team"/></div><div className="form-row"><label className="form-label">Start Time</label><input className="input" type="time" value={calForm.startTime} onChange={e=>setCalForm(p=>({...p,startTime:e.target.value}))}/></div><div className="form-row"><label className="form-label">End Time</label><input className="input" type="time" value={calForm.endTime} onChange={e=>setCalForm(p=>({...p,endTime:e.target.value}))}/></div><div className="form-row" style={{gridColumn:"1/-1"}}><label className="form-label">Attendees (comma-separated)</label><input className="input" value={calForm.attendees} onChange={e=>setCalForm(p=>({...p,attendees:e.target.value}))} placeholder="ana@company.com, chen@company.com"/></div><div className="form-row" style={{gridColumn:"1/-1"}}><label className="form-label">Description</label><input className="input" value={calForm.description} onChange={e=>setCalForm(p=>({...p,description:e.target.value}))} placeholder="Agenda or context..."/></div></div><div style={{fontSize:11,color:"var(--mut)"}}>A Google Meet link will be auto-generated.</div><div className="form-actions"><button className="btn" onClick={()=>setShowAddCal(false)}>Cancel</button><button className="btn btn-primary" onClick={createCalEvent} disabled={syncingInt==="cal-create"}>{syncingInt==="cal-create"?"Creating...":"Create Event + Meet Link"}</button></div></Modal>)}
+
+        {showAddMoscow&&(<Modal title="Add MoSCoW Item" onClose={()=>setShowAddMoscow(false)}><div className="form-row"><label className="form-label">Feature / Initiative</label><input className="input" value={moscowForm.title} onChange={e=>setMoscowForm(p=>({...p,title:e.target.value}))} autoFocus placeholder="e.g. Real-time notifications"/></div><div className="form-grid"><div className="form-row"><label className="form-label">Bucket</label><select className="input select" value={moscowForm.bucket} onChange={e=>setMoscowForm(p=>({...p,bucket:e.target.value}))}><option value="must">Must Have</option><option value="should">Should Have</option><option value="could">Could Have</option><option value="wont">Won't Have</option></select></div><div className="form-row"><label className="form-label">Project</label><select className="input select" value={moscowForm.project} onChange={e=>setMoscowForm(p=>({...p,project:e.target.value}))}><option value="">All</option>{projects.map(p=><option key={p.id} value={p.name}>{p.name}</option>)}</select></div></div><div className="form-actions"><button className="btn" onClick={()=>setShowAddMoscow(false)}>Cancel</button><button className="btn btn-primary" onClick={async()=>{if(!moscowForm.title.trim())return;await supabase.from("moscow_items").insert({...moscowForm,user_id:user?.id}).catch(()=>{});setShowAddMoscow(false);setMoscowForm({title:"",bucket:"must",project:""});loadMoscow();}}>Add Item</button></div></Modal>)}
+
+        {showAddRoadmap&&(<Modal title="Add Initiative" onClose={()=>setShowAddRoadmap(false)}><div className="form-row"><label className="form-label">Title</label><input className="input" value={rmForm.title} onChange={e=>setRmForm(p=>({...p,title:e.target.value}))} autoFocus placeholder="e.g. Mobile App v2"/></div><div className="form-grid"><div className="form-row"><label className="form-label">Project</label><select className="input select" value={rmForm.project} onChange={e=>setRmForm(p=>({...p,project:e.target.value}))}><option value="">None</option>{projects.map(p=><option key={p.id} value={p.name}>{p.name}</option>)}</select></div><div className="form-row"><label className="form-label">Color</label><div style={{display:"flex",gap:6,paddingTop:4}}>{["#00d4ff","#7c3aed","#10b981","#f59e0b","#ef4444"].map(c=><div key={c} onClick={()=>setRmForm(p=>({...p,color:c}))} style={{width:24,height:24,borderRadius:6,background:c,cursor:"pointer",border:rmForm.color===c?"2px solid #fff":"2px solid transparent"}}/>)}</div></div><div className="form-row"><label className="form-label">Start Quarter</label><select className="input select" value={rmForm.startQ} onChange={e=>setRmForm(p=>({...p,startQ:parseInt(e.target.value)}))}>{["Q1","Q2","Q3","Q4"].map((q,i)=><option key={q} value={i}>{q}</option>)}</select></div><div className="form-row"><label className="form-label">End Quarter</label><select className="input select" value={rmForm.endQ} onChange={e=>setRmForm(p=>({...p,endQ:parseInt(e.target.value)}))}>{["Q1","Q2","Q3","Q4"].map((q,i)=><option key={q} value={i}>{q}</option>)}</select></div></div><div className="form-actions"><button className="btn" onClick={()=>setShowAddRoadmap(false)}>Cancel</button><button className="btn btn-primary" onClick={saveRm}>Add Initiative</button></div></Modal>)}
+
+      </div>
+    </>
+  );
+}
+            {/* TOKEN ANALYTICS */}
+            {page==="tokens"&&(
+              <div className="col">
+                {tokenLoading&&<div className="loading"><div className="spin"/>Loading token data...</div>}
+
+                {/* KPI strip */}
+                {/* Budget alert */}
+                {budgetStatus&&budgetStatus.budget_status!=="ok"&&(
+                  <div className={`infobox ${budgetStatus.budget_status==="critical"?"ib-red":"ib-amb"}`} style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+                    <span>{budgetStatus.budget_status==="critical"?"🚨 Daily budget exceeded":"⚠️ Approaching daily budget"} · Today: ${parseFloat(budgetStatus.today_cost||0).toFixed(4)} · Week: ${parseFloat(budgetStatus.week_cost||0).toFixed(4)} · Month: ${parseFloat(budgetStatus.month_cost||0).toFixed(4)}</span>
+                  </div>
+                )}
+                {costAnomalies.length>0&&(
+                  <div className="infobox ib-amb" style={{fontSize:11}}>
+                    🔍 <strong style={{color:"var(--amb)"}}>Cost anomaly detected:</strong> {costAnomalies[0].multiplier}x above 7-day average on {costAnomalies[0].date} (${parseFloat(costAnomalies[0].day_cost).toFixed(4)} vs avg ${costAnomalies[0].rolling_avg_7d})
+                  </div>
+                )}
+                {!tokenLoading&&(()=>{
+                  const totalTokens=tokenUsage.reduce((s:number,r:any)=>s+(r.total_tokens||0),0);
+                  const totalCost=tokenUsage.reduce((s:number,r:any)=>s+(parseFloat(r.estimated_cost)||0),0);
+                  const todayCost=tokenRollup.filter((r:any)=>r.date===new Date().toISOString().split("T")[0]).reduce((s:number,r:any)=>s+(parseFloat(r.total_cost)||0),0);
+                  const agentSet=new Set(tokenUsage.map((r:any)=>r.agent_name));
+                  return(
+                    <div className="g4">
+                      {[
+                        {v:totalTokens.toLocaleString(),l:"Total Tokens",c:"var(--acc)"},
+                        {v:`$${totalCost.toFixed(4)}`,l:"Total Cost (USD)",c:"var(--grn)"},
+                        {v:`$${todayCost.toFixed(4)}`,l:"Cost Today",c:"var(--amb)"},
+                        {v:agentSet.size.toString(),l:"Agents Tracked",c:"var(--pur)"},
+                      ].map(({v,l,c})=>(
+                        <div key={l} className="kpi"><div className="kpi-v" style={{color:c}}>{v}</div><div className="kpi-l">{l}</div></div>
+                      ))}
+                    </div>
+                  );
+                })()}
+
+                <div className="g2">
+                  {/* Top agents */}
+                  <div className="card">
+                    <div className="ch"><div className="ct">Top Agents · Token Usage</div></div>
+                    {tokenUsage.length===0?<div className="empty">No token data yet. Run any agent to start tracking.</div>:(()=>{
+                      const byAgent=tokenUsage.reduce((acc:any,r:any)=>{
+                        const k=r.agent_name;
+                        if(!acc[k])acc[k]={agent:k,calls:0,tokens:0,cost:0};
+                        acc[k].calls++;acc[k].tokens+=(r.total_tokens||0);acc[k].cost+=(parseFloat(r.estimated_cost)||0);
+                        return acc;
+                      },{});
+                      const sorted=Object.values(byAgent).sort((a:any,b:any)=>b.tokens-a.tokens);
+                      const max=(sorted[0] as any)?.tokens||1;
+                      return(
+                        <div className="cb0" style={{padding:"4px 16px"}}>
+                          {sorted.map((ag:any)=>(
+                            <div key={ag.agent} style={{display:"flex",alignItems:"center",gap:10,padding:"9px 0",borderBottom:"1px solid var(--bdr)"}}>
+                              <span style={{width:140,fontSize:12,flexShrink:0}}>{ag.agent}</span>
+                              <div style={{flex:1,height:6,background:"var(--bdr2)",borderRadius:3,overflow:"hidden"}}>
+                                <div style={{height:"100%",width:`${(ag.tokens/max)*100}%`,background:"var(--acc)",borderRadius:3}}/>
+                              </div>
+                              <span className="mono" style={{fontSize:10,color:"var(--acc)",width:70,textAlign:"right"}}>{ag.tokens.toLocaleString()}</span>
+                              <span className="mono" style={{fontSize:10,color:"var(--grn)",width:55,textAlign:"right"}}>${ag.cost.toFixed(4)}</span>
+                              <span className="mono dim" style={{fontSize:10,width:35,textAlign:"right"}}>{ag.calls}x</span>
+                            </div>
+                          ))}
+                        </div>
+                      );
+                    })()}
+                  </div>
+
+                  {/* Daily trend */}
+                  <div className="card">
+                    <div className="ch"><div className="ct">Daily Cost Trend · Last 14 Days</div></div>
+                    {tokenRollup.length===0?<div className="empty">No rollup data yet.</div>:(()=>{
+                      const byDate=tokenRollup.reduce((acc:any,r:any)=>{
+                        const d=r.date;
+                        if(!acc[d])acc[d]={date:d,cost:0,tokens:0};
+                        acc[d].cost+=(parseFloat(r.total_cost)||0);acc[d].tokens+=(r.total_tokens||0);
+                        return acc;
+                      },{});
+                      const days=Object.values(byDate).sort((a:any,b:any)=>a.date.localeCompare(b.date)).slice(-14);
+                      const maxCost=Math.max(...days.map((d:any)=>d.cost),0.001);
+                      return(
+                        <div className="cb0" style={{padding:"4px 16px"}}>
+                          {days.map((d:any)=>(
+                            <div key={d.date} style={{display:"flex",alignItems:"center",gap:10,padding:"7px 0",borderBottom:"1px solid var(--bdr)"}}>
+                              <span className="mono dim" style={{fontSize:10,width:80,flexShrink:0}}>{new Date(d.date).toLocaleDateString("en-US",{month:"short",day:"numeric"})}</span>
+                              <div style={{flex:1,height:6,background:"var(--bdr2)",borderRadius:3,overflow:"hidden"}}>
+                                <div style={{height:"100%",width:`${(d.cost/maxCost)*100}%`,background:"var(--grn)",borderRadius:3}}/>
+                              </div>
+                              <span className="mono" style={{fontSize:10,color:"var(--grn)",width:60,textAlign:"right"}}>${d.cost.toFixed(4)}</span>
+                              <span className="mono dim" style={{fontSize:10,width:65,textAlign:"right"}}>{d.tokens.toLocaleString()}</span>
+                            </div>
+                          ))}
+                        </div>
+                      );
+                    })()}
+                  </div>
+                </div>
+
+                {/* Model breakdown */}
+                <div className="card">
+                  <div className="ch"><div className="ct">Model Breakdown</div></div>
+                  {tokenUsage.length===0?<div className="empty">No data yet.</div>:(()=>{
+                    const byModel=tokenUsage.reduce((acc:any,r:any)=>{
+                      const k=r.model||"unknown";
+                      if(!acc[k])acc[k]={model:k,calls:0,input:0,output:0,cost:0};
+                      acc[k].calls++;acc[k].input+=(r.input_tokens||0);acc[k].output+=(r.output_tokens||0);acc[k].cost+=(parseFloat(r.estimated_cost)||0);
+                      return acc;
+                    },{});
+                    const rows=Object.values(byModel).sort((a:any,b:any)=>b.cost-a.cost);
+                    return(
+                      <>
+                        <div className="th-row" style={{gridTemplateColumns:"1fr 60px 80px 80px 80px 80px"}}>
+                          <span>Model</span><span>Calls</span><span>Input tok</span><span>Output tok</span><span>Total tok</span><span>Cost USD</span>
+                        </div>
+                        {rows.map((m:any)=>(
+                          <div key={m.model} className="tr" style={{gridTemplateColumns:"1fr 60px 80px 80px 80px 80px"}}>
+                            <span className="tag tag-pur" style={{fontSize:9,width:"fit-content"}}>{m.model}</span>
+                            <span className="mono dim" style={{fontSize:11}}>{m.calls}</span>
+                            <span className="mono dim" style={{fontSize:11}}>{m.input.toLocaleString()}</span>
+                            <span className="mono dim" style={{fontSize:11}}>{m.output.toLocaleString()}</span>
+                            <span className="mono acc" style={{fontSize:11}}>{(m.input+m.output).toLocaleString()}</span>
+                            <span className="mono" style={{fontSize:11,color:"var(--grn)"}}>${m.cost.toFixed(4)}</span>
+                          </div>
+                        ))}
+                      </>
+                    );
+                  })()}
+                </div>
+
+                {/* Workflow runs */}
+                <div className="card">
+                  <div className="ch">
+                    <div className="ct">Workflow Runs · Orchestrated Calls</div>
+                    <button className="btn btn-sm" onClick={loadTokens}>⟳ Refresh</button>
+                  </div>
+                  {tokenWorkflows.length===0?<div className="empty">No workflow runs yet. Workflow tracking activates on Super Agent runs.</div>:(
+                    <>
+                      <div className="th-row" style={{gridTemplateColumns:"1fr 80px 80px 80px 60px 90px"}}>
+                        <span>Workflow</span><span>Agents</span><span>Tokens</span><span>Cost</span><span>Status</span><span>Started</span>
+                      </div>
+                      {tokenWorkflows.map((wf:any)=>(
+                        <div key={wf.id} className="tr" style={{gridTemplateColumns:"1fr 80px 80px 80px 60px 90px"}}>
+                          <div><div style={{fontWeight:500,fontSize:12}}>{wf.workflow_name}</div>{wf.triggered_by&&<span className="mono dim" style={{fontSize:9}}>{wf.triggered_by}</span>}</div>
+                          <span className="mono dim" style={{fontSize:11}}>{wf.agent_count}</span>
+                          <span className="mono acc" style={{fontSize:11}}>{(wf.total_tokens||0).toLocaleString()}</span>
+                          <span className="mono" style={{fontSize:11,color:"var(--grn)"}}>${parseFloat(wf.total_cost||0).toFixed(4)}</span>
+                          <span className={`tag ${wf.status==="completed"?"tag-grn":wf.status==="failed"?"tag-red":"tag-amb"}`} style={{fontSize:9}}>{wf.status}</span>
+                          <span className="mono dim" style={{fontSize:10}}>{wf.started_at?new Date(wf.started_at).toLocaleDateString("en-US",{month:"short",day:"numeric",hour:"2-digit",minute:"2-digit"}):"—"}</span>
+                        </div>
+                      ))}
+                    </>
+                  )}
+                </div>
+
+                {/* Raw log */}
+                <div className="card">
+                  <div className="ch"><div className="ct">Raw Token Log · Last 100 Calls</div></div>
+                  {tokenUsage.length===0?<div className="empty">No token logs yet.</div>:(
+                    <>
+                      <div className="th-row" style={{gridTemplateColumns:"140px 1fr 70px 70px 80px 80px 100px"}}>
+                        <span>Agent</span><span>Model</span><span>Input</span><span>Output</span><span>Total</span><span>Cost USD</span><span>When</span>
+                      </div>
+                      {tokenUsage.slice(0,50).map((r:any)=>(
+                        <div key={r.id} className="tr" style={{gridTemplateColumns:"140px 1fr 70px 70px 80px 80px 100px"}}>
+                          <span className="tag tag-pur" style={{fontSize:9}}>{r.agent_name}</span>
+                          <span className="mono dim" style={{fontSize:10}}>{r.model}</span>
+                          <span className="mono dim" style={{fontSize:11}}>{(r.input_tokens||0).toLocaleString()}</span>
+                          <span className="mono dim" style={{fontSize:11}}>{(r.output_tokens||0).toLocaleString()}</span>
+                          <span className="mono acc" style={{fontSize:11}}>{(r.total_tokens||0).toLocaleString()}</span>
+                          <span className="mono" style={{fontSize:11,color:"var(--grn)"}}>${parseFloat(r.estimated_cost||0).toFixed(6)}</span>
+                          <span className="mono dim" style={{fontSize:10}}>{r.created_at?new Date(r.created_at).toLocaleDateString("en-US",{month:"short",day:"numeric",hour:"2-digit",minute:"2-digit"}):"—"}</span>
+                        </div>
+                      ))}
+                    </>
+                  )}
+                </div>
+
+              </div>
+            )}
+
+            {/* AGENTS */}
+            {page==="agents"&&(
+              <div className="col">
+                {agentError&&<div className="infobox ib-red" style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}><span>⚠️ {agentError}</span><button className="btn btn-sm" onClick={()=>setAgentError(null)}>✕</button></div>}
+                <div className="ga">
+                  {[
+                    {ic:"🎙️",col:"ic-pur",name:"Meeting Scribe",trig:"After every meeting",desc:"Extracts decisions, action items with owners and due dates, and pushes to To-Do automatically.",chips:["Transcript","Calendar","Jira"],action:()=>setPage("meetings"),lbl:"▶ Go to Meetings",run:null},
+                    {ic:"🧠",col:"ic-blu",name:"Prioritization",trig:"Sprint planning",desc:"RICE-scores your backlog against Q2 OKRs. Surfaces top items with reasoning per item.",chips:["Backlog","OKRs","Capacity"],action:runPrio,lbl:`⚡ Score (${projects.length})`,run:"prioritization"},
+                    {ic:"📊",col:"ic-grn",name:"Weekly Digest",trig:"Every Monday 8am",desc:"Aggregates live project data, tasks and meetings into an executive Monday briefing.",chips:["Projects","Tasks","Meetings"],action:runDigest,lbl:"⚡ Generate Digest",run:"weekly-digest"},
+                    {ic:"🔔",col:"ic-amb",name:"Risk Monitor",trig:"Continuous",desc:"Scans all projects for risk signals, flags blockers, creates alert tasks automatically.",chips:["Projects","Sprints","Blockers"],action:runRisk,lbl:"⚡ Run Risk Scan",run:"risk-monitor"},
+                    {ic:"📝",col:"ic-blu",name:"Stakeholder Update",trig:"Every Friday 3pm",desc:"Writes a polished status email tailored to the recipient from live project data.",chips:["Projects","Tasks","OKRs"],action:null,lbl:"⚡ Draft Update",run:"stakeholder-update"},
+                    {ic:"📄",col:"ic-pur",name:"PRD Agent",trig:"On demand",desc:"Takes focus group transcripts, clusters themes, writes structured PRD with user stories.",chips:["Transcripts","Surveys","Research"],action:()=>setPage("prd"),lbl:"▶ Go to PRD Agent",run:null},
+                  ].map((ag,i)=>(
+                    <div key={i} className="agc">
+                      <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:10}}>
+                        <div className={`ag-icon ${ag.col}`}>{ag.ic}</div>
+                        <span className={`tag ${ag.run&&agentRunning===ag.run?"tag-amb":"tag-grn"}`} style={{fontSize:9}}>{ag.run&&agentRunning===ag.run?"● Running":"● Active"}</span>
+                      </div>
+                      <div className="ag-name">{ag.name}</div>
+                      <div className="ag-trig">{ag.trig}</div>
+                      <div className="ag-desc">{ag.desc}</div>
+                      <div className="chips" style={{marginBottom:12}}>{ag.chips.map((c,j)=><span key={j} className="chip">{c}</span>)}</div>
+                      {ag.name==="Stakeholder Update"&&!updateInput.show?(<button className="btn btn-primary" style={{width:"100%"}} disabled={agentRunning==="stakeholder-update"} onClick={()=>setUpdateInput(p=>({...p,show:true}))}>{agentRunning==="stakeholder-update"?<span style={{display:"flex",alignItems:"center",justifyContent:"center",gap:8}}><span className="spin" style={{width:13,height:13,borderWidth:1.5}}/>Drafting...</span>:"⚡ Draft Update"}</button>)
+                      :ag.name==="Stakeholder Update"&&updateInput.show?(<div style={{display:"flex",flexDirection:"column",gap:6}}><input className="input input-sm" placeholder="Recipient name" value={updateInput.name} onChange={e=>setUpdateInput(p=>({...p,name:e.target.value}))}/><input className="input input-sm" placeholder="Recipient role" value={updateInput.role} onChange={e=>setUpdateInput(p=>({...p,role:e.target.value}))}/><div style={{display:"flex",gap:6}}><button className="btn btn-primary" style={{flex:1}} onClick={()=>runSHUpdate(updateInput.name,updateInput.role)}>Generate</button><button className="btn" onClick={()=>setUpdateInput({show:false,name:"",role:""})}>Cancel</button></div></div>)
+                      :(<button className="btn btn-primary" style={{width:"100%"}} disabled={!!ag.run&&agentRunning===ag.run} onClick={ag.action||undefined}>{ag.run&&agentRunning===ag.run?<span style={{display:"flex",alignItems:"center",justifyContent:"center",gap:8}}><span className="spin" style={{width:13,height:13,borderWidth:1.5}}/>Working...</span>:ag.lbl}</button>)}
+                    </div>
+                  ))}
+                </div>
+                <div className="card">
+                  <div className="ch"><div className="ct">Stack</div></div>
+                  <div className="cb"><div className="g3" style={{gap:8}}>{[["LLM","Claude API (Sonnet)"],["Orchestration","Supabase Edge Functions"],["Database","Supabase Postgres"],["Auth","Supabase Auth"],["Realtime","Supabase Realtime"],["Integrations","Jira · Gmail · GCal"]].map(([l,v])=>(<div key={l} style={{background:"var(--surf2)",border:"1px solid var(--bdr)",borderRadius:8,padding:"10px 12px"}}><div className="section-lbl" style={{marginBottom:3}}>{l}</div><div className="acc" style={{fontWeight:500,fontSize:12}}>{v}</div></div>))}</div></div>
+                </div>
+              </div>
+            )}
+
+            {/* PRD */}
+            {page==="prd"&&(
+              <div className="g2">
+                <div className="col">
+                  <div className="card">
+                    <div className="ch"><div className="ct">Input — Research / Focus Group Data</div></div>
+                    <div className="cb">
+                      {prdStatus!=="done"?(<>
+                        <div className="upload-z" style={{marginBottom:12}} onClick={()=>document.getElementById("pf")?.click()}>
+                          <div style={{fontSize:28,marginBottom:8}}>📎</div>
+                          <div style={{fontFamily:"Syne",fontWeight:700,fontSize:13,marginBottom:3}}>Drop files or click to upload</div>
+                          <div style={{fontSize:12,color:"var(--mut)"}}>Supports .txt .csv .docx .pdf</div>
+                          <input id="pf" type="file" style={{display:"none"}} onChange={async(e:any)=>{const f=e.target.files[0];if(f){const t=await f.text();setPrdInput(t);}}}/>
+                        </div>
+                        <div className="section-lbl">Or paste raw text</div>
+                        <textarea className="input" value={prdInput} onChange={e=>setPrdInput(e.target.value)} placeholder={"Paste focus group transcript or survey results...\n\nExample:\n\"Participant 3: Onboarding took 45 minutes...\"\n\"Survey: 18 of 32 said onboarding was #1 pain point...\""} style={{minHeight:180,resize:"vertical" as any,marginBottom:10}}/>
+                        <button onClick={runPRD} disabled={!prdInput.trim()||prdStatus==="processing"} style={{width:"100%",padding:"10px 0",background:prdInput.trim()?"var(--acc)":"var(--bdr)",color:prdInput.trim()?"#000":"var(--mut)",border:"none",borderRadius:8,fontFamily:"Syne",fontWeight:700,fontSize:13,cursor:prdInput.trim()?"pointer":"default"}}>{prdStatus==="processing"?"Analysing...":"⚡ Generate PRD"}</button>
+                        {prdStatus==="processing"&&<div style={{display:"flex",alignItems:"center",gap:10,marginTop:12,fontSize:12,color:"var(--mut)"}}><div className="spin"/>Clustering themes, extracting pain points, writing PRD...</div>}
+                      </>):(<div><div style={{fontSize:12,color:"var(--grn)",marginBottom:10,fontFamily:"DM Mono"}}>✓ Processed {prdInput.split(' ').length} words</div><div style={{display:"flex",flexWrap:"wrap",gap:5,marginBottom:14}}>{prdResult.themes.map((t:any,i:number)=><span key={i} className="tag tag-blu">{t.lbl} <span style={{opacity:0.6}}>×{t.n}</span></span>)}</div><button onClick={()=>{setPrdStatus("idle");setPrdInput("");setPrdResult(null);}} style={{fontSize:11,fontFamily:"DM Mono",padding:"4px 10px",border:"1px solid var(--bdr)",borderRadius:6,background:"transparent",color:"var(--mut)",cursor:"pointer"}}>↺ New input</button></div>)}
+                    </div>
+                  </div>
+                </div>
+                <div>
+                  {!prdResult&&prdStatus!=="processing"&&<div className="card" style={{height:"100%",display:"flex",alignItems:"center",justifyContent:"center",flexDirection:"column",gap:10,opacity:0.4}}><div style={{fontSize:36}}>📄</div><div style={{fontFamily:"Syne",fontWeight:700,fontSize:13}}>PRD appears here</div></div>}
+                  {prdStatus==="processing"&&<div className="card" style={{height:"100%",display:"flex",alignItems:"center",justifyContent:"center",flexDirection:"column",gap:12}}><div className="spin" style={{width:32,height:32,borderWidth:3}}/><div style={{fontFamily:"Syne",fontWeight:700}}>Writing PRD...</div></div>}
+                  {prdResult&&(<div className="card">
+                    <div className="ch"><div><div style={{fontFamily:"Syne",fontWeight:800,fontSize:14}}>Product Requirements Document</div><div className="mono dim" style={{fontSize:10}}>AI-generated · {new Date().toLocaleDateString()} · Review before sharing</div></div><span className="tag tag-grn">Draft</span></div>
+                    <div className="prd-sec"><div className="prd-lbl">Problem Statement</div><p style={{fontSize:12,lineHeight:1.7}}>{prdResult.problem}</p></div>
+                    <div className="prd-sec"><div className="prd-lbl">User Stories</div>{prdResult.stories.map((s:string,i:number)=><div key={i} className="story">{s}</div>)}</div>
+                    <div className="prd-sec"><div className="prd-lbl">Acceptance Criteria</div>{prdResult.criteria.map((c:string,i:number)=><div key={i} style={{display:"flex",gap:7,fontSize:12,marginBottom:4,alignItems:"flex-start"}}><span style={{color:"var(--grn)",flexShrink:0}}>✓</span>{c}</div>)}</div>
+                    <div className="prd-sec"><div className="prd-lbl">Success Metrics</div>{prdResult.metrics.map((m:string,i:number)=><div key={i} style={{fontSize:12,padding:"3px 0",borderBottom:i<prdResult.metrics.length-1?"1px solid var(--bdr2)":"none",display:"flex",gap:7}}><div style={{width:3,height:3,borderRadius:"50%",background:"var(--acc)",flexShrink:0,marginTop:7}}/>{m}</div>)}</div>
+                    {prdResult.questions?.length>0&&<div className="prd-sec"><div className="prd-lbl">Open Questions</div>{prdResult.questions.map((q:string,i:number)=><div key={i} style={{fontSize:12,padding:"3px 0",color:"var(--amb)",display:"flex",gap:6}}><span>?</span>{q}</div>)}</div>}
+                    <div style={{padding:"11px 16px",borderTop:"1px solid var(--bdr)"}}><button className="xbtn" onClick={()=>{const md=`# PRD\n\n## Problem\n${prdResult.problem}\n\n## User Stories\n${prdResult.stories.map((s:string)=>`- ${s}`).join("\n")}\n\n## Acceptance Criteria\n${prdResult.criteria.map((c:string)=>`- [ ] ${c}`).join("\n")}\n\n## Success Metrics\n${prdResult.metrics.map((m:string)=>`- ${m}`).join("\n")}`;navigator.clipboard.writeText(md).then(()=>alert("Copied!"));}}>Copy as Markdown</button></div>
+                  </div>)}
+                </div>
+              </div>
+            )}
+
+            {/* STAKEHOLDERS */}
+            {page==="stakeholders"&&(
+              <div className="col">
+                <div style={{display:"flex",gap:8,flexWrap:"wrap",alignItems:"center"}}>
+                  {shProjects.map(p=><button key={p as string} onClick={()=>setShFilter(p as string)} style={{fontFamily:"DM Mono",fontSize:10,padding:"4px 12px",borderRadius:100,cursor:"pointer",border:`1px solid ${shFilter===p?"var(--acc)":"var(--bdr)"}`,background:shFilter===p?"rgba(0,212,255,0.07)":"var(--surf)",color:shFilter===p?"var(--acc)":"var(--mut)"}}>{p}</button>)}
+                  <div style={{marginLeft:"auto",display:"flex",gap:8}}>
+                    <span style={{fontFamily:"DM Mono",fontSize:10,padding:"4px 10px",borderRadius:100,background:"var(--surf)",border:"1px solid var(--bdr)",color:"var(--red)"}}>{filteredSh.filter((s:any)=>contactAge(s.last_contacted_at)==="stale").length} overdue</span>
+                    <button className="btn btn-primary btn-sm" onClick={openAddSh}>+ Add</button>
+                  </div>
+                </div>
+                <div className="card">
+                  {shLoading&&<div className="loading"><div className="spin"/>Loading...</div>}
+                  {!shLoading&&filteredSh.length===0&&<div className="empty">No stakeholders found.</div>}
+                  {filteredSh.map((s:any)=>{
+                    const age=contactAge(s.last_contacted_at);
+                    return(
+                      <div key={s.id} className="sh-row" style={{display:"grid",gridTemplateColumns:"180px 120px 160px 1fr 80px 85px 100px",gap:12,alignItems:"center"}}>
+                        <div style={{display:"flex",alignItems:"center",gap:9}}><div className="sh-av" style={{background:`${s.color||"#00d4ff"}18`,border:`1px solid ${s.color||"#00d4ff"}30`,color:s.color||"#00d4ff"}}>{s.initials||initials(s.name)}</div><div><div style={{fontSize:13,fontWeight:500}}>{s.name}</div><div style={{fontSize:11,color:"var(--mut)"}}>{s.role}</div></div></div>
+                        <span style={{fontSize:11,color:"var(--mut)"}}>{s.type}</span>
+                        <a href={`mailto:${s.email}`} style={{fontFamily:"DM Mono",fontSize:11,color:"var(--acc)",textDecoration:"none"}}>{s.email}</a>
+                        <div style={{display:"flex",flexWrap:"wrap",gap:3}}>{(s.proj||[]).map((p:string,j:number)=><span key={j} style={{fontSize:10,padding:"1px 6px",borderRadius:4,background:"var(--surf2)",border:"1px solid var(--bdr)",color:"var(--mut)"}}>{p}</span>)}</div>
+                        <div style={{display:"flex",gap:3}}>{Array.from({length:5},(_,j)=><div key={j} style={{width:8,height:8,borderRadius:2,background:j<(s.influence||0)?"var(--pur)":"var(--bdr2)"}}/>)}</div>
+                        <span className={`tag ${AGE_TAG[age]}`} style={{fontSize:9}}>{contactLabel(s.last_contacted_at)}</span>
+                        <div style={{display:"flex",gap:4}}><button className="btn btn-sm" onClick={()=>markContacted(s.id)}>✓</button><button className="btn btn-icon btn-sm" onClick={()=>openEditSh(s)}>✎</button><button className="btn btn-icon btn-danger btn-sm" onClick={()=>deleteSh(s.id)}>✕</button></div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+
+            {/* METRICS */}
+            {page==="metrics"&&(
+              <div className="col">
+                <div className="g4">{[{v:"23",l:"DAU",d:"+4 vs last week",up:true},{v:"61%",l:"WAU Retention",d:"+8pp",up:true},{v:"3.2h",l:"Time saved/user/wk",d:"+0.4h",up:true},{v:`${agentRuns.length}`,l:"Agent Runs (live)",d:"from DB",up:true}].map(({v,l,d,up})=>(<div key={l} className="kpi"><div className="kpi-v" style={{color:"var(--acc)"}}>{v}</div><div className="kpi-l">{l}</div><div className={`kpi-d ${up?"d-up":"d-dn"}`}>{up?"▲":"▼"} {d}</div></div>))}</div>
+                <div className="g2">
+                  <div className="card">
+                    <div className="ch"><div className="ct">Adoption Funnel</div></div>
+                    <div className="cb0">{[{l:"Invited",n:40,pct:100,c:"var(--acc)"},{l:"Activated",n:31,pct:78,c:"var(--acc)"},{l:"Used agent",n:23,pct:74,c:"var(--grn)"},{l:"3+ agents",n:14,pct:61,c:"var(--grn)"},{l:"Retained D7",n:9,pct:64,c:"var(--amb)"}].map(({l,n,pct,c},i,a)=>(<div key={i} style={{display:"flex",alignItems:"center",gap:12,padding:"9px 16px",borderBottom:i<a.length-1?"1px solid var(--bdr)":"none"}}><span style={{fontSize:12,width:90,flexShrink:0}}>{l}</span><div style={{flex:1,height:7,background:"var(--bdr2)",borderRadius:4,overflow:"hidden"}}><div style={{height:"100%",width:`${pct}%`,background:c,borderRadius:4}}/></div><span className="mono dim" style={{fontSize:11,width:46,textAlign:"right"}}>{n}</span></div>))}</div>
+                  </div>
+                  <div className="card">
+                    <div className="ch"><div className="ct">Agent Usage</div></div>
+                    <div className="cb0" style={{padding:"4px 16px"}}>{(agentRuns.length>0?Object.entries(agentRuns.reduce((acc:any,run:any)=>{acc[run.agent_name]=(acc[run.agent_name]||0)+1;return acc;},{})).sort((a:any,b:any)=>b[1]-a[1]).map(([name,count]:any)=>({n:name,r:count,max:Math.max(...Object.values(agentRuns.reduce((acc:any,run:any)=>{acc[run.agent_name]=(acc[run.agent_name]||0)+1;return acc;},{}) as any) as number[])})):[{n:"Meeting Scribe",r:47,max:47},{n:"Weekly Digest",r:23,max:47},{n:"Prioritization",r:14,max:47},{n:"PRD Agent",r:8,max:47}]).map(({n,r,max}:any)=>(<div key={n} className="use-row"><div className="use-name">{n}</div><div className="use-bw"><div className="use-bar"><div className="use-fill" style={{width:`${(r/max)*100}%`,background:"var(--acc)"}}/></div><div className="use-n">{r}</div></div></div>))}</div>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* PRIVACY */}
+            {page==="privacy"&&(
+              <div className="col">
+                <div style={{padding:"12px 16px",background:"rgba(16,185,129,0.05)",border:"1px solid rgba(16,185,129,0.2)",borderRadius:10,display:"flex",gap:10,alignItems:"center",flexWrap:"wrap"}}><div style={{width:8,height:8,borderRadius:"50%",background:"var(--grn)",boxShadow:"0 0 5px var(--grn)"}}/><span style={{fontFamily:"Syne",fontWeight:700,fontSize:13}}>No data has left this machine</span><span style={{fontSize:12,color:"var(--mut)"}}>Only outbound: Claude API calls</span></div>
+                <div className="g2">
+                  <div className="card">
+                    <div className="ch"><div className="ct">Memory Log</div><button className="btn btn-danger btn-sm" onClick={forgetAll}>Forget All</button></div>
+                    <div className="cb">{memLog.length===0?<div className="empty">Memory cleared</div>:memLog.map((m:any)=>(<div key={m.id} className="mem-row"><div className="mdot" style={{background:m.type==="project"?"var(--acc)":m.type==="agent"?"var(--pur)":m.type==="meeting"?"var(--amb)":"var(--grn)"}}/><div style={{flex:1}}><div className="mem-text">{m.content||m.text}</div><div className="mem-src">{m.source||m.src}</div></div><button className="btn btn-danger btn-sm" onClick={()=>forgetMem(m.id)}>Forget</button></div>))}</div>
+                  </div>
+                  <div className="col">
+                    <div className="card">
+                      <div className="ch"><div className="ct">Settings</div></div>
+                      <div className="cb">{[{k:"persist",l:"Persistent memory",s:"Agents remember across sessions"},{k:"learn",l:"Agent learning",s:"Improve from usage patterns"},{k:"session",l:"Session-only",s:"Wipe on close"},{k:"audit",l:"Audit log",s:"Record every agent action"}].map(({k,l,s})=>(<div key={k} className="tog-row"><div><div className="tog-lbl">{l}</div><div className="tog-sub">{s}</div></div><div className={`tog ${(privTogs as any)[k]?"on":"off"}`} onClick={()=>togglePriv(k)}/></div>))}</div>
+                    </div>
+                    <div className="card">
+                      <div className="ch"><div className="ct">Data Flow</div></div>
+                      <div className="cb">{[{s:"Jira tickets",d:"Local Postgres only"},{s:"Calendar events",d:"Local Postgres only"},{s:"Meeting transcripts",d:"Claude API (anonymised)"},{s:"Backlog items",d:"Claude API (no PII)"},{s:"Stakeholder emails",d:"Local only — never AI"}].map((r,i)=>(<div key={i} className="flow-row"><div style={{flex:1,fontSize:12,color:"var(--mut)"}}>{r.s}</div><span className="dim" style={{fontSize:11}}>→</span><div style={{fontFamily:"DM Mono",fontSize:11,flex:1,color:"var(--grn)"}}>{r.d}</div><div className="fdot" style={{background:"var(--grn)"}}/></div>))}</div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* INTEGRATIONS */}
+            {page==="integrations"&&(
+              <div className="col">
+                <div className="g4">
+                  {[{name:"jira",label:"Jira",icon:"🔷",desc:"Issues, sprints, project tracking",fn:()=>syncJira()},{name:"webex",label:"Webex",icon:"💬",desc:"Meetings (personal token)",fn:async()=>{setSyncingInt("webex");const{data,error}=await supabase.functions.invoke("webex-sync",{body:{action:"pull"}});setSyncingInt(null);if(error){alert(error.message);return;}alert(`Synced ${data?.synced||0}`);}},{name:"gmail",label:"Gmail",icon:"📧",desc:"Starred emails as tasks",fn:syncGmail},{name:"google_calendar",label:"Calendar",icon:"📅",desc:"Bidirectional GCal sync",fn:()=>syncCal()}].map(({name,label,icon,desc,fn})=>{
+                    const st=getIntSt(name);
+                    const syncing=syncingInt===name;
+                    const disp=syncing?"syncing":st.status;
+                    return(<div key={name} className="card" style={{padding:16}}>
+                      <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:10}}><div style={{fontSize:24}}>{icon}</div><span className={`tag ${disp==="connected"?"tag-grn":disp==="syncing"?"tag-blu":disp==="error"?"tag-red":"tag-dim"}`} style={{fontSize:9}}>{disp==="connected"?"● Connected":disp==="syncing"?"⟳ Syncing...":disp==="error"?"● Error":"○ Disconnected"}</span></div>
+                      <div style={{fontFamily:"Syne",fontWeight:700,fontSize:14,marginBottom:3}}>{label}</div>
+                      <div style={{fontSize:11,color:"var(--mut)",marginBottom:10}}>{desc}</div>
+                      {st.last_synced_at&&<div style={{fontFamily:"DM Mono",fontSize:9,color:"var(--mut)",marginBottom:8}}>Last: {new Date(st.last_synced_at).toLocaleString()}</div>}
+                      <button className="btn btn-primary" style={{width:"100%",fontSize:11}} disabled={syncingInt===name} onClick={fn}>{syncingInt===name?<span style={{display:"flex",alignItems:"center",justifyContent:"center",gap:6}}><span className="spin" style={{width:12,height:12,borderWidth:1.5}}/>Syncing...</span>:`⟳ Sync ${label}`}</button>
+                    </div>);
+                  })}
+                </div>
+                <div className="card">
+                  <div className="ch"><div className="ct">Jira Issues</div><div style={{display:"flex",gap:6}}><button className="btn btn-sm" onClick={()=>syncJira()} disabled={syncingInt==="jira"}>⟳ Sync</button><button className="btn btn-primary btn-sm" onClick={()=>setShowCreateJira(true)}>+ Create</button></div></div>
+                  {jiraIssues.length===0?<div className="empty">{isSyncing?"Syncing Jira...":"No issues synced."}</div>:(<><div className="th-row" style={{gridTemplateColumns:"80px 1fr 80px 80px 100px"}}><span>Key</span><span>Summary</span><span>Status</span><span>Priority</span><span>Assignee</span></div>{jiraIssues.map((issue:any)=>(<div key={issue.id} className="tr" style={{gridTemplateColumns:"80px 1fr 80px 80px 100px"}}><span style={{fontFamily:"DM Mono",fontSize:11,color:"var(--acc)"}}>{issue.jira_key}</span><span style={{fontSize:12}}>{issue.summary}</span><span className={`tag ${["done","closed"].some(s=>issue.status?.includes(s))?"tag-grn":issue.status?.includes("progress")?"tag-blu":"tag-dim"}`} style={{fontSize:9}}>{issue.status}</span><span className={`tag ${issue.priority==="high"?"tag-red":issue.priority==="low"?"tag-grn":"tag-amb"}`} style={{fontSize:9}}>{issue.priority}</span><span style={{fontSize:11,color:"var(--mut)"}}>{issue.assignee||"—"}</span></div>))}</>)}
+                </div>
+                <div className="card">
+                  <div className="ch"><div className="ct">Gmail Threads</div><button className="btn btn-sm" onClick={syncGmail} disabled={syncingInt==="gmail"}>⟳ Sync</button></div>
+                  {gmailThreads.length===0?<div className="empty">{isSyncing?"Syncing Gmail...":"No threads synced."}</div>:gmailThreads.map((t:any,i:number)=>(<div key={t.id} style={{display:"flex",alignItems:"flex-start",gap:10,padding:"11px 16px",borderBottom:i<gmailThreads.length-1?"1px solid var(--bdr)":"none"}}><div style={{width:6,height:6,borderRadius:"50%",background:t.is_read?"var(--bdr2)":"var(--acc)",flexShrink:0,marginTop:5}}/><div style={{flex:1}}><div style={{display:"flex",justifyContent:"space-between",marginBottom:2}}><span style={{fontSize:13,fontWeight:t.is_read?400:600}}>{t.subject}</span><span className="mono dim" style={{fontSize:10}}>{t.received_at?new Date(t.received_at).toLocaleDateString():"—"}</span></div><div style={{fontSize:11,color:"var(--mut)"}}>{t.from_email}</div></div><div style={{display:"flex",gap:5,flexShrink:0}}>{!t.is_read&&<button className="btn btn-sm" onClick={()=>markGmailRead(t.thread_id)}>Read</button>}<a href={`https://mail.google.com/mail/u/0/#inbox/${t.thread_id}`} target="_blank" rel="noopener noreferrer" className="btn btn-sm">Open</a></div></div>))}
+                </div>
+                <div className="card">
+                  <div className="ch"><div className="ct">Agent Run History</div></div>
+                  {agentRuns.length===0?<div className="empty">No agent runs yet.</div>:(<><div className="th-row" style={{gridTemplateColumns:"140px 1fr 1fr 70px 80px"}}><span>Agent</span><span>Input</span><span>Output</span><span>Tokens</span><span>When</span></div>{agentRuns.map((run:any)=>(<div key={run.id} className="tr" style={{gridTemplateColumns:"140px 1fr 1fr 70px 80px"}}><span className="tag tag-pur" style={{fontSize:9}}>{run.agent_name}</span><span style={{fontSize:11,color:"var(--mut)"}}>{run.input_summary}</span><span style={{fontSize:11,color:"var(--mut)"}}>{run.output_summary}</span><span className="mono dim" style={{fontSize:10}}>{run.tokens_used}</span><span className="mono dim" style={{fontSize:10}}>{run.ran_at?new Date(run.ran_at).toLocaleDateString():"—"}</span></div>))}</>)}
+                </div>
+              </div>
+            )}
+
+          </div>
+        </main>
+
+        {/* MODALS */}
+        {agentResultType==="error"&&<Modal title="Agent Error" onClose={closeResult}><div className="infobox ib-red">{agentError}</div><div className="form-actions"><button className="btn btn-primary" onClick={closeResult}>Close</button></div></Modal>}
+        {agentResultType==="prioritization"&&agentResult&&(<Modal title="Prioritization Results" onClose={closeResult} wide>{agentResult.summary&&<div className="infobox ib-blue" style={{fontSize:12}}>🤖 {agentResult.summary}</div>}{agentResult.scored_items?.length>0&&<div className="col" style={{gap:6}}>{[...agentResult.scored_items].sort((a:any,b:any)=>b.rice_score-a.rice_score).map((it:any,i:number)=><div key={i} style={{padding:"8px 10px",background:"var(--surf2)",borderRadius:7,border:"1px solid var(--bdr)"}}><div style={{display:"flex",justifyContent:"space-between",marginBottom:3}}><span style={{fontWeight:500,fontSize:12}}>{it.title}</span><div style={{display:"flex",gap:5}}><span className="tag tag-blu" style={{fontSize:9}}>RICE {Math.round(it.rice_score)}</span><span className="tag tag-dim" style={{fontSize:9}}>{it.recommended_quarter}</span></div></div><div style={{fontSize:11,color:"var(--mut)"}}>{it.reasoning}</div></div>)}</div>}<div className="form-actions"><button className="btn" onClick={()=>{closeResult();setPage("priority");}}>View in Prioritization</button><button className="btn btn-primary" onClick={closeResult}>Done</button></div></Modal>)}
+        {agentResultType==="weekly-digest"&&agentResult&&(<Modal title="Weekly Digest" onClose={closeResult} wide>{agentResult.headline&&<div style={{fontFamily:"Syne",fontWeight:800,fontSize:16,color:"var(--acc)"}}>{agentResult.headline}</div>}{[{label:"On Track",items:agentResult.whats_on_track,c:"var(--grn)"},{label:"At Risk",items:agentResult.whats_at_risk,c:"var(--red)"},{label:"Top Priorities",items:agentResult.top_3_priorities,c:"var(--amb)"}].filter(s=>s.items?.length>0).map(({label,items,c})=>(<div key={label}><div className="section-lbl">{label}</div>{items.map((item:string,i:number)=><div key={i} style={{display:"flex",gap:7,fontSize:12,padding:"4px 0",borderBottom:"1px solid var(--bdr)"}}><div style={{width:4,height:4,borderRadius:"50%",background:c,flexShrink:0,marginTop:5}}/>{item}</div>)}</div>))}<div className="form-actions"><button className="btn btn-primary" onClick={closeResult}>Done</button></div></Modal>)}
+        {agentResultType==="risk-monitor"&&agentResult&&(<Modal title="Risk Scan" onClose={closeResult} wide><div style={{display:"flex",alignItems:"center",gap:10}}><span style={{fontFamily:"Syne",fontWeight:700}}>Portfolio Health</span><span className={`tag ${agentResult.overall_health==="green"?"tag-grn":agentResult.overall_health==="amber"?"tag-amb":"tag-red"}`}>{agentResult.overall_health?.toUpperCase()}</span></div>{agentResult.alerts?.length>0?<div className="col" style={{gap:8}}>{agentResult.alerts.map((a:any,i:number)=><div key={i} className={`alert-b ${a.risk_level==="high"?"al-warn":"al-good"}`}><div style={{flex:1}}><div className="al-ttl" style={{color:a.risk_level==="high"?"var(--red)":"var(--amb)"}}>{a.project}</div><div className="al-body">{a.reason}</div><div style={{fontSize:11,color:"var(--acc)",marginTop:3}}>→ {a.suggested_action}</div></div></div>)}</div>:<div className="infobox ib-grn">✓ No critical risks.</div>}<div className="form-actions"><button className="btn" onClick={()=>{closeResult();setPage("tracker");}}>View Projects</button><button className="btn btn-primary" onClick={closeResult}>Done</button></div></Modal>)}
+        {agentResultType==="stakeholder-update"&&agentResult&&(<Modal title="Stakeholder Update Draft" onClose={closeResult} wide><div style={{background:"var(--surf2)",border:"1px solid var(--bdr)",borderRadius:8,padding:12}}><div className="form-label" style={{marginBottom:4}}>SUBJECT</div><div style={{fontWeight:500,fontSize:13,marginBottom:12}}>{agentResult.subject}</div><div className="form-label" style={{marginBottom:4}}>BODY</div><div style={{fontSize:12,lineHeight:1.8,whiteSpace:"pre-line"}}>{agentResult.body}</div></div><div className="form-actions"><button className="btn" onClick={()=>navigator.clipboard.writeText(`Subject: ${agentResult.subject}\n\n${agentResult.body}`).then(()=>alert("Copied!"))}>Copy Email</button><button className="btn btn-primary" onClick={closeResult}>Done</button></div></Modal>)}
+
+        {okrInsight&&(<Modal title={`${okrInsight.type==="weekly"?"Weekly":"Quarterly"} AI Insight`} onClose={()=>setOkrInsight(null)} wide>
+          <div style={{fontFamily:"Syne",fontWeight:700,fontSize:13,marginBottom:4}}>{okrInsight.okr.objective}</div>
+          {okrInsight.data?.headline&&<div style={{fontFamily:"Syne",fontWeight:800,fontSize:15,color:"var(--acc)"}}>{okrInsight.data.headline}</div>}
+          {[{label:"On Track",items:okrInsight.data?.whats_on_track,c:"var(--grn)"},{label:"At Risk",items:okrInsight.data?.whats_at_risk,c:"var(--red)"},{label:"Top Priorities",items:okrInsight.data?.top_3_priorities,c:"var(--amb)"}].filter(s=>s.items?.length>0).map(({label,items,c})=>(<div key={label}><div className="section-lbl">{label}</div>{items.map((item:string,i:number)=><div key={i} style={{fontSize:12,padding:"4px 0",borderBottom:"1px solid var(--bdr)",display:"flex",gap:7}}><div style={{width:4,height:4,borderRadius:"50%",background:c,flexShrink:0,marginTop:5}}/>{item}</div>)}</div>))}
+          <div className="form-actions">
+            <button className="btn" onClick={()=>navigator.clipboard.writeText(JSON.stringify(okrInsight.data,null,2)).then(()=>alert("Copied!"))}>Copy for Exec Summary</button>
+            <button className="btn" onClick={()=>{runSHUpdate("Leadership","CPO");setOkrInsight(null);}}>Send Stakeholder Update</button>
+            <button className="btn btn-primary" onClick={()=>setOkrInsight(null)}>Done</button>
+          </div>
+        </Modal>)}
+
+        {showAddTask&&(<Modal title="Add Task" onClose={()=>setShowAddTask(false)}><div className="form-row"><label className="form-label">Title</label><input className="input" value={newTask.title} onChange={e=>setNewTask(p=>({...p,title:e.target.value}))} placeholder="Task description..." autoFocus onKeyDown={e=>e.key==="Enter"&&addTask()}/></div><div className="form-grid"><div className="form-row"><label className="form-label">Priority</label><select className="input select" value={newTask.priority} onChange={e=>setNewTask(p=>({...p,priority:e.target.value}))}><option value="high">High</option><option value="med">Medium</option><option value="low">Low</option></select></div><div className="form-row"><label className="form-label">Schedule for date</label><input className="input" type="date" value={newTask.scheduled_date} onChange={e=>setNewTask(p=>({...p,scheduled_date:e.target.value}))}/></div></div><div className="form-actions"><button className="btn" onClick={()=>setShowAddTask(false)}>Cancel</button><button className="btn btn-primary" onClick={addTask}>Add Task</button></div></Modal>)}
+
+        {showAddProj&&(<Modal title={editProj?"Edit Project":"Add Project"} onClose={()=>setShowAddProj(false)}>
+          <div className="form-grid">
+            <div className="form-row" style={{gridColumn:"1/-1"}}><label className="form-label">Project Name</label><input className="input" value={projForm.name} onChange={e=>setProjForm(p=>({...p,name:e.target.value}))} autoFocus placeholder="e.g. Mobile Onboarding V2"/></div>
+            <div className="form-row"><label className="form-label">Owner</label><input className="input" value={projForm.owner} onChange={e=>setProjForm(p=>({...p,owner:e.target.value}))} placeholder="Ana + Raj"/></div>
+            <div className="form-row"><label className="form-label">Status</label><select className="input select" value={projForm.status} onChange={e=>setProjForm(p=>({...p,status:e.target.value}))}><option value="planning">Planning</option><option value="on-track">On Track</option><option value="at-risk">At Risk</option><option value="delayed">Delayed</option></select></div>
+            <div className="form-row"><label className="form-label">Progress (%)</label><input className="input" type="number" min="0" max="100" value={projForm.progress} onChange={e=>setProjForm(p=>({...p,progress:e.target.value as any}))}/></div>
+            <div className="form-row"><label className="form-label">Priority</label><select className="input select" value={projForm.priority} onChange={e=>setProjForm(p=>({...p,priority:e.target.value}))}><option value="high">High</option><option value="med">Medium</option><option value="low">Low</option></select></div>
+            <div className="form-row"><label className="form-label">Due Date</label><input className="input" type="date" value={projForm.due_date} onChange={e=>setProjForm(p=>({...p,due_date:e.target.value}))}/></div>
+            <div className="form-row" style={{gridColumn:"1/-1"}}><label className="form-label">User Research Summary (optional)</label><textarea className="input" value={projForm.research_summary} onChange={e=>setProjForm(p=>({...p,research_summary:e.target.value}))} style={{minHeight:70,resize:"vertical" as any}} placeholder="Key user research findings, pain points, themes..."/></div>
+            <div className="form-row" style={{gridColumn:"1/-1"}}><label className="form-label">Competitive Intelligence Summary (optional)</label><textarea className="input" value={projForm.competitive_summary} onChange={e=>setProjForm(p=>({...p,competitive_summary:e.target.value}))} style={{minHeight:70,resize:"vertical" as any}} placeholder="Competitor positioning, feature gaps, market signals..."/></div>
+          </div>
+          <div className="form-actions"><button className="btn" onClick={()=>setShowAddProj(false)}>Cancel</button><button className="btn btn-primary" onClick={saveProject}>{editProj?"Save Changes":"Add Project"}</button></div>
+        </Modal>)}
+
+        {showAddMeet&&(<Modal title="New Meeting" onClose={()=>setShowAddMeet(false)} wide><div className="form-row"><label className="form-label">Title</label><input className="input" value={meetForm.title} onChange={e=>setMeetForm(p=>({...p,title:e.target.value}))} autoFocus placeholder="Sprint Planning — Mobile Team"/></div><div className="form-row"><label className="form-label">Date & Time (optional)</label><input className="input" type="datetime-local" value={meetForm.meeting_time} onChange={e=>setMeetForm(p=>({...p,meeting_time:e.target.value}))}/></div><div className="form-row"><label className="form-label">Paste Transcript</label><textarea className="input" value={meetForm.raw_transcript} onChange={e=>setMeetForm(p=>({...p,raw_transcript:e.target.value}))} placeholder="Paste transcript here. AI will extract action items, decisions and owners automatically..." style={{minHeight:160,resize:"vertical" as any}}/></div><div className="form-actions"><button className="btn" onClick={()=>setShowAddMeet(false)}>Cancel</button><button className="btn btn-primary" onClick={saveMeeting} disabled={meetProcessing}>{meetProcessing?<><span className="spin" style={{width:13,height:13,borderWidth:1.5,display:"inline-block",verticalAlign:"middle",marginRight:6}}/>Processing...</>:meetForm.raw_transcript.trim()?"Save & Extract with AI":"Save Meeting"}</button></div></Modal>)}
+
+        {editingAction&&(<Modal title="Edit Action Item" onClose={()=>setEditingAction(null)}><div className="form-row"><label className="form-label">Action</label><input className="input" value={actionForm.text} onChange={e=>setActionForm(p=>({...p,text:e.target.value}))} autoFocus/></div><div className="form-grid"><div className="form-row"><label className="form-label">Owner</label><input className="input" value={actionForm.owner} onChange={e=>setActionForm(p=>({...p,owner:e.target.value}))} placeholder="Person responsible"/></div><div className="form-row"><label className="form-label">Priority</label><select className="input select" value={actionForm.priority} onChange={e=>setActionForm(p=>({...p,priority:e.target.value}))}><option value="high">High</option><option value="med">Medium</option><option value="low">Low</option></select></div><div className="form-row"><label className="form-label">Due Date</label><input className="input" type="date" value={actionForm.due_date} onChange={e=>setActionForm(p=>({...p,due_date:e.target.value}))}/></div></div><div className="form-actions"><button className="btn" onClick={()=>setEditingAction(null)}>Cancel</button><button className="btn btn-primary" onClick={saveActionEdit}>Save</button></div></Modal>)}
+
+        {showAddOkr&&(<Modal title="Add Objective" onClose={()=>setShowAddOkr(false)}><div className="form-row"><label className="form-label">Objective</label><input className="input" value={okrForm.objective} onChange={e=>setOkrForm(p=>({...p,objective:e.target.value}))} autoFocus placeholder="Become the #1 B2B productivity platform"/></div><div className="form-grid"><div className="form-row"><label className="form-label">Owner</label><input className="input" value={okrForm.owner} onChange={e=>setOkrForm(p=>({...p,owner:e.target.value}))} placeholder="PM / Team lead"/></div><div className="form-row"><label className="form-label">Icon</label><input className="input" value={okrForm.icon} onChange={e=>setOkrForm(p=>({...p,icon:e.target.value}))} placeholder="🎯"/></div><div className="form-row"><label className="form-label">Color</label><div style={{display:"flex",gap:6,flexWrap:"wrap"}}>{["#00d4ff","#7c3aed","#10b981","#f59e0b","#ef4444","#ec4899"].map(c=><div key={c} onClick={()=>setOkrForm(p=>({...p,color:c}))} style={{width:24,height:24,borderRadius:6,background:c,cursor:"pointer",border:okrForm.color===c?"2px solid #fff":"2px solid transparent"}}/>)}</div></div></div><div className="form-actions"><button className="btn" onClick={()=>setShowAddOkr(false)}>Cancel</button><button className="btn btn-primary" onClick={addOkr}>Add Objective</button></div></Modal>)}
+
+        {showAddSh&&(<Modal title={editSh?"Edit Stakeholder":"Add Stakeholder"} onClose={()=>setShowAddSh(false)}><div className="form-grid"><div className="form-row"><label className="form-label">Full Name</label><input className="input" value={shForm.name} onChange={e=>setShForm(p=>({...p,name:e.target.value}))} autoFocus placeholder="Sarah Mitchell"/></div><div className="form-row"><label className="form-label">Role</label><input className="input" value={shForm.role} onChange={e=>setShForm(p=>({...p,role:e.target.value}))} placeholder="Chief Product Officer"/></div><div className="form-row" style={{gridColumn:"1/-1"}}><label className="form-label">Email</label><input className="input" type="email" value={shForm.email} onChange={e=>setShForm(p=>({...p,email:e.target.value}))} placeholder="s.mitchell@company.com"/></div><div className="form-row"><label className="form-label">Type</label><select className="input select" value={shForm.type} onChange={e=>setShForm(p=>({...p,type:e.target.value}))}>{["Internal — Executive","Internal — Engineering","Internal — Design","Internal — GTM","Internal — ML","External — Client"].map(t=><option key={t}>{t}</option>)}</select></div><div className="form-row"><label className="form-label">Influence (1–5)</label><select className="input select" value={shForm.influence} onChange={e=>setShForm(p=>({...p,influence:parseInt(e.target.value)}))}>{[1,2,3,4,5].map(n=><option key={n} value={n}>{n}</option>)}</select></div><div className="form-row"><label className="form-label">Color</label><div style={{display:"flex",gap:6,flexWrap:"wrap"}}>{["#00d4ff","#7c3aed","#10b981","#f59e0b","#ef4444","#ec4899"].map(c=><div key={c} onClick={()=>setShForm(p=>({...p,color:c}))} style={{width:22,height:22,borderRadius:6,background:c,cursor:"pointer",border:shForm.color===c?"2px solid #fff":"2px solid transparent"}}/>)}</div></div></div><div className="form-actions"><button className="btn" onClick={()=>setShowAddSh(false)}>Cancel</button><button className="btn btn-primary" onClick={saveSh}>{editSh?"Save Changes":"Add Stakeholder"}</button></div></Modal>)}
+
+        {showCreateJira&&(<Modal title="Create Jira Issue" onClose={()=>setShowCreateJira(false)}><div className="form-grid"><div className="form-row" style={{gridColumn:"1/-1"}}><label className="form-label">Summary</label><input className="input" value={jiraForm.summary} onChange={e=>setJiraForm(p=>({...p,summary:e.target.value}))} autoFocus placeholder="Issue summary..."/></div><div className="form-row"><label className="form-label">Project Key</label><input className="input" value={jiraForm.projectKey} onChange={e=>setJiraForm(p=>({...p,projectKey:e.target.value}))} placeholder="PM"/></div><div className="form-row"><label className="form-label">Issue Type</label><select className="input select" value={jiraForm.issueType} onChange={e=>setJiraForm(p=>({...p,issueType:e.target.value}))}><option>Task</option><option>Story</option><option>Bug</option><option>Epic</option></select></div><div className="form-row"><label className="form-label">Priority</label><select className="input select" value={jiraForm.priority} onChange={e=>setJiraForm(p=>({...p,priority:e.target.value}))}><option value="high">High</option><option value="med">Medium</option><option value="low">Low</option></select></div><div className="form-row" style={{gridColumn:"1/-1"}}><label className="form-label">Description</label><textarea className="input" value={jiraForm.description} onChange={e=>setJiraForm(p=>({...p,description:e.target.value}))} style={{minHeight:80,resize:"vertical" as any}} placeholder="Describe the issue..."/></div></div><div className="form-actions"><button className="btn" onClick={()=>setShowCreateJira(false)}>Cancel</button><button className="btn btn-primary" onClick={createJira} disabled={syncingInt==="jira-c"}>{syncingInt==="jira-c"?"Creating...":"Create in Jira"}</button></div></Modal>)}
 
         {showAddCal&&(<Modal title="Add Calendar Event" onClose={()=>setShowAddCal(false)}><div className="form-grid"><div className="form-row" style={{gridColumn:"1/-1"}}><label className="form-label">Title</label><input className="input" value={calForm.title} onChange={e=>setCalForm(p=>({...p,title:e.target.value}))} autoFocus placeholder="Sprint Planning — Mobile Team"/></div><div className="form-row"><label className="form-label">Start Time</label><input className="input" type="time" value={calForm.startTime} onChange={e=>setCalForm(p=>({...p,startTime:e.target.value}))}/></div><div className="form-row"><label className="form-label">End Time</label><input className="input" type="time" value={calForm.endTime} onChange={e=>setCalForm(p=>({...p,endTime:e.target.value}))}/></div><div className="form-row" style={{gridColumn:"1/-1"}}><label className="form-label">Attendees (comma-separated)</label><input className="input" value={calForm.attendees} onChange={e=>setCalForm(p=>({...p,attendees:e.target.value}))} placeholder="ana@company.com, chen@company.com"/></div><div className="form-row" style={{gridColumn:"1/-1"}}><label className="form-label">Description</label><input className="input" value={calForm.description} onChange={e=>setCalForm(p=>({...p,description:e.target.value}))} placeholder="Agenda or context..."/></div></div><div style={{fontSize:11,color:"var(--mut)"}}>A Google Meet link will be auto-generated.</div><div className="form-actions"><button className="btn" onClick={()=>setShowAddCal(false)}>Cancel</button><button className="btn btn-primary" onClick={createCalEvent} disabled={syncingInt==="cal-create"}>{syncingInt==="cal-create"?"Creating...":"Create Event + Meet Link"}</button></div></Modal>)}
 
