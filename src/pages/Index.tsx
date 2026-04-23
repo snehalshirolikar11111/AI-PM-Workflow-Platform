@@ -3065,6 +3065,7 @@ ${(prdResult.criteria||[]).join("\n")}`).then(()=>alert("Copied!"))}>Copy</butto
             )}
 
           </div>
+          </div>
         </main>
 
         {/* MODALS */}
