@@ -635,15 +635,15 @@ export default function PMDashboard(){
   const loadCal=useCallback(async()=>{const{data}=await supabase.from("schedule_blocks").select("*").order("start_time");if(data)setCalEvents(data);},[]);
   const loadAgentRuns=useCallback(async()=>{const{data}=await supabase.from("agent_runs").select("*").order("ran_at",{ascending:false}).limit(20);if(data)setAgentRuns(data);},[]);
   const loadRice=useCallback(async()=>{const{data}=await supabase.from("rice_scores").select("*").order("rice_score",{ascending:false});if(data)setRiceScores(data);},[]);
-  const loadMoscow=useCallback(async()=>{const{data}=await supabase.from("moscow_items").select("*").order("created_at").catch(()=>({data:[]}));if(data)setMoscowItems(data);},[]);
-  const loadRoadmap=useCallback(async()=>{const{data}=await supabase.from("roadmap_items").select("*").order("start_quarter").catch(()=>({data:[]}));if(data)setRoadmapItems(data);},[]);
-  const loadAlign=useCallback(async()=>{const{data}=await supabase.from("okr_alignment").select("*").limit(1).catch(()=>({data:[]}));if(data&&data[0])setOkrAlign(data[0]);},[]);
-  const loadDecisions=useCallback(async()=>{const{data}=await supabase.from("decision_log").select("*,projects(name)").order("created_at",{ascending:false}).catch(()=>({data:[]}));if(data)setDecisions(data);},[]);
-  const loadKnowledge=useCallback(async()=>{const{data}=await supabase.from("knowledge_items").select("*").order("created_at",{ascending:false}).catch(()=>({data:[]}));if(data)setKnowledgeItems(data);},[]);
-  const loadOutcomes=useCallback(async()=>{const{data}=await supabase.from("outcomes").select("*,projects(name),okrs(objective)").order("created_at",{ascending:false}).catch(()=>({data:[]}));if(data)setOutcomes(data);},[]);
-  const loadRiskPreds=useCallback(async()=>{const{data}=await supabase.from("risk_predictions").select("*,projects(name)").eq("status","active").order("detected_at",{ascending:false}).catch(()=>({data:[]}));if(data)setRiskPredictions(data);},[]);
-  const loadCostAnomalies=useCallback(async()=>{const{data}=await supabase.from("v_cost_anomalies").select("*").limit(10).catch(()=>({data:[]}));if(data)setCostAnomalies(data);const{data:bs}=await supabase.from("v_budget_status").select("*").limit(1).catch(()=>({data:[]}));if(bs&&bs[0])setBudgetStatus(bs[0]);},[]);
-  const loadFeedback=useCallback(async()=>{const{data}=await supabase.from("feedback_events").select("*").order("created_at",{ascending:false}).limit(30).catch(()=>({data:[]}));if(data)setFeedbackEvents(data);},[]);
+  const loadMoscow=useCallback(async()=>{const{data}=await supabase.from("moscow_items").select("*").order("created_at").then(undefined,()=>({data:[]} as any));if(data)setMoscowItems(data);},[]);
+  const loadRoadmap=useCallback(async()=>{const{data}=await supabase.from("roadmap_items").select("*").order("start_quarter").then(undefined,()=>({data:[]} as any));if(data)setRoadmapItems(data);},[]);
+  const loadAlign=useCallback(async()=>{const{data}=await supabase.from("okr_alignment").select("*").limit(1).then(undefined,()=>({data:[]} as any));if(data&&data[0])setOkrAlign(data[0]);},[]);
+  const loadDecisions=useCallback(async()=>{const{data}=await supabase.from("decision_log").select("*,projects(name)").order("created_at",{ascending:false}).then(undefined,()=>({data:[]} as any));if(data)setDecisions(data);},[]);
+  const loadKnowledge=useCallback(async()=>{const{data}=await supabase.from("knowledge_items").select("*").order("created_at",{ascending:false}).then(undefined,()=>({data:[]} as any));if(data)setKnowledgeItems(data);},[]);
+  const loadOutcomes=useCallback(async()=>{const{data}=await supabase.from("outcomes").select("*,projects(name),okrs(objective)").order("created_at",{ascending:false}).then(undefined,()=>({data:[]} as any));if(data)setOutcomes(data);},[]);
+  const loadRiskPreds=useCallback(async()=>{const{data}=await supabase.from("risk_predictions").select("*,projects(name)").eq("status","active").order("detected_at",{ascending:false}).then(undefined,()=>({data:[]} as any));if(data)setRiskPredictions(data);},[]);
+  const loadCostAnomalies=useCallback(async()=>{const{data}=await supabase.from("v_cost_anomalies").select("*").limit(10).then(undefined,()=>({data:[]} as any));if(data)setCostAnomalies(data);const{data:bs}=await supabase.from("v_budget_status").select("*").limit(1).then(undefined,()=>({data:[]} as any));if(bs&&bs[0])setBudgetStatus(bs[0]);},[]);
+  const loadFeedback=useCallback(async()=>{const{data}=await supabase.from("feedback_events").select("*").order("created_at",{ascending:false}).limit(30).then(undefined,()=>({data:[]} as any));if(data)setFeedbackEvents(data);},[]);
   const loadTokens=useCallback(async()=>{
     setTokenLoading(true);
     const[a,b,c]=await Promise.allSettled([
