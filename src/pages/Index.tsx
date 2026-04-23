@@ -267,7 +267,7 @@ const S = `
 
 const NAV = [
   {grp:"Today",items:[{id:"schedule",ic:"🕐",lbl:"Daily Schedule"},{id:"todos",ic:"☑",lbl:"To-Do List"}]},
-  {grp:"Execution",items:[{id:"tracker",ic:"◎",lbl:"Projects"},{id:"meetings",ic:"✦",lbl:"Meeting Intel"}]},
+  {grp:"Execution",items:[{id:"tracker",ic:"◎",lbl:"Projects"},{id:"meetings",ic:"✦",lbl:"Meeting Intel"},{id:"release",ic:"🚦",lbl:"Release Readiness"}]},
   {grp:"Strategy",items:[{id:"priority",ic:"◈",lbl:"Prioritization"},{id:"roadmap",ic:"🗺",lbl:"Roadmap"},{id:"okr",ic:"◎",lbl:"OKR Tracker"}]},
   {grp:"Intelligence",items:[{id:"super",ic:"🔮",lbl:"Super Agent"},{id:"optimizer",ic:"⚡",lbl:"Cost Optimizer"},{id:"research",ic:"🔍",lbl:"Research"},{id:"decisions",ic:"📌",lbl:"Decision Log"},{id:"knowledge",ic:"🧠",lbl:"Knowledge"},{id:"agents",ic:"⬡",lbl:"AI Agents"},{id:"prd",ic:"📄",lbl:"PRD Agent"}]},
   {grp:"People",items:[{id:"stakeholders",ic:"◉",lbl:"Stakeholders"}]},
@@ -282,6 +282,7 @@ const PAGE_INFO: Record<string,{title:string;sub:string}> = {
   priority:{title:"Prioritization",sub:"Choose a framework and project — AI scores your backlog"},
   roadmap:{title:"Roadmap",sub:"Quarterly initiative planning across all projects"},
   okr:{title:"OKR Tracker",sub:"Key results with AI-generated weekly and quarterly insights"},
+  release:{title:"Release Readiness Agent",sub:"Autonomous go/no-go assessment — multi-step reasoning across Jira, risks, stakeholders and OKRs"},
   research:{title:"Research Agents",sub:"Competitive · Market · Customer — AI-powered with live web search"},
   decisions:{title:"Decision Log",sub:"Every decision · rationale · data used · trade-offs · outcome status"},
   knowledge:{title:"Knowledge Memory",sub:"Past PRDs · insights · learnings · reusable patterns"},
@@ -517,6 +518,14 @@ export default function PMDashboard(){
 
   // Calendar date for todos
   const [selectedTodoDate,setSelectedTodoDate]=useState(new Date());
+
+  // Release Readiness
+  const [rrProject,setRrProject]=useState("");
+  const [rrScope,setRrScope]=useState("");
+  const [rrRunning,setRrRunning]=useState(false);
+  const [rrResult,setRrResult]=useState<any>(null);
+  const [rrError,setRrError]=useState<string|null>(null);
+  const [rrStep,setRrStep]=useState(0);
 
   // Research Agents
   const [researchProduct,setResearchProduct]=useState("");
@@ -850,6 +859,24 @@ export default function PMDashboard(){
   /* ── Roadmap ── */
   const saveRm=async()=>{if(!rmForm.title.trim())return;await supabase.from("roadmap_items").insert({...rmForm,year:rmYear,user_id:user?.id}).catch(()=>{});setShowAddRoadmap(false);setRmForm({title:"",project:"",startQ:0,endQ:1,color:"#00d4ff"});loadRoadmap();};
   const deleteRm=async(id:string)=>{await supabase.from("roadmap_items").delete().eq("id",id).catch(()=>{});loadRoadmap();};
+
+  /* ── Release Readiness ── */
+  const RR_STEPS=["Checking Jira issues and P0s…","Analyzing blockers and bug trends…","Checking stakeholder coverage…","Scanning meeting action items…","Checking OKR alignment and risk predictions…","Running self-evaluation loop…","Generating go/no-go recommendation…"];
+  const runReleaseReadiness=async()=>{
+    if(!rrProject.trim())return;
+    setRrRunning(true);setRrResult(null);setRrError(null);setRrStep(0);
+    const iv=setInterval(()=>setRrStep(s=>Math.min(s+1,RR_STEPS.length-1)),2000);
+    try{
+      const proj=projects.find(p=>p.name===rrProject);
+      const{data,error}=await supabase.functions.invoke("release-readiness-agent",{body:{projectName:rrProject,projectId:proj?.id||null,releaseScope:rrScope,userId:user?.id}});
+      if(error)throw new Error(error.message);if(data?.error)throw new Error(data.error);
+      setRrResult(data);loadDecisions();loadRiskPreds();loadAgentRuns();
+    }catch(e:any){setRrError(e.message);}
+    finally{clearInterval(iv);setRrStep(RR_STEPS.length-1);setRrRunning(false);}
+  };
+  const rrStatusColor=(s:string)=>s==="green"?"var(--grn)":s==="yellow"?"var(--amb)":"var(--red)";
+  const rrStatusBg=(s:string)=>s==="green"?"rgba(16,185,129,0.08)":s==="yellow"?"rgba(245,158,11,0.08)":"rgba(239,68,68,0.08)";
+  const rrStatusBdr=(s:string)=>s==="green"?"rgba(16,185,129,0.2)":s==="yellow"?"rgba(245,158,11,0.2)":"rgba(239,68,68,0.2)";
 
   /* ── Research Agents ── */
   const RESEARCH_STEPS=["Running Competitive Analysis Agent (web search)…","Running Market Analysis Agent (web search)…","Running Customer Insights Agent…","Synthesizing across all three agents…"];
@@ -1590,6 +1617,195 @@ export default function PMDashboard(){
             )}
 
 
+
+
+            {/* RELEASE READINESS */}
+            {page==="release"&&(
+              <div className="col">
+
+                {/* Input */}
+                <div className="card">
+                  <div className="ch">
+                    <div>
+                      <div style={{fontFamily:"Syne",fontWeight:800,fontSize:16}}>🚦 Release Readiness Agent</div>
+                      <div style={{fontSize:12,color:"var(--mut)",marginTop:3}}>Autonomous multi-step assessment — agent decides what to investigate based on what it finds</div>
+                    </div>
+                  </div>
+                  <div className="cb">
+                    <div className="form-grid" style={{marginBottom:10}}>
+                      <div className="form-row">
+                        <label className="form-label">Project</label>
+                        <select className="input select" value={rrProject} onChange={e=>setRrProject(e.target.value)}>
+                          <option value="">Select project...</option>
+                          {projects.map(p=><option key={p.id} value={p.name}>{p.name}</option>)}
+                        </select>
+                      </div>
+                      <div className="form-row">
+                        <label className="form-label">Release Scope (optional)</label>
+                        <input className="input" value={rrScope} onChange={e=>setRrScope(e.target.value)} placeholder="e.g. Sprint 9 — PDF export + SSO redesign"/>
+                      </div>
+                    </div>
+                    {rrError&&<div className="infobox ib-red" style={{marginBottom:10}}>⚠️ {rrError}</div>}
+                    <button style={{width:"100%",padding:13,background:rrRunning||!rrProject?"var(--bdr)":"linear-gradient(90deg,#ef4444,#f59e0b,#10b981)",border:"none",borderRadius:9,fontFamily:"Syne",fontWeight:800,fontSize:14,color:rrRunning||!rrProject?"var(--mut)":"#000",cursor:rrRunning||!rrProject?"not-allowed":"pointer",display:"flex",alignItems:"center",justifyContent:"center",gap:10}} onClick={runReleaseReadiness} disabled={rrRunning||!rrProject}>
+                      {rrRunning?<><span className="spin" style={{width:16,height:16,borderWidth:2,borderTopColor:"#000",borderColor:"rgba(0,0,0,0.2)"}}/>Assessing...</>:"🚦 Run Release Readiness Check"}
+                    </button>
+                  </div>
+                </div>
+
+                {/* Thinking */}
+                {rrRunning&&(
+                  <div className="sa-thinking">
+                    <div style={{fontFamily:"Syne",fontWeight:700,fontSize:13,marginBottom:4}}>Agent investigating autonomously…</div>
+                    {RR_STEPS.map((step,i)=>(
+                      <div key={i} className="sa-think-step">
+                        <div className={`sa-think-dot ${i<rrStep?"sa-think-done":i===rrStep?"sa-think-active":"sa-think-wait"}`}/>
+                        <span style={{color:i<rrStep?"var(--grn)":i===rrStep?"var(--acc)":"var(--mut)"}}>{step}</span>
+                        {i<rrStep&&<span style={{marginLeft:"auto",fontFamily:"DM Mono",fontSize:9,color:"var(--grn)"}}>✓</span>}
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                {/* Result */}
+                {rrResult&&!rrRunning&&(()=>{
+                  const status=rrResult.release_status||"yellow";
+                  const rec=rrResult.go_no_go_recommendation||"conditional_go";
+                  return(
+                    <div className="col">
+
+                      {/* Verdict banner */}
+                      <div style={{background:rrStatusBg(status),border:`1px solid ${rrStatusBdr(status)}`,borderRadius:14,padding:"20px 24px",display:"flex",justifyContent:"space-between",alignItems:"center",flexWrap:"wrap",gap:16}}>
+                        <div>
+                          <div style={{display:"flex",alignItems:"center",gap:12,marginBottom:6}}>
+                            <div style={{fontFamily:"Syne",fontWeight:800,fontSize:28,color:rrStatusColor(status)}}>
+                              {status==="green"?"🟢":status==="yellow"?"🟡":"🔴"} {status.toUpperCase()}
+                            </div>
+                            <span style={{fontFamily:"DM Mono",fontSize:11,padding:"4px 12px",borderRadius:100,background:`${rrStatusColor(status)}15`,border:`1px solid ${rrStatusColor(status)}30`,color:rrStatusColor(status),fontWeight:600}}>
+                              {rec==="go"?"✓ GO":rec==="no_go"?"✗ NO-GO":"⚠ CONDITIONAL GO"}
+                            </span>
+                          </div>
+                          <div style={{fontSize:13,lineHeight:1.7,maxWidth:600}}>{rrResult.summary}</div>
+                        </div>
+                        <div style={{display:"flex",flex:"column",gap:6,alignItems:"flex-end"}}>
+                          <span className={`tag ${rrResult.confidence_score==="high"?"tag-grn":rrResult.confidence_score==="medium"?"tag-amb":"tag-red"}`} style={{fontSize:9}}>Confidence: {rrResult.confidence_score}</span>
+                          <div style={{fontSize:10,color:"var(--mut)",fontFamily:"DM Mono",marginTop:4}}>{rrResult.assessed_at?new Date(rrResult.assessed_at).toLocaleString():""}</div>
+                          <div style={{fontSize:10,color:"var(--grn)",fontFamily:"DM Mono"}}>✓ Saved to Decision Log</div>
+                        </div>
+                      </div>
+
+                      {/* Readiness grid */}
+                      {rrResult.readiness_breakdown&&(
+                        <div className="g3" style={{gap:8}}>
+                          {Object.entries(rrResult.readiness_breakdown).map(([dim,data]:any)=>(
+                            <div key={dim} style={{background:rrStatusBg(data.status||"yellow"),border:`1px solid ${rrStatusBdr(data.status||"yellow")}`,borderRadius:9,padding:"12px 14px"}}>
+                              <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:8}}>
+                                <span style={{fontFamily:"Syne",fontWeight:700,fontSize:12,textTransform:"capitalize"}}>{dim}</span>
+                                <span style={{fontFamily:"DM Mono",fontSize:10,color:rrStatusColor(data.status||"yellow"),fontWeight:600}}>{(data.status||"unknown").toUpperCase()}</span>
+                              </div>
+                              {(data.key_signals||[]).slice(0,3).map((sig:string,i:number)=>(
+                                <div key={i} style={{fontSize:11,color:"var(--mut)",display:"flex",gap:5,padding:"2px 0"}}><span style={{opacity:0.5}}>—</span>{sig}</div>
+                              ))}
+                            </div>
+                          ))}
+                        </div>
+                      )}
+
+                      {/* Blocking issues */}
+                      {rrResult.blocking_issues?.length>0&&(
+                        <div className="card">
+                          <div className="ch"><div className="ct">🚫 Blocking Issues</div><span className="tag tag-red" style={{fontSize:9}}>{rrResult.blocking_issues.length} blockers</span></div>
+                          <div className="cb">
+                            {rrResult.blocking_issues.map((b:string,i:number)=>(
+                              <div key={i} style={{display:"flex",gap:10,padding:"8px 0",borderBottom:"1px solid var(--bdr)",fontSize:13}}>
+                                <span style={{color:"var(--red)",flexShrink:0}}>✕</span>{b}
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Critical risks + actions */}
+                      <div className="g2">
+                        {rrResult.critical_risks?.length>0&&(
+                          <div className="card">
+                            <div className="ch"><div className="ct">Critical Risks</div></div>
+                            <div className="cb">
+                              {rrResult.critical_risks.map((r:any,i:number)=>(
+                                <div key={i} style={{padding:"8px 0",borderBottom:"1px solid var(--bdr)"}}>
+                                  <div style={{display:"flex",gap:6,marginBottom:3}}>
+                                    <span className={`tag ${r.severity==="high"?"tag-red":r.severity==="medium"?"tag-amb":"tag-dim"}`} style={{fontSize:9}}>{r.severity}</span>
+                                    <span style={{fontSize:12,fontWeight:500}}>{r.risk}</span>
+                                  </div>
+                                  <div style={{fontSize:11,color:"var(--mut)",marginBottom:2}}>{r.impact}</div>
+                                  {r.mitigation&&<div style={{fontSize:11,color:"var(--acc)"}}>→ {r.mitigation}</div>}
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+                        {rrResult.recommended_actions?.length>0&&(
+                          <div className="card">
+                            <div className="ch"><div className="ct">Actions Required</div></div>
+                            <div className="cb">
+                              {rrResult.recommended_actions.map((a:string,i:number)=>(
+                                <div key={i} style={{display:"flex",gap:10,padding:"8px 0",borderBottom:"1px solid var(--bdr)",fontSize:12,alignItems:"flex-start"}}>
+                                  <div style={{width:20,height:20,borderRadius:"50%",background:"rgba(0,212,255,0.1)",border:"1px solid rgba(0,212,255,0.2)",display:"flex",alignItems:"center",justifyContent:"center",fontFamily:"DM Mono",fontSize:10,color:"var(--acc)",flexShrink:0}}>{i+1}</div>
+                                  {a}
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Data sources + gaps */}
+                      <div className="g2">
+                        {rrResult.data_sources?.length>0&&(
+                          <div className="card">
+                            <div className="ch"><div className="ct">Data Sources Used</div></div>
+                            <div className="cb">
+                              {rrResult.data_sources.map((s:any,i:number)=>(
+                                <div key={i} style={{display:"flex",gap:8,padding:"5px 0",borderBottom:"1px solid var(--bdr)",fontSize:11}}>
+                                  <span className="tag tag-pur" style={{fontSize:9,flexShrink:0}}>{s.source}</span>
+                                  <span style={{color:"var(--mut)"}}>{s.summary}</span>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+                        {rrResult.data_gaps?.length>0&&(
+                          <div className="card">
+                            <div className="ch"><div className="ct">Data Gaps</div></div>
+                            <div className="cb">
+                              {rrResult.data_gaps.map((g:string,i:number)=>(
+                                <div key={i} style={{fontSize:12,display:"flex",gap:7,padding:"4px 0",color:"var(--amb)"}}><span>⚠</span>{g}</div>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Self-evaluation */}
+                      {rrResult.self_evaluation&&(
+                        <div className="infobox ib-blue" style={{fontSize:11}}>
+                          <strong className="acc">Self-Evaluation:</strong> {rrResult.self_evaluation.improvements_made||rrResult.self_evaluation.critique}
+                        </div>
+                      )}
+
+                    </div>
+                  );
+                })()}
+
+                {/* Empty state */}
+                {!rrResult&&!rrRunning&&(
+                  <div className="card" style={{padding:32,textAlign:"center",opacity:0.5}}>
+                    <div style={{fontSize:40,marginBottom:10}}>🚦</div>
+                    <div style={{fontFamily:"Syne",fontWeight:700,fontSize:15,marginBottom:6}}>Select a project and run</div>
+                    <div style={{fontSize:12,color:"var(--mut)",maxWidth:380,margin:"0 auto"}}>The agent autonomously investigates Jira, risks, stakeholders, meetings, and OKRs — then returns a structured go/no-go recommendation with evidence.</div>
+                  </div>
+                )}
+              </div>
+            )}
 
             {/* RESEARCH AGENTS */}
             {page==="research"&&(
