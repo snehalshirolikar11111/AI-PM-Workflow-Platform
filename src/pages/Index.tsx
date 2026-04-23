@@ -445,7 +445,7 @@ export default function PMDashboard(){
   const [projLoading,setProjLoading]=useState(true);
   const [showAddProj,setShowAddProj]=useState(false);
   const [editProj,setEditProj]=useState<any>(null);
-  const [projForm,setProjForm]=useState({name:"",owner:"",status:"planning",progress:0,due_date:"",priority:"med",research_summary:"",competitive_summary:""});
+  const [projForm,setProjForm]=useState({name:"",owner:"",status:"planning",progress:0,due_date:"",priority:"med",jira_key:"",research_summary:"",competitive_summary:""});
   const [expandedProj,setExpandedProj]=useState<string|null>(null);
 
   // Meetings
@@ -730,7 +730,26 @@ export default function PMDashboard(){
   useEffect(()=>{const t=setInterval(autoSync,5*60*1000);return()=>clearInterval(t);},[autoSync]);
 
   /* ── Sync fns ── */
-  const syncJira=async(pk?:string)=>{setSyncingInt("jira");const{data,error}=await supabase.functions.invoke("jira-sync",{body:{action:"pull",projectKey:pk}});setSyncingInt(null);if(error){alert("Jira: "+error.message);return;}await Promise.all([loadJira(),loadTasks(),loadProjects(),loadIntegrations()]);alert(`Jira: ${data?.synced||0} synced`);};
+  const syncJira=async(pk?:string)=>{
+    setSyncingInt("jira");
+    if(pk){
+      const{data,error}=await supabase.functions.invoke("jira-sync",{body:{action:"pull",projectKey:pk}});
+      setSyncingInt(null);if(error){alert("Jira: "+error.message);return;}
+      await Promise.all([loadJira(),loadTasks(),loadProjects(),loadIntegrations()]);
+      alert(`Jira: ${data?.synced||0} synced`);
+    }else{
+      const keyed=projects.filter((p:any)=>p.jira_key);
+      if(!keyed.length){setSyncingInt(null);alert("No projects have a Jira key set. Edit a project and add the Jira key (e.g. RTVT).");return;}
+      let total=0;
+      for(const proj of keyed){
+        const{data}=await supabase.functions.invoke("jira-sync",{body:{action:"pull",projectKey:proj.jira_key}});
+        total+=(data?.synced||0);
+      }
+      setSyncingInt(null);
+      await Promise.all([loadJira(),loadTasks(),loadProjects(),loadIntegrations()]);
+      alert(`Jira: ${total} issues synced across ${keyed.length} project(s)`);
+    }
+  };
   const syncGmail=async()=>{setSyncingInt("gmail");const{data,error}=await supabase.functions.invoke("gmail-sync",{body:{action:"pull"}});setSyncingInt(null);if(error){alert("Gmail: "+error.message);return;}await Promise.all([loadGmail(),loadTasks(),loadIntegrations()]);alert(`Gmail: ${data?.synced||0} synced`);};
   const syncCal=async(date?:string)=>{setSyncingInt("calendar");const{data,error}=await supabase.functions.invoke("calendar-sync",{body:{date}});setSyncingInt(null);if(error){alert("Calendar: "+error.message);return;}await Promise.all([loadCal(),loadIntegrations()]);return data?.events||[];};
   const createCalEvent=async()=>{
@@ -781,12 +800,13 @@ export default function PMDashboard(){
 
   /* ── Project CRUD ── */
   const openAddProj=()=>{setProjForm({name:"",owner:"",status:"planning",progress:0,due_date:"",priority:"med",research_summary:"",competitive_summary:""});setEditProj(null);setShowAddProj(true);};
-  const openEditProj=(p:any)=>{setProjForm({name:p.name,owner:p.owner||"",status:p.status,progress:p.progress,due_date:p.due_date||"",priority:p.priority||"med",research_summary:p.research_summary||"",competitive_summary:p.competitive_summary||""});setEditProj(p);setShowAddProj(true);};
+  const openEditProj=(p:any)=>{setProjForm({name:p.name,owner:p.owner||"",status:p.status,progress:p.progress,due_date:p.due_date||"",priority:p.priority||"med",jira_key:p.jira_key||"",research_summary:p.research_summary||"",competitive_summary:p.competitive_summary||""});setEditProj(p);setShowAddProj(true);};
   const saveProject=async()=>{
     if(!projForm.name.trim())return;
-    const payload={name:projForm.name.trim(),owner:projForm.owner,status:projForm.status,progress:parseInt(String(projForm.progress))||0,due_date:projForm.due_date||null,priority:projForm.priority,research_summary:projForm.research_summary||null,competitive_summary:projForm.competitive_summary||null};
+    const payload={name:projForm.name.trim(),owner:projForm.owner,status:projForm.status,progress:parseInt(String(projForm.progress))||0,due_date:projForm.due_date||null,priority:projForm.priority,jira_key:projForm.jira_key.trim().toUpperCase()||null,research_summary:projForm.research_summary||null,competitive_summary:projForm.competitive_summary||null};
     if(editProj){
       await supabase.from("projects").update(payload).eq("id",editProj.id);
+      if(payload.jira_key)await supabase.from("projects").update({jira_key:payload.jira_key}).eq("id",editProj.id);
       if(editProj.jira_key)supabase.functions.invoke("jira-sync",{body:{action:"update_issue",issueData:{jiraKey:editProj.jira_key,fields:{summary:payload.name}}}}).catch(()=>{});
     }else{
       const{data:np}=await supabase.from("projects").insert({...payload,user_id:user?.id}).select().single();
@@ -3496,7 +3516,8 @@ export default function PMDashboard(){
 
         {showAddProj&&(<Modal title={editProj?"Edit Project":"Add Project"} onClose={()=>setShowAddProj(false)}>
           <div className="form-grid">
-            <div className="form-row" style={{gridColumn:"1/-1"}}><label className="form-label">Project Name</label><input className="input" value={projForm.name} onChange={e=>setProjForm(p=>({...p,name:e.target.value}))} autoFocus placeholder="e.g. Mobile Onboarding V2"/></div>
+            <div className="form-row"><label className="form-label">Project Name</label><input className="input" value={projForm.name} onChange={e=>setProjForm(p=>({...p,name:e.target.value}))} autoFocus placeholder="e.g. Mobile Onboarding V2"/></div>
+            <div className="form-row"><label className="form-label">Jira Project Key</label><input className="input" value={projForm.jira_key} onChange={e=>setProjForm(p=>({...p,jira_key:e.target.value.toUpperCase()}))} placeholder="e.g. RTVT, DET, MSP"/></div>
             <div className="form-row"><label className="form-label">Owner</label><input className="input" value={projForm.owner} onChange={e=>setProjForm(p=>({...p,owner:e.target.value}))} placeholder="Ana + Raj"/></div>
             <div className="form-row"><label className="form-label">Status</label><select className="input select" value={projForm.status} onChange={e=>setProjForm(p=>({...p,status:e.target.value}))}><option value="planning">Planning</option><option value="on-track">On Track</option><option value="at-risk">At Risk</option><option value="delayed">Delayed</option></select></div>
             <div className="form-row"><label className="form-label">Progress (%)</label><input className="input" type="number" min="0" max="100" value={projForm.progress} onChange={e=>setProjForm(p=>({...p,progress:e.target.value as any}))}/></div>
