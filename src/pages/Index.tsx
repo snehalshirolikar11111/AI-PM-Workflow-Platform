@@ -269,8 +269,8 @@ const S = `
 const NAV = [
   {grp:"Today",        items:[{id:"schedule",ic:"🕐",lbl:"Daily Schedule"},{id:"todos",ic:"☑",lbl:"To-Do List"}]},
   {grp:"Execution",    items:[{id:"tracker",ic:"◎",lbl:"Projects"},{id:"roadmap",ic:"🗺",lbl:"Roadmap"}]},
-  {grp:"AI Agents",    items:[{id:"super",ic:"🔮",lbl:"Executive Briefing"},{id:"sprint",ic:"⚡",lbl:"Sprint Intelligence"},{id:"release",ic:"🚦",lbl:"Release Readiness"},{id:"research",ic:"🔍",lbl:"Research Agents"},{id:"prd",ic:"📄",lbl:"PRD Agent"}]},
-  {grp:"AI Workflows", items:[{id:"meetings",ic:"✦",lbl:"Meeting Intel"},{id:"priority",ic:"◈",lbl:"Prioritization"},{id:"agents",ic:"⬡",lbl:"All Agents"}]},
+  {grp:"AI Agents",    items:[{id:"super",ic:"🔮",lbl:"Executive Briefing"},{id:"sprint",ic:"⚡",lbl:"Sprint Intelligence"},{id:"release",ic:"🚦",lbl:"Release Readiness"},{id:"research",ic:"🔍",lbl:"Research Agents"}]},
+  {grp:"AI Workflows", items:[{id:"meetings",ic:"✦",lbl:"Meeting Intel"},{id:"prd",ic:"📄",lbl:"PRD Agent"},{id:"priority",ic:"◈",lbl:"Prioritization"},{id:"agents",ic:"⬡",lbl:"All Agents"}]},
   {grp:"Insights",     items:[{id:"optimizer",ic:"⚡",lbl:"Cost Optimizer"},{id:"decisions",ic:"📌",lbl:"Decision Log"},{id:"knowledge",ic:"🧠",lbl:"Knowledge"}]},
   {grp:"Metrics",      items:[{id:"okr",ic:"◎",lbl:"OKR Tracker"},{id:"tokens",ic:"◈",lbl:"Token Analytics"},{id:"outcomes",ic:"🎯",lbl:"Outcomes"},{id:"metrics",ic:"◎",lbl:"Pilot Metrics"}]},
   {grp:"People",       items:[{id:"stakeholders",ic:"◉",lbl:"Stakeholders"}]},
@@ -480,10 +480,6 @@ export default function PMDashboard(){
 
   // PRD
   const [prdInput,setPrdInput]=useState("");
-  const [prdProductName,setPrdProductName]=useState("");
-  const [prdProjectName,setPrdProjectName]=useState("");
-  const [prdAgentResult,setPrdAgentResult]=useState<any>(null);
-  const [prdAgentStep,setPrdAgentStep]=useState(0);
   const [prdStatus,setPrdStatus]=useState("idle");
   const [prdResult,setPrdResult]=useState<any>(null);
 
@@ -639,15 +635,15 @@ export default function PMDashboard(){
   const loadCal=useCallback(async()=>{const{data}=await supabase.from("schedule_blocks").select("*").order("start_time");if(data)setCalEvents(data);},[]);
   const loadAgentRuns=useCallback(async()=>{const{data}=await supabase.from("agent_runs").select("*").order("ran_at",{ascending:false}).limit(20);if(data)setAgentRuns(data);},[]);
   const loadRice=useCallback(async()=>{const{data}=await supabase.from("rice_scores").select("*").order("rice_score",{ascending:false});if(data)setRiceScores(data);},[]);
-  const loadMoscow=useCallback(async()=>{const{data}=await supabase.from("moscow_items").select("*").order("created_at").then(undefined,()=>({data:[]}));if(data)setMoscowItems(data);},[]);
-  const loadRoadmap=useCallback(async()=>{const{data}=await supabase.from("roadmap_items").select("*").order("start_quarter").then(undefined,()=>({data:[]}));if(data)setRoadmapItems(data);},[]);
-  const loadAlign=useCallback(async()=>{const{data}=await supabase.from("okr_alignment").select("*").limit(1).then(undefined,()=>({data:[]}));if(data&&data[0])setOkrAlign(data[0]);},[]);
-  const loadDecisions=useCallback(async()=>{const{data}=await supabase.from("decision_log").select("*,projects(name)").order("created_at",{ascending:false}).then(undefined,()=>({data:[]}));if(data)setDecisions(data);},[]);
-  const loadKnowledge=useCallback(async()=>{const{data}=await supabase.from("knowledge_items").select("*").order("created_at",{ascending:false}).then(undefined,()=>({data:[]}));if(data)setKnowledgeItems(data);},[]);
-  const loadOutcomes=useCallback(async()=>{const{data}=await supabase.from("outcomes").select("*,projects(name),okrs(objective)").order("created_at",{ascending:false}).then(undefined,()=>({data:[]}));if(data)setOutcomes(data);},[]);
-  const loadRiskPreds=useCallback(async()=>{const{data}=await supabase.from("risk_predictions").select("*,projects(name)").eq("status","active").order("detected_at",{ascending:false}).then(undefined,()=>({data:[]}));if(data)setRiskPredictions(data);},[]);
-  const loadCostAnomalies=useCallback(async()=>{const{data}=await supabase.from("v_cost_anomalies").select("*").limit(10).then(undefined,()=>({data:[]}));if(data)setCostAnomalies(data);const{data:bs}=await supabase.from("v_budget_status").select("*").limit(1).then(undefined,()=>({data:[]}));if(bs&&bs[0])setBudgetStatus(bs[0]);},[]);
-  const loadFeedback=useCallback(async()=>{const{data}=await supabase.from("feedback_events").select("*").order("created_at",{ascending:false}).limit(30).then(undefined,()=>({data:[]}));if(data)setFeedbackEvents(data);},[]);
+  const loadMoscow=useCallback(async()=>{const{data}=await supabase.from("moscow_items").select("*").order("created_at").catch(()=>({data:[]}));if(data)setMoscowItems(data);},[]);
+  const loadRoadmap=useCallback(async()=>{const{data}=await supabase.from("roadmap_items").select("*").order("start_quarter").catch(()=>({data:[]}));if(data)setRoadmapItems(data);},[]);
+  const loadAlign=useCallback(async()=>{const{data}=await supabase.from("okr_alignment").select("*").limit(1).catch(()=>({data:[]}));if(data&&data[0])setOkrAlign(data[0]);},[]);
+  const loadDecisions=useCallback(async()=>{const{data}=await supabase.from("decision_log").select("*,projects(name)").order("created_at",{ascending:false}).catch(()=>({data:[]}));if(data)setDecisions(data);},[]);
+  const loadKnowledge=useCallback(async()=>{const{data}=await supabase.from("knowledge_items").select("*").order("created_at",{ascending:false}).catch(()=>({data:[]}));if(data)setKnowledgeItems(data);},[]);
+  const loadOutcomes=useCallback(async()=>{const{data}=await supabase.from("outcomes").select("*,projects(name),okrs(objective)").order("created_at",{ascending:false}).catch(()=>({data:[]}));if(data)setOutcomes(data);},[]);
+  const loadRiskPreds=useCallback(async()=>{const{data}=await supabase.from("risk_predictions").select("*,projects(name)").eq("status","active").order("detected_at",{ascending:false}).catch(()=>({data:[]}));if(data)setRiskPredictions(data);},[]);
+  const loadCostAnomalies=useCallback(async()=>{const{data}=await supabase.from("v_cost_anomalies").select("*").limit(10).catch(()=>({data:[]}));if(data)setCostAnomalies(data);const{data:bs}=await supabase.from("v_budget_status").select("*").limit(1).catch(()=>({data:[]}));if(bs&&bs[0])setBudgetStatus(bs[0]);},[]);
+  const loadFeedback=useCallback(async()=>{const{data}=await supabase.from("feedback_events").select("*").order("created_at",{ascending:false}).limit(30).catch(()=>({data:[]}));if(data)setFeedbackEvents(data);},[]);
   const loadTokens=useCallback(async()=>{
     setTokenLoading(true);
     const[a,b,c]=await Promise.allSettled([
@@ -685,7 +681,7 @@ export default function PMDashboard(){
       .on("postgres_changes",{event:"*",schema:"public",table:"schedule_blocks"},()=>loadCal())
       .on("postgres_changes",{event:"*",schema:"public",table:"agent_runs"},()=>loadAgentRuns())
       .subscribe();
-    return()=>{void supabase.removeChannel(ch);};
+    return()=>supabase.removeChannel(ch);
   },[loadProjects,loadIntegrations,loadJira,loadTasks,loadCal,loadAgentRuns]);
 
   /* ── Auto-sync ── */
@@ -749,7 +745,7 @@ export default function PMDashboard(){
     const ns=t.status==="done"?"open":"done";
     setTodos(p=>p.map((x:any)=>x.id===t.id?{...x,status:ns}:x));
     await supabase.from("tasks").update({status:ns}).eq("id",t.id);
-    if(t.jira_key)supabase.functions.invoke("jira-sync",{body:{action:"transition_issue",issueData:{jiraKey:t.jira_key,transitionName:ns==="done"?"done":"in progress"}}}).then(undefined,()=>{});
+    if(t.jira_key)supabase.functions.invoke("jira-sync",{body:{action:"transition_issue",issueData:{jiraKey:t.jira_key,transitionName:ns==="done"?"done":"in progress"}}}).catch(()=>{});
   };
   const addTask=async()=>{
     if(!newTask.title.trim())return;
@@ -768,7 +764,7 @@ export default function PMDashboard(){
     const payload={name:projForm.name.trim(),owner:projForm.owner,status:projForm.status,progress:parseInt(String(projForm.progress))||0,due_date:projForm.due_date||null,priority:projForm.priority,research_summary:projForm.research_summary||null,competitive_summary:projForm.competitive_summary||null};
     if(editProj){
       await supabase.from("projects").update(payload).eq("id",editProj.id);
-      if(editProj.jira_key)supabase.functions.invoke("jira-sync",{body:{action:"update_issue",issueData:{jiraKey:editProj.jira_key,fields:{summary:payload.name}}}}).then(undefined,()=>{});
+      if(editProj.jira_key)supabase.functions.invoke("jira-sync",{body:{action:"update_issue",issueData:{jiraKey:editProj.jira_key,fields:{summary:payload.name}}}}).catch(()=>{});
     }else{
       const{data:np}=await supabase.from("projects").insert({...payload,user_id:user?.id}).select().single();
       const{data:jd}=await supabase.functions.invoke("jira-sync",{body:{action:"create_issue",issueData:{summary:payload.name,description:`Owner: ${payload.owner||"TBD"}`,projectKey:"PM",priority:"med",issueType:"Epic"}}}).catch(()=>({data:null}));
@@ -833,22 +829,13 @@ export default function PMDashboard(){
   const togglePriv=async(key:string)=>{const n={...privTogs,[key]:!(privTogs as any)[key]};setPrivTogs(n);await supabase.from("user_settings").upsert({user_id:user?.id,persistent_memory:n.persist,agent_learning:n.learn,session_only:n.session,audit_log:n.audit});};
 
   /* ── PRD ── */
-  const PRD_STEPS=["Aggregating focus group data…","Fetching competitive context…","Searching web for market signals…","Checking OKR alignment…","Checking RICE scores…","Identifying stakeholders…","Writing PRD…","Saving to knowledge base…"];
   const runPRD=async()=>{
-    if(!prdInput.trim()&&!prdProductName.trim())return;
-    setPrdStatus("processing");setPrdAgentResult(null);setPrdAgentStep(0);
-    const iv=setInterval(()=>setPrdAgentStep(s=>Math.min(s+1,PRD_STEPS.length-1)),2500);
+    if(!prdInput.trim())return;
+    setPrdStatus("processing");
     try{
-      const{data}=await supabase.functions.invoke("prd-agent",{body:{text:prdInput,productName:prdProductName,projectName:prdProjectName,userId:user?.id}});
-      clearInterval(iv);
-      if(data?.error)throw new Error(data.error);
-      if(data?.prd){
-        setPrdAgentResult(data);
-        const prd=data.prd;
-        setPrdResult({themes:[],problem:prd.problem_statement||"",stories:prd.user_stories||[],criteria:prd.acceptance_criteria||[],metrics:(prd.success_metrics||[]).map((m:any)=>`${m.metric}: ${m.baseline} → ${m.target}`),questions:prd.open_questions||[]});
-        setPrdStatus("done");loadKnowledge();loadDecisions();loadAgentRuns();
-      }
-    }catch(e:any){clearInterval(iv);setPrdStatus("idle");alert("PRD Agent failed: "+e.message);}
+      const{data}=await supabase.functions.invoke("prd-agent",{body:{text:prdInput}});
+      if(data){setPrdResult({themes:data.themes?.map((t:any)=>({lbl:t.label,n:t.frequency}))||[],problem:data.problem_statement||"",stories:data.user_stories?.map((s:any)=>`As a ${s.role}, I want ${s.goal} so that ${s.outcome}.`)||[],criteria:data.acceptance_criteria||[],metrics:data.success_metrics?.map((m:any)=>`${m.metric}: ${m.baseline} → ${m.target}`)||[],questions:data.open_questions||[]});setPrdStatus("done");}
+    }catch{setPrdStatus("idle");alert("PRD Agent failed.");}
   };
 
   /* ── Agent runners ── */
@@ -873,17 +860,17 @@ export default function PMDashboard(){
     if(!newAlignText.trim())return;
     const updated={...okrAlign,[section]:[...(okrAlign as any)[section],newAlignText.trim()]};
     setOkrAlign(updated);setNewAlignText("");setShowAddAlign(null);
-    await supabase.from("okr_alignment").upsert({user_id:user?.id,...updated},{onConflict:"user_id"}).then(undefined,()=>{});
+    await supabase.from("okr_alignment").upsert({user_id:user?.id,...updated},{onConflict:"user_id"}).catch(()=>{});
   };
   const removeAlignItem=async(section:string,idx:number)=>{
     const arr=[...(okrAlign as any)[section]];arr.splice(idx,1);
     const updated={...okrAlign,[section]:arr};setOkrAlign(updated);
-    await supabase.from("okr_alignment").upsert({user_id:user?.id,...updated},{onConflict:"user_id"}).then(undefined,()=>{});
+    await supabase.from("okr_alignment").upsert({user_id:user?.id,...updated},{onConflict:"user_id"}).catch(()=>{});
   };
 
   /* ── Roadmap ── */
-  const saveRm=async()=>{if(!rmForm.title.trim())return;await supabase.from("roadmap_items").insert({...rmForm,year:rmYear,user_id:user?.id}).then(undefined,()=>{});setShowAddRoadmap(false);setRmForm({title:"",project:"",startQ:0,endQ:1,color:"#00d4ff"});loadRoadmap();};
-  const deleteRm=async(id:string)=>{await supabase.from("roadmap_items").delete().eq("id",id).then(undefined,()=>{});loadRoadmap();};
+  const saveRm=async()=>{if(!rmForm.title.trim())return;await supabase.from("roadmap_items").insert({...rmForm,year:rmYear,user_id:user?.id}).catch(()=>{});setShowAddRoadmap(false);setRmForm({title:"",project:"",startQ:0,endQ:1,color:"#00d4ff"});loadRoadmap();};
+  const deleteRm=async(id:string)=>{await supabase.from("roadmap_items").delete().eq("id",id).catch(()=>{});loadRoadmap();};
 
   /* ── Sprint Intelligence ── */
   const SI_STEPS=["Fetching Jira sprint issues…","Analyzing velocity trend across sprints…","Deep-diving blockers and durations…","Checking assignee workload distribution…","Correlating meeting actions with blockers…","Assessing OKR impact of delays…","Running autonomous action tools…","Self-evaluating and finalizing…"];
@@ -940,20 +927,20 @@ export default function PMDashboard(){
   /* ── Decision Log ── */
   const saveDecision=async()=>{
     if(!decisionForm.title.trim()||!decisionForm.decision.trim())return;
-    await supabase.from("decision_log").insert({...decisionForm,user_id:user?.id,trade_offs:decisionForm.trade_offs?decisionForm.trade_offs.split("\n").filter(Boolean):undefined,tags:decisionForm.tags?decisionForm.tags.split(",").map((t:string)=>t.trim()).filter(Boolean):undefined,project_id:decisionForm.project_id||null}).then(undefined,()=>{});
+    await supabase.from("decision_log").insert({...decisionForm,user_id:user?.id,trade_offs:decisionForm.trade_offs?decisionForm.trade_offs.split("\n").filter(Boolean):undefined,tags:decisionForm.tags?decisionForm.tags.split(",").map((t:string)=>t.trim()).filter(Boolean):undefined,project_id:decisionForm.project_id||null}).catch(()=>{});
     setShowAddDecision(false);setDecisionForm({title:"",decision:"",rationale:"",trade_offs:"",project_id:"",tags:""});loadDecisions();
   };
   const logFeedback=async(agentName:string,eventType:string,field:string,original:string,corrected:string)=>{
-    await supabase.from("feedback_events").insert({user_id:user?.id,agent_name:agentName,event_type:eventType,field,original,corrected}).then(undefined,()=>{});loadFeedback();
+    await supabase.from("feedback_events").insert({user_id:user?.id,agent_name:agentName,event_type:eventType,field,original,corrected}).catch(()=>{});loadFeedback();
   };
   const saveKnowledgeItem=async()=>{
     if(!knowledgeForm.title.trim()||!knowledgeForm.content.trim())return;
-    await supabase.from("knowledge_items").insert({...knowledgeForm,user_id:user?.id,tags:knowledgeForm.tags?knowledgeForm.tags.split(",").map((t:string)=>t.trim()).filter(Boolean):[]}).then(undefined,()=>{});
+    await supabase.from("knowledge_items").insert({...knowledgeForm,user_id:user?.id,tags:knowledgeForm.tags?knowledgeForm.tags.split(",").map((t:string)=>t.trim()).filter(Boolean):[]}).catch(()=>{});
     setShowAddKnowledge(false);setKnowledgeForm({type:"insight",title:"",content:"",tags:""});loadKnowledge();
   };
   const saveOutcome=async()=>{
     if(!outcomeForm.feature_name.trim())return;
-    await supabase.from("outcomes").insert({...outcomeForm,user_id:user?.id,project_id:outcomeForm.project_id||null,target_value:parseFloat(outcomeForm.target_value)||null}).then(undefined,()=>{});
+    await supabase.from("outcomes").insert({...outcomeForm,user_id:user?.id,project_id:outcomeForm.project_id||null,target_value:parseFloat(outcomeForm.target_value)||null}).catch(()=>{});
     setShowAddOutcome(false);setOutcomeForm({feature_name:"",project_id:"",hypothesis:"",target_metric:"",target_value:"",measurement_date:""});loadOutcomes();
   };
 
@@ -1301,7 +1288,7 @@ export default function PMDashboard(){
                           <div key={k} className="mos-bucket">
                             <div className="mos-hd"><span style={{fontFamily:"Syne",fontWeight:700,fontSize:13,color:c}}>{l}</span><span className="tag tag-dim" style={{fontSize:9}}>{items.length}</span></div>
                             {items.length===0&&<div style={{padding:"12px 14px",fontSize:12,color:"var(--mut)"}}>No items</div>}
-                            {items.map((it:any)=>(<div key={it.id} className="mos-item"><div style={{flex:1}}>{it.title}</div>{it.project&&<span className="tag tag-dim" style={{fontSize:9}}>{it.project}</span>}<button className="btn btn-icon btn-danger btn-sm" onClick={async()=>{await supabase.from("moscow_items").delete().eq("id",it.id).then(undefined,()=>{});loadMoscow();}}>✕</button></div>))}
+                            {items.map((it:any)=>(<div key={it.id} className="mos-item"><div style={{flex:1}}>{it.title}</div>{it.project&&<span className="tag tag-dim" style={{fontSize:9}}>{it.project}</span>}<button className="btn btn-icon btn-danger btn-sm" onClick={async()=>{await supabase.from("moscow_items").delete().eq("id",it.id).catch(()=>{});loadMoscow();}}>✕</button></div>))}
                           </div>
                         );
                       })}
@@ -2330,7 +2317,7 @@ export default function PMDashboard(){
                         </div>
                         <div style={{display:"flex",gap:5,alignItems:"center",flexShrink:0}}>
                           <span className={`tag ${d.outcome_status==="validated"?"tag-grn":d.outcome_status==="reversed"?"tag-red":"tag-dim"}`} style={{fontSize:9}}>{d.outcome_status}</span>
-                          <button className="btn btn-danger btn-sm" onClick={async()=>{if(!window.confirm("Delete?"))return;await supabase.from("decision_log").delete().eq("id",d.id).then(undefined,()=>{});loadDecisions();}}>✕</button>
+                          <button className="btn btn-danger btn-sm" onClick={async()=>{if(!window.confirm("Delete?"))return;await supabase.from("decision_log").delete().eq("id",d.id).catch(()=>{});loadDecisions();}}>✕</button>
                         </div>
                       </div>
                       <div style={{fontSize:13,lineHeight:1.7,marginBottom:10,padding:"8px 10px",background:"rgba(0,212,255,0.04)",borderRadius:7,borderLeft:"2px solid var(--acc)"}}>{d.decision}</div>
@@ -2360,7 +2347,7 @@ export default function PMDashboard(){
                     <div key={k.id} className="card" style={{padding:"14px 16px"}}>
                       <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:8}}>
                         <span className={`tag ${k.type==="prd"?"tag-pur":k.type==="insight"?"tag-blu":k.type==="competitive"?"tag-amb":k.type==="learning"?"tag-grn":"tag-dim"}`} style={{fontSize:9}}>{k.type}</span>
-                        <button className="btn btn-danger btn-sm" onClick={async()=>{await supabase.from("knowledge_items").delete().eq("id",k.id).then(undefined,()=>{});loadKnowledge();}}>✕</button>
+                        <button className="btn btn-danger btn-sm" onClick={async()=>{await supabase.from("knowledge_items").delete().eq("id",k.id).catch(()=>{});loadKnowledge();}}>✕</button>
                       </div>
                       <div style={{fontFamily:"Syne",fontWeight:700,fontSize:13,marginBottom:6}}>{k.title}</div>
                       <div style={{fontSize:12,color:"var(--mut)",lineHeight:1.6,marginBottom:8}}>{k.content.slice(0,200)}{k.content.length>200?"...":""}</div>
@@ -2428,7 +2415,7 @@ export default function PMDashboard(){
                           <div style={{fontSize:12,marginBottom:3}}>{r.prediction}</div>
                           {r.recommended_action&&<div style={{fontSize:11,color:"var(--acc)"}}>→ {r.recommended_action}</div>}
                         </div>
-                        <button className="btn btn-sm" onClick={async()=>{await supabase.from("risk_predictions").update({status:"dismissed"}).eq("id",r.id).then(undefined,()=>{});loadRiskPreds();}}>Dismiss</button>
+                        <button className="btn btn-sm" onClick={async()=>{await supabase.from("risk_predictions").update({status:"dismissed"}).eq("id",r.id).catch(()=>{});loadRiskPreds();}}>Dismiss</button>
                       </div>
                     ))}
                   </div>
@@ -2679,73 +2666,124 @@ export default function PMDashboard(){
                         </div>
                       )}
                     </div>
-                  </div>
-                )}
-              </div>
-            )}
 
-            {/* PRD */}
-            {page==="prd"&&(
-              <div className="g2">
-                <div className="col">
-                  <div className="card">
-                    <div className="ch"><div><div style={{fontFamily:"Syne",fontWeight:800,fontSize:15}}>📄 Autonomous PRD Agent</div><div style={{fontSize:11,color:"var(--mut)",marginTop:2}}>Web search · OKR alignment · competitive context · saves to knowledge base</div></div></div>
-                    <div className="cb"><div className="col" style={{gap:10}}>
-                      <div className="form-row"><label className="form-label">Product / Feature Name</label><input className="input" value={prdProductName} onChange={e=>setPrdProductName(e.target.value)} placeholder="e.g. AI Alert Suppression Engine for NOC teams"/></div>
-                      <div className="form-row"><label className="form-label">Link to Project (optional)</label><select className="input select" value={prdProjectName} onChange={e=>setPrdProjectName(e.target.value)}><option value="">None</option>{projects.map(p=><option key={p.id} value={p.name}>{p.name}</option>)}</select></div>
-                      <div className="upload-z" style={{marginBottom:0}} onClick={()=>document.getElementById("pf")?.click()}><div style={{fontSize:24,marginBottom:6}}>📎</div><div style={{fontFamily:"Syne",fontWeight:700,fontSize:12,marginBottom:2}}>Drop files or click</div><div style={{fontSize:11,color:"var(--mut)"}}>Supports .txt .csv .docx</div><input id="pf" type="file" style={{display:"none"}} onChange={async(e:any)=>{const f=e.target.files[0];if(f){const t=await f.text();setPrdInput(t);}}}/></div>
-                      <div className="form-row"><label className="form-label">Or paste raw text</label><textarea className="input" value={prdInput} onChange={e=>setPrdInput(e.target.value)} placeholder="Paste focus group transcript, survey results, or feature brief..." style={{minHeight:120,resize:"vertical" as any}}/></div>
-                      <div style={{display:"flex",gap:5,flexWrap:"wrap"}}>{["Web search","OKR alignment","Competitive context","RICE scores","Saves to knowledge base"].map(l=>(<span key={l} style={{fontFamily:"DM Mono",fontSize:9,padding:"3px 8px",borderRadius:100,background:"rgba(124,58,237,0.07)",border:"1px solid rgba(124,58,237,0.15)",color:"var(--pur)"}}>{l}</span>))}</div>
-                      <button onClick={runPRD} disabled={(!prdInput.trim()&&!prdProductName.trim())||prdStatus==="processing"} style={{width:"100%",padding:12,background:(!prdInput.trim()&&!prdProductName.trim())||prdStatus==="processing"?"var(--bdr)":"linear-gradient(90deg,var(--pur),var(--acc))",border:"none",borderRadius:9,fontFamily:"Syne",fontWeight:800,fontSize:14,color:"#000",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",gap:10}}>{prdStatus==="processing"?<><span className="spin" style={{width:15,height:15,borderWidth:2,borderTopColor:"#000",borderColor:"rgba(0,0,0,0.2)"}}/>Generating...</>:"📄 Generate PRD Autonomously"}</button>
-                    </div></div>
-                  </div>
-                  {prdStatus==="processing"&&(
-                    <div className="sa-thinking">
-                      <div style={{fontFamily:"Syne",fontWeight:700,fontSize:13,marginBottom:4}}>Investigating and writing PRD…</div>
-                      {PRD_STEPS.map((step,i)=>(
-                        <div key={i} className="sa-think-step">
-                          <div className={`sa-think-dot ${i<prdAgentStep?"sa-think-done":i===prdAgentStep?"sa-think-active":"sa-think-wait"}`}/>
-                          <span style={{color:i<prdAgentStep?"var(--grn)":i===prdAgentStep?"var(--acc)":"var(--mut)"}}>{step}</span>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </div>
-                <div>
-                  {!prdResult&&prdStatus!=="processing"&&(<div className="card" style={{height:"100%",display:"flex",alignItems:"center",justifyContent:"center",flexDirection:"column",gap:10,opacity:0.4}}><div style={{fontSize:36}}>📄</div><div style={{fontFamily:"Syne",fontWeight:700,fontSize:13}}>PRD appears here</div></div>)}
-                  {prdStatus==="processing"&&(<div className="card" style={{height:"100%",display:"flex",alignItems:"center",justifyContent:"center",flexDirection:"column",gap:12}}><div className="spin" style={{width:32,height:32,borderWidth:3}}/><div style={{fontFamily:"Syne",fontWeight:700}}>Writing PRD…</div></div>)}
-                  {prdResult&&prdStatus==="done"&&(
-                    <div className="col">
-                      {prdAgentResult&&(
-                        <div style={{display:"flex",gap:8,flexWrap:"wrap",padding:"10px 14px",background:"var(--surf2)",border:"1px solid var(--bdr)",borderRadius:9,alignItems:"center"}}>
-                          <span className={prdAgentResult.confidence_score==="High"?"confidence-high":"confidence-medium"}>Confidence: {prdAgentResult.confidence_score}</span>
-                          {prdAgentResult.okr_alignment?.length>0&&<span className="tag tag-grn" style={{fontSize:9}}>✓ OKR aligned</span>}
-                          {prdAgentResult.competitive_context&&<span className="tag tag-pur" style={{fontSize:9}}>✓ Competitive context</span>}
-                          <button className="btn btn-sm" style={{marginLeft:"auto"}} onClick={()=>{setPrdStatus("idle");setPrdInput("");setPrdResult(null);setPrdAgentResult(null);setPrdProductName("");setPrdProjectName("");}}>&#8635; New PRD</button>
+                    {/* PRD */}
+                    <div className="sa-out-sec">
+                      <div className="sa-out-hd" onClick={()=>toggleSuperSec("prd")}>
+                        <div style={{display:"flex",alignItems:"center",gap:10}}><span style={{fontSize:16}}>📄</span><span style={{fontFamily:"Syne",fontWeight:700,fontSize:14}}>Product Requirements</span></div>
+                        <div style={{display:"flex",gap:6}}><button className="btn btn-sm" onClick={e=>{e.stopPropagation();const prd=superResult.prd;if(prd)navigator.clipboard.writeText(`# PRD\n\n## Problem\n${prd.problem}\n\n## Goals\n${prd.goals}\n\n## Users\n${prd.users}\n\n## Requirements\n${(prd.requirements||[]).map((r:string)=>`- ${r}`).join("\n")}\n\n## Metrics\n${(prd.metrics||[]).map((m:string)=>`- ${m}`).join("\n")}\n\n## Constraints\n${(prd.constraints||[]).map((c:string)=>`- ${c}`).join("\n")}\n\n## Open Questions\n${(prd.open_questions||[]).map((q:string)=>`- ${q}`).join("\n")}`).then(()=>alert("Copied!"));}}>Copy MD</button><span style={{fontSize:13,color:"var(--mut)",lineHeight:"24px"}}>{superExpanded.prd?"▾":"▸"}</span></div>
+                      </div>
+                      {superExpanded.prd&&superResult.prd&&(
+                        <div className="sa-out-body">
+                          <div className="g2" style={{gap:14}}>
+                            {[{k:"problem",l:"Problem Statement"},{k:"goals",l:"Goals"},{k:"users",l:"User Segments"}].map(({k,l})=>(
+                              <div key={k} className="sa-field">
+                                <div className="sa-lbl">{l}</div>
+                                <div className="sa-val">{(superResult.prd as any)[k]||<span style={{color:"var(--mut)"}}>—</span>}</div>
+                              </div>
+                            ))}
+                          </div>
+                          <div className="g2" style={{gap:14,marginTop:12}}>
+                            {[{k:"requirements",l:"Requirements"},{k:"metrics",l:"Success Metrics"},{k:"constraints",l:"Constraints"},{k:"open_questions",l:"Open Questions"}].map(({k,l})=>{
+                              const items=(superResult.prd as any)[k]||[];
+                              return(
+                                <div key={k} className="sa-field">
+                                  <div className="sa-lbl">{l}</div>
+                                  {Array.isArray(items)?<div className="sa-list">{items.map((it:string,j:number)=><div key={j} style={{display:"flex",gap:8,fontSize:12,padding:"3px 0",borderBottom:"1px solid var(--bdr)",color:"var(--txt)"}}><span style={{color:k==="open_questions"?"var(--amb)":k==="constraints"?"var(--red)":"var(--grn)",flexShrink:0}}>{k==="open_questions"?"?":k==="constraints"?"⚠":"✓"}</span>{it}</div>)}</div>:<div className="sa-val">{items}</div>}
+                                </div>
+                              );
+                            })}
+                          </div>
                         </div>
                       )}
-                      <div className="card">
-                        <div className="ch"><div><div style={{fontFamily:"Syne",fontWeight:800,fontSize:14}}>{prdAgentResult?.prd?.title||"Product Requirements Document"}</div><div className="mono dim" style={{fontSize:10}}>Draft · {new Date().toLocaleDateString()} · Review before sharing</div></div><button className="btn btn-sm" onClick={()=>navigator.clipboard.writeText(`PRD: ${prdResult.problem}
-
-Stories:
-${(prdResult.stories||[]).join("\n")}
-
-Criteria:
-${(prdResult.criteria||[]).join("\n")}`).then(()=>alert("Copied!"))}>Copy</button></div>
-                        <div className="prd-sec"><div className="prd-lbl">Problem Statement</div><p style={{fontSize:12,lineHeight:1.8}}>{prdResult.problem}</p></div>
-                        {prdAgentResult?.okr_alignment?.length>0&&<div className="prd-sec"><div className="prd-lbl">OKR Alignment</div>{(prdAgentResult.okr_alignment||[]).map((o:any,i:number)=>(<div key={i} style={{display:"flex",gap:8,fontSize:12,padding:"4px 0",borderBottom:"1px solid var(--bdr2)"}}><span style={{color:"var(--grn)"}}>&#9675;</span><div><strong>{o.objective}</strong><div style={{fontSize:11,color:"var(--acc)"}}>{o.contribution}</div></div></div>))}</div>}
-                        {prdAgentResult?.competitive_context&&<div className="prd-sec"><div className="prd-lbl">Competitive Context</div><div style={{fontSize:12,lineHeight:1.7}}>{prdAgentResult.competitive_context}</div></div>}
-                        <div className="prd-sec"><div className="prd-lbl">User Stories</div>{(prdAgentResult?.prd?.user_stories||prdResult.stories||[]).map((s:string,i:number)=>(<div key={i} className="story">{s}</div>))}</div>
-                        <div className="prd-sec"><div className="prd-lbl">Acceptance Criteria</div>{(prdAgentResult?.prd?.acceptance_criteria||prdResult.criteria||[]).map((c:string,i:number)=>(<div key={i} style={{display:"flex",gap:7,fontSize:12,marginBottom:5,padding:"4px 8px",background:"rgba(16,185,129,0.04)",borderRadius:6,border:"1px solid rgba(16,185,129,0.12)"}}><span style={{color:"var(--grn)",flexShrink:0}}>✓</span>{c}</div>))}</div>
-                        <div className="prd-sec"><div className="prd-lbl">Success Metrics</div>{(prdResult.metrics||[]).map((m:string,i:number)=>(<div key={i} style={{fontSize:12,padding:"4px 0",borderBottom:"1px solid var(--bdr2)",display:"flex",gap:7}}><div style={{width:3,height:3,borderRadius:"50%",background:"var(--acc)",flexShrink:0,marginTop:7}}/>{m}</div>))}</div>
-                        {(prdResult.questions||[]).length>0&&<div className="prd-sec"><div className="prd-lbl">Open Questions</div>{(prdResult.questions||[]).map((q:string,i:number)=>(<div key={i} style={{fontSize:12,padding:"3px 0",color:"var(--amb)",display:"flex",gap:6}}><span>?</span>{q}</div>))}</div>}
-                      </div>
                     </div>
-                  )}
-                </div>
+
+                    {/* Risks */}
+                    <div className="sa-out-sec">
+                      <div className="sa-out-hd" onClick={()=>toggleSuperSec("risks")}>
+                        <div style={{display:"flex",alignItems:"center",gap:10}}><span style={{fontSize:16}}>🔔</span><span style={{fontFamily:"Syne",fontWeight:700,fontSize:14}}>Risks</span><span className="tag tag-red" style={{fontSize:9}}>{superResult.risks?.filter((r:any)=>r.severity==="Critical"||r.severity==="High").length||0} critical/high</span></div>
+                        <span style={{fontSize:13,color:"var(--mut)"}}>{superExpanded.risks?"▾":"▸"}</span>
+                      </div>
+                      {superExpanded.risks&&superResult.risks?.length>0&&(
+                        <div className="sa-out-body">
+                          {[...superResult.risks].sort((a:any,b:any)=>{const ord:any={Critical:0,High:1,Medium:2,Low:3};return(ord[a.severity]??4)-(ord[b.severity]??4);}).map((risk:any,i:number)=>(
+                            <div key={i} className={`sa-risk-card ${saRiskClass(risk.severity)}`}>
+                              <div style={{flexShrink:0,marginTop:2}}>
+                                <span style={{fontFamily:"DM Mono",fontSize:9,color:saRiskColor(risk.severity),background:`${saRiskColor(risk.severity)}15`,border:`1px solid ${saRiskColor(risk.severity)}30`,padding:"2px 7px",borderRadius:100}}>{risk.severity}</span>
+                              </div>
+                              <div style={{flex:1}}>
+                                <div style={{display:"flex",gap:6,alignItems:"center",marginBottom:4}}>
+                                  <span style={{fontFamily:"Syne",fontWeight:700,fontSize:12}}>{risk.description}</span>
+                                  <span className="tag tag-dim" style={{fontSize:9}}>{risk.type}</span>
+                                </div>
+                                <div style={{fontSize:11,color:"var(--acc)"}}>→ {risk.mitigation}</div>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Data Sources */}
+                    <div className="sa-out-sec">
+                      <div className="sa-out-hd" onClick={()=>toggleSuperSec("sources")}>
+                        <div style={{display:"flex",alignItems:"center",gap:10}}><span style={{fontSize:14}}>⚡</span><span style={{fontFamily:"Syne",fontWeight:700,fontSize:13}}>Data Sources</span><span className="tag tag-grn" style={{fontSize:9}}>{superResult.data_sources?.length||0} agents</span>{superResult.data_gaps?.length>0&&<span className="tag tag-amb" style={{fontSize:9}}>{superResult.data_gaps.length} gaps</span>}</div>
+                        <span style={{fontSize:13,color:"var(--mut)"}}>{superExpanded.sources?"▾":"▸"}</span>
+                      </div>
+                      {superExpanded.sources&&(
+                        <div className="sa-out-body">
+                          {superResult.data_sources?.map((ds:any,i:number)=>(
+                            <div key={i} style={{display:"flex",gap:10,padding:"7px 0",borderBottom:"1px solid var(--bdr)",fontSize:12}}>
+                              <span className="tag tag-pur" style={{fontSize:9,flexShrink:0,alignSelf:"flex-start",marginTop:2}}>{ds.agent}</span>
+                              <span style={{color:"var(--mut)"}}>{ds.summary}</span>
+                            </div>
+                          ))}
+                          {superResult.data_gaps?.length>0&&(
+                            <div style={{marginTop:12}}>
+                              <div className="section-lbl" style={{marginBottom:6}}>Data Gaps</div>
+                              {superResult.data_gaps.map((gap:string,i:number)=>(
+                                <div key={i} style={{display:"flex",gap:7,fontSize:11,padding:"4px 0",color:"var(--amb)"}}><span>⚠</span>{gap}</div>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Self Evaluation */}
+                    {superResult.self_evaluation&&(
+                      <div className="sa-out-sec">
+                        <div className="sa-out-hd" onClick={()=>toggleSuperSec("eval")}>
+                          <div style={{display:"flex",alignItems:"center",gap:10}}><span style={{fontSize:14}}>🔍</span><span style={{fontFamily:"Syne",fontWeight:700,fontSize:13}}>Self-Evaluation</span><span className={superResult.self_evaluation.hallucination_check==="passed"?"tag tag-grn":"tag tag-red"} style={{fontSize:9}}>Hallucination: {superResult.self_evaluation.hallucination_check}</span></div>
+                          <span style={{fontSize:13,color:"var(--mut)"}}>{superExpanded.eval?"▾":"▸"}</span>
+                        </div>
+                        {superExpanded.eval&&(
+                          <div className="sa-out-body">
+                            {[["Data grounding",superResult.self_evaluation.data_grounding],["Hallucination check",superResult.self_evaluation.hallucination_check],["Improvements made",superResult.self_evaluation.improvements_made]].map(([l,v])=>(
+                              <div key={l} style={{display:"flex",justifyContent:"space-between",padding:"7px 0",borderBottom:"1px solid var(--bdr)",fontSize:12}}>
+                                <span className="dim">{l}</span>
+                                <span style={{color:"var(--acc)",fontFamily:"DM Mono",fontSize:11,maxWidth:300,textAlign:"right"}}>{v}</span>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    )}
+
+                  </div>
+                )}
+
+                {/* Empty state */}
+                {!superResult&&!superRunning&&!superError&&(
+                  <div className="card" style={{padding:32,textAlign:"center",opacity:0.5}}>
+                    <div style={{fontSize:48,marginBottom:12}}>🔮</div>
+                    <div style={{fontFamily:"Syne",fontWeight:700,fontSize:16,marginBottom:6}}>Structured output appears here</div>
+                    <div style={{fontSize:12,color:"var(--mut)",maxWidth:380,margin:"0 auto"}}>Enter a request above or leave blank for a full portfolio brief. The agent will fetch real data from all sources and return PRD + Risks + Prioritization + Exec Summary.</div>
+                  </div>
+                )}
+
               </div>
             )}
-
 
 
             {/* TOKEN ANALYTICS */}
@@ -2963,6 +3001,43 @@ ${(prdResult.criteria||[]).join("\n")}`).then(()=>alert("Copied!"))}>Copy</butto
             )}
 
             {/* PRD */}
+            {page==="prd"&&(
+              <div className="g2">
+                <div className="col">
+                  <div className="card">
+                    <div className="ch"><div className="ct">Input — Research / Focus Group Data</div></div>
+                    <div className="cb">
+                      {prdStatus!=="done"?(<>
+                        <div className="upload-z" style={{marginBottom:12}} onClick={()=>document.getElementById("pf")?.click()}>
+                          <div style={{fontSize:28,marginBottom:8}}>📎</div>
+                          <div style={{fontFamily:"Syne",fontWeight:700,fontSize:13,marginBottom:3}}>Drop files or click to upload</div>
+                          <div style={{fontSize:12,color:"var(--mut)"}}>Supports .txt .csv .docx .pdf</div>
+                          <input id="pf" type="file" style={{display:"none"}} onChange={async(e:any)=>{const f=e.target.files[0];if(f){const t=await f.text();setPrdInput(t);}}}/>
+                        </div>
+                        <div className="section-lbl">Or paste raw text</div>
+                        <textarea className="input" value={prdInput} onChange={e=>setPrdInput(e.target.value)} placeholder={"Paste focus group transcript or survey results...\n\nExample:\n\"Participant 3: Onboarding took 45 minutes...\"\n\"Survey: 18 of 32 said onboarding was #1 pain point...\""} style={{minHeight:180,resize:"vertical" as any,marginBottom:10}}/>
+                        <button onClick={runPRD} disabled={!prdInput.trim()||prdStatus==="processing"} style={{width:"100%",padding:"10px 0",background:prdInput.trim()?"var(--acc)":"var(--bdr)",color:prdInput.trim()?"#000":"var(--mut)",border:"none",borderRadius:8,fontFamily:"Syne",fontWeight:700,fontSize:13,cursor:prdInput.trim()?"pointer":"default"}}>{prdStatus==="processing"?"Analysing...":"⚡ Generate PRD"}</button>
+                        {prdStatus==="processing"&&<div style={{display:"flex",alignItems:"center",gap:10,marginTop:12,fontSize:12,color:"var(--mut)"}}><div className="spin"/>Clustering themes, extracting pain points, writing PRD...</div>}
+                      </>):(<div><div style={{fontSize:12,color:"var(--grn)",marginBottom:10,fontFamily:"DM Mono"}}>✓ Processed {prdInput.split(' ').length} words</div><div style={{display:"flex",flexWrap:"wrap",gap:5,marginBottom:14}}>{prdResult.themes.map((t:any,i:number)=><span key={i} className="tag tag-blu">{t.lbl} <span style={{opacity:0.6}}>×{t.n}</span></span>)}</div><button onClick={()=>{setPrdStatus("idle");setPrdInput("");setPrdResult(null);}} style={{fontSize:11,fontFamily:"DM Mono",padding:"4px 10px",border:"1px solid var(--bdr)",borderRadius:6,background:"transparent",color:"var(--mut)",cursor:"pointer"}}>↺ New input</button></div>)}
+                    </div>
+                  </div>
+                </div>
+                <div>
+                  {!prdResult&&prdStatus!=="processing"&&<div className="card" style={{height:"100%",display:"flex",alignItems:"center",justifyContent:"center",flexDirection:"column",gap:10,opacity:0.4}}><div style={{fontSize:36}}>📄</div><div style={{fontFamily:"Syne",fontWeight:700,fontSize:13}}>PRD appears here</div></div>}
+                  {prdStatus==="processing"&&<div className="card" style={{height:"100%",display:"flex",alignItems:"center",justifyContent:"center",flexDirection:"column",gap:12}}><div className="spin" style={{width:32,height:32,borderWidth:3}}/><div style={{fontFamily:"Syne",fontWeight:700}}>Writing PRD...</div></div>}
+                  {prdResult&&(<div className="card">
+                    <div className="ch"><div><div style={{fontFamily:"Syne",fontWeight:800,fontSize:14}}>Product Requirements Document</div><div className="mono dim" style={{fontSize:10}}>AI-generated · {new Date().toLocaleDateString()} · Review before sharing</div></div><span className="tag tag-grn">Draft</span></div>
+                    <div className="prd-sec"><div className="prd-lbl">Problem Statement</div><p style={{fontSize:12,lineHeight:1.7}}>{prdResult.problem}</p></div>
+                    <div className="prd-sec"><div className="prd-lbl">User Stories</div>{prdResult.stories.map((s:string,i:number)=><div key={i} className="story">{s}</div>)}</div>
+                    <div className="prd-sec"><div className="prd-lbl">Acceptance Criteria</div>{prdResult.criteria.map((c:string,i:number)=><div key={i} style={{display:"flex",gap:7,fontSize:12,marginBottom:4,alignItems:"flex-start"}}><span style={{color:"var(--grn)",flexShrink:0}}>✓</span>{c}</div>)}</div>
+                    <div className="prd-sec"><div className="prd-lbl">Success Metrics</div>{prdResult.metrics.map((m:string,i:number)=><div key={i} style={{fontSize:12,padding:"3px 0",borderBottom:i<prdResult.metrics.length-1?"1px solid var(--bdr2)":"none",display:"flex",gap:7}}><div style={{width:3,height:3,borderRadius:"50%",background:"var(--acc)",flexShrink:0,marginTop:7}}/>{m}</div>)}</div>
+                    {prdResult.questions?.length>0&&<div className="prd-sec"><div className="prd-lbl">Open Questions</div>{prdResult.questions.map((q:string,i:number)=><div key={i} style={{fontSize:12,padding:"3px 0",color:"var(--amb)",display:"flex",gap:6}}><span>?</span>{q}</div>)}</div>}
+                    <div style={{padding:"11px 16px",borderTop:"1px solid var(--bdr)"}}><button className="xbtn" onClick={()=>{const md=`# PRD\n\n## Problem\n${prdResult.problem}\n\n## User Stories\n${prdResult.stories.map((s:string)=>`- ${s}`).join("\n")}\n\n## Acceptance Criteria\n${prdResult.criteria.map((c:string)=>`- [ ] ${c}`).join("\n")}\n\n## Success Metrics\n${prdResult.metrics.map((m:string)=>`- ${m}`).join("\n")}`;navigator.clipboard.writeText(md).then(()=>alert("Copied!"));}}>Copy as Markdown</button></div>
+                  </div>)}
+                </div>
+              </div>
+            )}
+
             {/* STAKEHOLDERS */}
             {page==="stakeholders"&&(
               <div className="col">
@@ -3115,7 +3190,7 @@ ${(prdResult.criteria||[]).join("\n")}`).then(()=>alert("Copied!"))}>Copy</butto
 
         {showAddCal&&(<Modal title="Add Calendar Event" onClose={()=>setShowAddCal(false)}><div className="form-grid"><div className="form-row" style={{gridColumn:"1/-1"}}><label className="form-label">Title</label><input className="input" value={calForm.title} onChange={e=>setCalForm(p=>({...p,title:e.target.value}))} autoFocus placeholder="Sprint Planning — Mobile Team"/></div><div className="form-row"><label className="form-label">Start Time</label><input className="input" type="time" value={calForm.startTime} onChange={e=>setCalForm(p=>({...p,startTime:e.target.value}))}/></div><div className="form-row"><label className="form-label">End Time</label><input className="input" type="time" value={calForm.endTime} onChange={e=>setCalForm(p=>({...p,endTime:e.target.value}))}/></div><div className="form-row" style={{gridColumn:"1/-1"}}><label className="form-label">Attendees (comma-separated)</label><input className="input" value={calForm.attendees} onChange={e=>setCalForm(p=>({...p,attendees:e.target.value}))} placeholder="ana@company.com, chen@company.com"/></div><div className="form-row" style={{gridColumn:"1/-1"}}><label className="form-label">Description</label><input className="input" value={calForm.description} onChange={e=>setCalForm(p=>({...p,description:e.target.value}))} placeholder="Agenda or context..."/></div></div><div style={{fontSize:11,color:"var(--mut)"}}>A Google Meet link will be auto-generated.</div><div className="form-actions"><button className="btn" onClick={()=>setShowAddCal(false)}>Cancel</button><button className="btn btn-primary" onClick={createCalEvent} disabled={syncingInt==="cal-create"}>{syncingInt==="cal-create"?"Creating...":"Create Event + Meet Link"}</button></div></Modal>)}
 
-        {showAddMoscow&&(<Modal title="Add MoSCoW Item" onClose={()=>setShowAddMoscow(false)}><div className="form-row"><label className="form-label">Feature / Initiative</label><input className="input" value={moscowForm.title} onChange={e=>setMoscowForm(p=>({...p,title:e.target.value}))} autoFocus placeholder="e.g. Real-time notifications"/></div><div className="form-grid"><div className="form-row"><label className="form-label">Bucket</label><select className="input select" value={moscowForm.bucket} onChange={e=>setMoscowForm(p=>({...p,bucket:e.target.value}))}><option value="must">Must Have</option><option value="should">Should Have</option><option value="could">Could Have</option><option value="wont">Won't Have</option></select></div><div className="form-row"><label className="form-label">Project</label><select className="input select" value={moscowForm.project} onChange={e=>setMoscowForm(p=>({...p,project:e.target.value}))}><option value="">All</option>{projects.map(p=><option key={p.id} value={p.name}>{p.name}</option>)}</select></div></div><div className="form-actions"><button className="btn" onClick={()=>setShowAddMoscow(false)}>Cancel</button><button className="btn btn-primary" onClick={async()=>{if(!moscowForm.title.trim())return;await supabase.from("moscow_items").insert({...moscowForm,user_id:user?.id}).then(undefined,()=>{});setShowAddMoscow(false);setMoscowForm({title:"",bucket:"must",project:""});loadMoscow();}}>Add Item</button></div></Modal>)}
+        {showAddMoscow&&(<Modal title="Add MoSCoW Item" onClose={()=>setShowAddMoscow(false)}><div className="form-row"><label className="form-label">Feature / Initiative</label><input className="input" value={moscowForm.title} onChange={e=>setMoscowForm(p=>({...p,title:e.target.value}))} autoFocus placeholder="e.g. Real-time notifications"/></div><div className="form-grid"><div className="form-row"><label className="form-label">Bucket</label><select className="input select" value={moscowForm.bucket} onChange={e=>setMoscowForm(p=>({...p,bucket:e.target.value}))}><option value="must">Must Have</option><option value="should">Should Have</option><option value="could">Could Have</option><option value="wont">Won't Have</option></select></div><div className="form-row"><label className="form-label">Project</label><select className="input select" value={moscowForm.project} onChange={e=>setMoscowForm(p=>({...p,project:e.target.value}))}><option value="">All</option>{projects.map(p=><option key={p.id} value={p.name}>{p.name}</option>)}</select></div></div><div className="form-actions"><button className="btn" onClick={()=>setShowAddMoscow(false)}>Cancel</button><button className="btn btn-primary" onClick={async()=>{if(!moscowForm.title.trim())return;await supabase.from("moscow_items").insert({...moscowForm,user_id:user?.id}).catch(()=>{});setShowAddMoscow(false);setMoscowForm({title:"",bucket:"must",project:""});loadMoscow();}}>Add Item</button></div></Modal>)}
 
         {showAddRoadmap&&(<Modal title="Add Initiative" onClose={()=>setShowAddRoadmap(false)}><div className="form-row"><label className="form-label">Title</label><input className="input" value={rmForm.title} onChange={e=>setRmForm(p=>({...p,title:e.target.value}))} autoFocus placeholder="e.g. Mobile App v2"/></div><div className="form-grid"><div className="form-row"><label className="form-label">Project</label><select className="input select" value={rmForm.project} onChange={e=>setRmForm(p=>({...p,project:e.target.value}))}><option value="">None</option>{projects.map(p=><option key={p.id} value={p.name}>{p.name}</option>)}</select></div><div className="form-row"><label className="form-label">Color</label><div style={{display:"flex",gap:6,paddingTop:4}}>{["#00d4ff","#7c3aed","#10b981","#f59e0b","#ef4444"].map(c=><div key={c} onClick={()=>setRmForm(p=>({...p,color:c}))} style={{width:24,height:24,borderRadius:6,background:c,cursor:"pointer",border:rmForm.color===c?"2px solid #fff":"2px solid transparent"}}/>)}</div></div><div className="form-row"><label className="form-label">Start Quarter</label><select className="input select" value={rmForm.startQ} onChange={e=>setRmForm(p=>({...p,startQ:parseInt(e.target.value)}))}>{["Q1","Q2","Q3","Q4"].map((q,i)=><option key={q} value={i}>{q}</option>)}</select></div><div className="form-row"><label className="form-label">End Quarter</label><select className="input select" value={rmForm.endQ} onChange={e=>setRmForm(p=>({...p,endQ:parseInt(e.target.value)}))}>{["Q1","Q2","Q3","Q4"].map((q,i)=><option key={q} value={i}>{q}</option>)}</select></div></div><div className="form-actions"><button className="btn" onClick={()=>setShowAddRoadmap(false)}>Cancel</button><button className="btn btn-primary" onClick={saveRm}>Add Initiative</button></div></Modal>)}
 
