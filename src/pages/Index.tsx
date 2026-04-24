@@ -1043,9 +1043,62 @@ export default function PMDashboard(){
     finally{setAgentRunning(null);}
   };
   const runPrio=async()=>{
-    const riceProj=prioProjId==="all"?projects:projects.filter((p:any)=>p.id===prioProjId);const items=riceProj.map((p:any)=>({title:p.name,description:`Status:${p.status},Progress:${p.progress}%`}));
-    if(!items.length){setAgentError("No projects to score.");setAgentResultType("error");return;}
-    await runAgent("prioritization",{items});loadRice();
+    const riceProj=prioProjId==="all"?projects:projects.filter((p:any)=>p.id===prioProjId);
+    if(!riceProj.length){setAgentError("No projects to score.");setAgentResultType("error");return;}
+    // Enrich each project with live Jira signals before scoring
+    const items=riceProj.map((p:any)=>{
+      const issues=jiraIssues.filter((i:any)=>i.project_key===p.jira_key);
+      const total=issues.length;
+      const done=issues.filter((i:any)=>["done","closed","resolved"].includes(i.status?.toLowerCase()||"")).length;
+      const blockers=issues.filter((i:any)=>(i.status||"").toLowerCase().includes("block")).length;
+      const highBugs=issues.filter((i:any)=>i.issue_type==="Bug"&&i.priority==="high").length;
+      const openHighPri=issues.filter((i:any)=>i.priority==="high"&&!["done","closed","resolved"].includes(i.status?.toLowerCase()||"")).length;
+      const assignees=[...new Set(issues.map((i:any)=>i.assignee).filter(Boolean))];
+      const atRiskKRs=okrs.flatMap((o:any)=>o.krs||[]).filter((k:any)=>k.status==="at-risk").length;
+      return{
+        title:p.name,
+        description:`Status:${p.status}, Progress:${total>0?Math.round(done/total*100):p.progress}%, Blockers:${blockers}, HighBugs:${highBugs}, HighPriIssues:${openHighPri}, TeamSize:${assignees.length}, Owner:${p.owner||"unknown"}, DueDateSet:${!!p.due_date}, AtRiskOKRs:${atRiskKRs}`,
+        jira_context:{total_issues:total,completion_pct:total>0?Math.round(done/total*100):p.progress,blockers,high_bugs:highBugs,open_high_priority:openHighPri,team_size:assignees.length},
+        project_id:p.id,
+      };
+    });
+    await runAgent("prioritization",{items,okr_context:okrs.slice(0,3).map((o:any)=>({objective:o.objective,progress:o.overall_pct,at_risk_krs:(o.krs||[]).filter((k:any)=>k.status==="at-risk").length})),userId:user?.id});
+    loadRice();
+  };
+
+  const autoPopulateMoscow=async()=>{
+    setAgentRunning("moscow-auto");
+    try{
+      const proj=prioProjId==="all"?null:projects.find((p:any)=>p.id===prioProjId);
+      const issues=jiraIssues.filter((i:any)=>!proj||i.project_key===proj?.jira_key).slice(0,40);
+      if(!issues.length){alert("No Jira issues to classify. Sync Jira first.");setAgentRunning(null);return;}
+      // Classify each Jira issue into MoSCoW using priority + type + status
+      const classified=issues.map((i:any)=>{
+        const pri=i.priority?.toLowerCase()||"med";
+        const type=i.issue_type?.toLowerCase()||"";
+        const status=i.status?.toLowerCase()||"";
+        const isDone=["done","closed","resolved"].includes(status);
+        if(isDone)return null; // skip done issues
+        // Must: P0/high bugs, blockers, critical stories
+        if(pri==="high"&&(type==="bug"||type==="blocker"||status.includes("block")))return{bucket:"must",title:i.summary,jira_key:i.jira_key,project:i.project_key};
+        // Must: high priority stories/tasks
+        if(pri==="high")return{bucket:"must",title:i.summary,jira_key:i.jira_key,project:i.project_key};
+        // Should: medium priority
+        if(pri==="medium"||pri==="med")return{bucket:"should",title:i.summary,jira_key:i.jira_key,project:i.project_key};
+        // Won't: low priority or enhancement
+        if(pri==="low"||type==="improvement")return{bucket:"wont",title:i.summary,jira_key:i.jira_key,project:i.project_key};
+        // Could: everything else
+        return{bucket:"could",title:i.summary,jira_key:i.jira_key,project:i.project_key};
+      }).filter(Boolean);
+      // Deduplicate against existing items
+      const existing=new Set(moscowItems.map((m:any)=>m.jira_key).filter(Boolean));
+      const toInsert=classified.filter((c:any)=>!existing.has(c.jira_key));
+      if(!toInsert.length){alert("All Jira issues already in MoSCoW. Delete existing items to re-populate.");setAgentRunning(null);return;}
+      await Promise.all(toInsert.map((item:any)=>supabase.from("moscow_items").insert({...item,user_id:user?.id})));
+      loadMoscow();
+      alert(`Added ${toInsert.length} items from Jira (${classified.filter((c:any)=>c?.bucket==="must").length} Must, ${classified.filter((c:any)=>c?.bucket==="should").length} Should, ${classified.filter((c:any)=>c?.bucket==="could").length} Could, ${classified.filter((c:any)=>c?.bucket==="wont").length} Won't)`);
+    }catch(e:any){alert("Auto-populate failed: "+e.message);}
+    setAgentRunning(null);
   };
   const runDigest=()=>runAgent("weekly-digest",{});
   const runRisk=async()=>{await runAgent("risk-monitor",{});loadProjects();loadTasks();};
@@ -1737,6 +1790,40 @@ export default function PMDashboard(){
             {/* PRIORITIZATION */}
             {page==="priority"&&(
               <div className="col">
+
+                {/* Live signal bar */}
+                {(()=>{
+                  const total=jiraIssues.length;
+                  const blocked=jiraIssues.filter((i:any)=>(i.status||"").toLowerCase().includes("block")).length;
+                  const highBugs=jiraIssues.filter((i:any)=>i.issue_type==="Bug"&&i.priority==="high"&&!["done","closed","resolved"].includes(i.status?.toLowerCase()||"")).length;
+                  const atRisk=projects.filter((p:any)=>p.status==="at-risk").length;
+                  const atRiskKRs=okrs.flatMap((o:any)=>o.krs||[]).filter((k:any)=>k.status==="at-risk").length;
+                  const lastScore=riceScores[0]?.created_at;
+                  const stale=lastScore&&(Date.now()-new Date(lastScore).getTime())>86400000*2;
+                  return(
+                    <div style={{display:"flex",gap:10,padding:"10px 16px",background:"var(--surf)",border:"1px solid var(--bdr)",borderRadius:10,alignItems:"center",flexWrap:"wrap"}}>
+                      <span style={{fontFamily:"DM Mono",fontSize:9,color:"var(--mut)",letterSpacing:".1em"}}>LIVE SIGNALS</span>
+                      {[
+                        {v:total,l:"Jira issues",c:"var(--acc)"},
+                        {v:blocked,l:"blockers",c:blocked>0?"var(--red)":"var(--grn)"},
+                        {v:highBugs,l:"open high bugs",c:highBugs>0?"var(--red)":"var(--grn)"},
+                        {v:atRisk,l:"projects at-risk",c:atRisk>0?"var(--amb)":"var(--grn)"},
+                        {v:atRiskKRs,l:"KRs at-risk",c:atRiskKRs>0?"var(--amb)":"var(--grn)"},
+                      ].map(({v,l,c})=>(
+                        <div key={l} style={{display:"flex",alignItems:"baseline",gap:4}}>
+                          <span style={{fontFamily:"Syne",fontWeight:800,fontSize:16,color:c}}>{v}</span>
+                          <span style={{fontSize:11,color:"var(--mut)"}}>{l}</span>
+                        </div>
+                      ))}
+                      <div style={{marginLeft:"auto",display:"flex",gap:6,alignItems:"center"}}>
+                        {stale&&<span style={{fontFamily:"DM Mono",fontSize:9,color:"var(--amb)",padding:"2px 8px",background:"rgba(245,158,11,0.08)",border:"1px solid rgba(245,158,11,0.2)",borderRadius:100}}>⚠ Scores {Math.floor((Date.now()-new Date(lastScore).getTime())/86400000)}d old — re-score</span>}
+                        {!stale&&riceScores.length>0&&<span style={{fontFamily:"DM Mono",fontSize:9,color:"var(--grn)"}}>✓ Scores current</span>}
+                        <span style={{fontFamily:"DM Mono",fontSize:9,color:"var(--mut)"}}>⟳ auto-refreshes with Jira sync</span>
+                      </div>
+                    </div>
+                  );
+                })()}
+
                 <div style={{display:"flex",gap:10,alignItems:"center",flexWrap:"wrap"}}>
                   <div className="fw-tabs">
                     {[{k:"rice",l:"RICE"},{k:"moscow",l:"MoSCoW"},{k:"cost-delay",l:"Cost of Delay"},{k:"impact-effort",l:"Impact / Effort"}].map(({k,l})=>(
@@ -1746,76 +1833,181 @@ export default function PMDashboard(){
                   <select className="input select" style={{width:190}} value={prioProjId} onChange={e=>setPrioProjId(e.target.value)}>
                     {prioProjects.map(p=><option key={p.id} value={p.id}>{p.name}</option>)}
                   </select>
-                  {(prioFw==="rice"||prioFw==="cost-delay")&&<button className="btn btn-primary btn-sm" onClick={runPrio} disabled={agentRunning==="prioritization"}>{agentRunning==="prioritization"?<span style={{display:"flex",alignItems:"center",gap:6}}><span className="spin" style={{width:12,height:12,borderWidth:1.5}}/>Scoring...</span>:"⚡ AI Score"}</button>}
+                  {(prioFw==="rice"||prioFw==="cost-delay")&&(
+                    <button className="btn btn-primary btn-sm" onClick={runPrio} disabled={agentRunning==="prioritization"}>
+                      {agentRunning==="prioritization"?<span style={{display:"flex",alignItems:"center",gap:6}}><span className="spin" style={{width:12,height:12,borderWidth:1.5}}/>Scoring...</span>:"⚡ Re-score with Live Data"}
+                    </button>
+                  )}
+                  {prioFw==="moscow"&&<button className="btn btn-sm" onClick={autoPopulateMoscow} disabled={agentRunning==="moscow-auto"} style={{borderColor:"rgba(0,212,255,0.3)",color:"var(--acc)"}}>{agentRunning==="moscow-auto"?<span style={{display:"flex",alignItems:"center",gap:6}}><span className="spin" style={{width:12,height:12,borderWidth:1.5}}/>Populating...</span>:"✦ Auto-populate from Jira"}</button>}
                 </div>
 
+                {/* RICE tab */}
                 {prioFw==="rice"&&(
                   <div className="card">
-                    <div className="ch"><div className="ct">RICE Score · AI-Calculated</div><div style={{fontSize:11,color:"var(--mut)"}}>Reach × Impact × Confidence ÷ Effort</div></div>
-                    {(riceScores.length>0?riceScores:projects.filter(p=>prioProjId==="all"||p.id===prioProjId).map(p=>({title:p.name,rice_score:0,reach:0,impact:0,confidence:0,effort:0,reasoning:"Click AI Score to calculate"}))).sort((a:any,b:any)=>b.rice_score-a.rice_score).map((it:any,i:number)=>(
-                      <div key={i} className="tr" style={{gridTemplateColumns:"1fr 36px 36px 36px 36px 100px"}}>
-                        <div><div style={{fontWeight:500,fontSize:12}}>{it.title||it.name}</div>{it.reasoning&&<div style={{fontSize:10,color:"var(--mut)",marginTop:1}}>{it.reasoning}</div>}</div>
-                        {[it.reach??0,it.impact??0,it.confidence??0,it.effort??0].map((v:any,j:number)=><span key={j} className="mono dim" style={{fontSize:11}}>{v||"—"}</span>)}
-                        <div className="bar-wrap"><div className="bar-track"><div className="bar-fill" style={{width:`${Math.min(100,(it.rice_score/130)*100)}%`,background:`hsl(${Math.min(it.rice_score+80,160)},60%,58%)`}}/></div><span className="mono acc" style={{fontSize:11,width:24,textAlign:"right"}}>{Math.round(it.rice_score||0)}</span></div>
+                    <div className="ch">
+                      <div>
+                        <div className="ct">RICE Score · Computed from live Jira signals</div>
+                        <div style={{fontSize:10,color:"var(--mut)",marginTop:2}}>Reach × Impact × Confidence ÷ Effort · enriched with blockers, bug count, OKR alignment, team size</div>
                       </div>
-                    ))}
-                    {riceScores.length===0&&projects.length>0&&<div className="empty" style={{padding:16}}>Click ⚡ AI Score above.</div>}
+                      {riceScores[0]?.created_at&&<span style={{fontFamily:"DM Mono",fontSize:9,color:"var(--mut)"}}>Last scored {new Date(riceScores[0].created_at).toLocaleDateString()}</span>}
+                    </div>
+                    {(riceScores.length>0?riceScores:projects.filter(p=>prioProjId==="all"||p.id===prioProjId).map(p=>({title:p.name,rice_score:0,reach:0,impact:0,confidence:0,effort:0,reasoning:"Click Re-score to calculate with live Jira data"}))).sort((a:any,b:any)=>b.rice_score-a.rice_score).map((it:any,i:number)=>{
+                      const proj=projects.find((p:any)=>p.name===it.title);
+                      const issues=jiraIssues.filter((j:any)=>j.project_key===proj?.jira_key);
+                      const total=issues.length;
+                      const done=issues.filter((j:any)=>["done","closed","resolved"].includes(j.status?.toLowerCase()||"")).length;
+                      const blocked=issues.filter((j:any)=>(j.status||"").toLowerCase().includes("block")).length;
+                      const completion=total>0?Math.round(done/total*100):proj?.progress||0;
+                      return(
+                        <div key={i} className="tr" style={{gridTemplateColumns:"1fr 160px 36px 36px 36px 36px 100px"}}>
+                          <div>
+                            <div style={{fontWeight:500,fontSize:12}}>{it.title||it.name}</div>
+                            {it.reasoning&&<div style={{fontSize:10,color:"var(--mut)",marginTop:1}}>{it.reasoning}</div>}
+                            {it.recommended_quarter&&<span className="tag tag-dim" style={{fontSize:9,marginTop:3}}>{it.recommended_quarter}</span>}
+                          </div>
+                          {/* Live health signals */}
+                          <div style={{display:"flex",gap:5,alignItems:"center",flexWrap:"wrap"}}>
+                            {total>0&&<span style={{fontFamily:"DM Mono",fontSize:9,color:"var(--acc)"}}>{completion}% done</span>}
+                            {blocked>0&&<span style={{fontFamily:"DM Mono",fontSize:9,color:"var(--red)",background:"rgba(239,68,68,0.08)",padding:"1px 5px",borderRadius:4}}>{blocked} blocked</span>}
+                            {proj?.status==="at-risk"&&<span style={{fontFamily:"DM Mono",fontSize:9,color:"var(--amb)"}}>⚠ at-risk</span>}
+                          </div>
+                          {[it.reach??0,it.impact??0,it.confidence??0,it.effort??0].map((v:any,j:number)=><span key={j} className="mono dim" style={{fontSize:11}}>{v||"—"}</span>)}
+                          <div className="bar-wrap"><div className="bar-track"><div className="bar-fill" style={{width:`${Math.min(100,(it.rice_score/130)*100)}%`,background:`hsl(${Math.min(it.rice_score+80,160)},60%,58%)`}}/></div><span className="mono acc" style={{fontSize:11,width:24,textAlign:"right"}}>{Math.round(it.rice_score||0)}</span></div>
+                        </div>
+                      );
+                    })}
+                    {riceScores.length===0&&projects.length>0&&<div className="infobox ib-blue" style={{margin:12,fontSize:11}}>⚡ Click Re-score — the agent reads live Jira issues, blockers, bug counts and OKR alignment before scoring. Not just project name.</div>}
                   </div>
                 )}
 
+                {/* MoSCoW tab */}
                 {prioFw==="moscow"&&(
                   <div className="col">
-                    <div style={{display:"flex",justifyContent:"flex-end"}}><button className="btn btn-primary btn-sm" onClick={()=>setShowAddMoscow(true)}>+ Add Item</button></div>
                     <div className="g2">
                       {[{k:"must",l:"Must Have",c:"var(--red)"},{k:"should",l:"Should Have",c:"var(--amb)"},{k:"could",l:"Could Have",c:"var(--grn)"},{k:"wont",l:"Won't Have",c:"var(--mut)"}].map(({k,l,c})=>{
-                        const proj=projects.find((p:any)=>p.id===prioProjId);const items=moscowItems.filter((i:any)=>i.bucket===k&&(prioProjId==="all"||i.project===(proj?.name||prioProjId)));
+                        const proj=projects.find((p:any)=>p.id===prioProjId);
+                        const items=moscowItems.filter((i:any)=>i.bucket===k&&(prioProjId==="all"||i.project===(proj?.name||prioProjId)));
                         return(
                           <div key={k} className="mos-bucket">
                             <div className="mos-hd"><span style={{fontFamily:"Syne",fontWeight:700,fontSize:13,color:c}}>{l}</span><span className="tag tag-dim" style={{fontSize:9}}>{items.length}</span></div>
-                            {items.length===0&&<div style={{padding:"12px 14px",fontSize:12,color:"var(--mut)"}}>No items</div>}
-                            {items.map((it:any)=>(<div key={it.id} className="mos-item"><div style={{flex:1}}>{it.title}</div>{it.project&&<span className="tag tag-dim" style={{fontSize:9}}>{it.project}</span>}<button className="btn btn-icon btn-danger btn-sm" onClick={async()=>{await supabase.from("moscow_items").delete().eq("id",it.id);loadMoscow();}}>✕</button></div>))}
+                            {items.length===0&&<div style={{padding:"12px 14px",fontSize:12,color:"var(--mut)"}}>No items · use Auto-populate or + Add Item</div>}
+                            {items.map((it:any)=>(
+                              <div key={it.id} className="mos-item">
+                                <div style={{flex:1}}>
+                                  <div>{it.title}</div>
+                                  {it.jira_key&&<span style={{fontFamily:"DM Mono",fontSize:9,color:"var(--pur)"}}>{it.jira_key}</span>}
+                                </div>
+                                {it.project&&<span className="tag tag-dim" style={{fontSize:9}}>{it.project}</span>}
+                                <button className="btn btn-icon btn-danger btn-sm" onClick={async()=>{await supabase.from("moscow_items").delete().eq("id",it.id);loadMoscow();}}>✕</button>
+                              </div>
+                            ))}
                           </div>
                         );
                       })}
                     </div>
+                    <div className="infobox ib-blue" style={{fontSize:11}}>✦ <strong className="acc">Auto-populate</strong> reads live Jira issues and classifies them into Must/Should/Could/Won't based on priority, issue type, and OKR alignment. Existing items are preserved.</div>
+                    <div style={{display:"flex",justifyContent:"flex-end"}}><button className="btn btn-primary btn-sm" onClick={()=>setShowAddMoscow(true)}>+ Add Item</button></div>
                   </div>
                 )}
 
+                {/* Cost of Delay tab */}
                 {prioFw==="cost-delay"&&(
                   <div className="card">
-                    <div className="ch"><div className="ct">Cost of Delay = Urgency × Value ÷ Duration</div></div>
+                    <div className="ch">
+                      <div className="ct">Cost of Delay — live from Jira</div>
+                      <div style={{fontSize:11,color:"var(--mut)"}}>CoD = Urgency × Value ÷ Duration · urgency from blocker count · value from OKR alignment</div>
+                    </div>
                     {projects.length===0?<div className="empty">Add projects first.</div>:(
                       <>
-                        <div className="th-row" style={{gridTemplateColumns:"1fr 80px 80px 80px 110px"}}><span>Project</span><span>Urgency</span><span>Value</span><span>Duration</span><span>CoD Score</span></div>
+                        <div className="th-row" style={{gridTemplateColumns:"1fr 70px 70px 70px 70px 110px"}}><span>Project</span><span>Urgency</span><span>Value</span><span>Duration</span><span>Blockers</span><span>CoD Score</span></div>
                         {(prioProjId==="all"?projects:projects.filter((p:any)=>p.id===prioProjId)).map((p:any,i:number)=>{
                           const rs=riceScores.find((r:any)=>r.title===p.name);
-                          const urg=rs?.reach||50,val=rs?.impact||5,dur=rs?.effort||3;
+                          const issues=jiraIssues.filter((j:any)=>j.project_key===p.jira_key);
+                          const blockers=issues.filter((j:any)=>(j.status||"").toLowerCase().includes("block")).length;
+                          const total=issues.length;
+                          const done=issues.filter((j:any)=>["done","closed","resolved"].includes(j.status?.toLowerCase()||"")).length;
+                          const completion=total>0?Math.round(done/total*100):p.progress;
+                          // Urgency: live blocker signal boosts urgency
+                          const urg=Math.min(100,(rs?.reach||50)+(blockers*10));
+                          const val=rs?.impact||5;
+                          // Duration: remaining work estimate (weeks)
+                          const remaining=total>0?Math.ceil((total-done)/Math.max(1,done/4)):3;
+                          const dur=Math.max(1,rs?.effort||remaining);
                           const cod=dur>0?Math.round((urg*val)/dur):0;
-                          return(<div key={i} className="tr" style={{gridTemplateColumns:"1fr 80px 80px 80px 110px"}}><span style={{fontWeight:500,fontSize:12}}>{p.name}</span><span className="mono dim" style={{fontSize:11}}>{urg}</span><span className="mono dim" style={{fontSize:11}}>{val}</span><span className="mono dim" style={{fontSize:11}}>{dur}w</span><div className="bar-wrap"><div className="bar-track"><div className="bar-fill" style={{width:`${Math.min(100,cod/200*100)}%`,background:"var(--red)"}}/></div><span className="mono" style={{fontSize:11,color:"var(--red)",width:32,textAlign:"right"}}>{cod}</span></div></div>);
+                          const codColor=cod>200?"var(--red)":cod>100?"var(--amb)":"var(--grn)";
+                          return(
+                            <div key={i} className="tr" style={{gridTemplateColumns:"1fr 70px 70px 70px 70px 110px"}}>
+                              <div>
+                                <span style={{fontWeight:500,fontSize:12}}>{p.name}</span>
+                                <span style={{fontFamily:"DM Mono",fontSize:9,color:"var(--mut)",marginLeft:6}}>{completion}% done</span>
+                              </div>
+                              <span className="mono dim" style={{fontSize:11}}>{urg}{blockers>0&&<span style={{color:"var(--red)",fontSize:9}}> +{blockers*10}b</span>}</span>
+                              <span className="mono dim" style={{fontSize:11}}>{val}</span>
+                              <span className="mono dim" style={{fontSize:11}}>{dur}w</span>
+                              <span className="mono" style={{fontSize:11,color:blockers>0?"var(--red)":"var(--grn)"}}>{blockers}</span>
+                              <div className="bar-wrap"><div className="bar-track"><div className="bar-fill" style={{width:`${Math.min(100,cod/300*100)}%`,background:codColor}}/></div><span className="mono" style={{fontSize:11,color:codColor,width:36,textAlign:"right"}}>{cod}</span></div>
+                            </div>
+                          );
                         })}
-                        {riceScores.length===0&&<div className="infobox ib-blue" style={{margin:"12px 16px",fontSize:11}}>Run RICE scoring first to populate urgency and effort values.</div>}
+                        <div className="infobox ib-blue" style={{margin:12,fontSize:11}}>Urgency is boosted +10 per active blocker. Duration uses remaining Jira issues ÷ velocity estimate. Updates on every Jira sync.</div>
                       </>
                     )}
                   </div>
                 )}
 
+                {/* Impact / Effort quadrant - real placement from RICE */}
                 {prioFw==="impact-effort"&&(
                   <div className="card">
-                    <div className="ch"><div className="ct">Impact vs Effort Matrix</div></div>
+                    <div className="ch"><div className="ct">Impact vs Effort — from live RICE scores</div></div>
                     <div className="cb">
-                      <div style={{display:"flex",justifyContent:"space-between",fontSize:9,fontFamily:"DM Mono",color:"var(--mut)",marginBottom:6}}><span>← Low Effort</span><span>High Effort →</span></div>
-                      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gridTemplateRows:"1fr 1fr",gap:8,height:280}}>
-                        {[{c:"rgba(16,185,129,0.08)",bc:"rgba(16,185,129,0.2)",l:"🚀 Quick Wins",sub:"High impact, low effort"},{c:"rgba(0,212,255,0.06)",bc:"rgba(0,212,255,0.15)",l:"🎯 Major Projects",sub:"High impact, high effort"},{c:"rgba(245,158,11,0.06)",bc:"rgba(245,158,11,0.15)",l:"🔧 Fill-ins",sub:"Low impact, low effort"},{c:"rgba(78,95,116,0.06)",bc:"rgba(78,95,116,0.15)",l:"🚫 Avoid",sub:"Low impact, high effort"}].map((q,qi)=>{
-                          const sorted=[...riceScores].sort((a:any,b:any)=>b.rice_score-a.rice_score);
-                          const displayItems=sorted.length>0?sorted.filter((_:any,i:number)=>i%4===qi).map((r:any)=>r.title):(prioProjId==="all"?projects:projects.filter((p:any)=>p.id===prioProjId)).filter((_:any,i:number)=>i%4===qi).map((p:any)=>p.name);
-                          return(<div key={qi} style={{background:q.c,border:`1px solid ${q.bc}`,borderRadius:8,padding:12,display:"flex",flexDirection:"column",gap:4}}><div style={{fontFamily:"Syne",fontSize:11,fontWeight:700}}>{q.l}</div><div style={{fontSize:10,color:"var(--mut)",marginBottom:4}}>{q.sub}</div><div>{displayItems.length===0?<span style={{fontSize:10,color:"var(--mut)"}}>None</span>:displayItems.map((it:string,j:number)=><div key={j} style={{fontSize:10,padding:"2px 0",color:"var(--txt)",display:"flex",gap:4}}><span style={{opacity:0.4}}>—</span>{it}</div>)}</div></div>);
-                        })}
-                      </div>
-                      {riceScores.length===0&&<div className="infobox ib-blue" style={{marginTop:12,fontSize:11}}>Run RICE scoring to auto-populate quadrants.</div>}
+                      {(()=>{
+                        const allProj=(prioProjId==="all"?projects:projects.filter((p:any)=>p.id===prioProjId));
+                        const scored=allProj.map((p:any)=>{
+                          const rs=riceScores.find((r:any)=>r.title===p.name);
+                          const issues=jiraIssues.filter((j:any)=>j.project_key===p.jira_key);
+                          const blockers=issues.filter((j:any)=>(j.status||"").toLowerCase().includes("block")).length;
+                          return{
+                            name:p.name,
+                            impact:rs?.impact||0,
+                            effort:rs?.effort||0,
+                            rice:rs?.rice_score||0,
+                            status:p.status,
+                            blockers,
+                            hasScore:!!rs,
+                          };
+                        });
+                        const highImpact=5,highEffort=5; // thresholds
+                        const quadrants=[
+                          {label:"🚀 Quick Wins",sub:"High impact, low effort",items:scored.filter(s=>s.impact>=highImpact&&s.effort<highEffort),c:"rgba(16,185,129,0.08)",bc:"rgba(16,185,129,0.2)"},
+                          {label:"🎯 Major Projects",sub:"High impact, high effort",items:scored.filter(s=>s.impact>=highImpact&&s.effort>=highEffort),c:"rgba(0,212,255,0.06)",bc:"rgba(0,212,255,0.15)"},
+                          {label:"🔧 Fill-ins",sub:"Low impact, low effort",items:scored.filter(s=>s.impact<highImpact&&s.effort<highEffort),c:"rgba(245,158,11,0.06)",bc:"rgba(245,158,11,0.15)"},
+                          {label:"🚫 Avoid",sub:"Low impact, high effort",items:scored.filter(s=>s.impact<highImpact&&s.effort>=highEffort),c:"rgba(78,95,116,0.06)",bc:"rgba(78,95,116,0.15)"},
+                        ];
+                        return(
+                          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8}}>
+                            {quadrants.map((q,qi)=>(
+                              <div key={qi} style={{background:q.c,border:`1px solid ${q.bc}`,borderRadius:8,padding:12,minHeight:120}}>
+                                <div style={{fontFamily:"Syne",fontSize:12,fontWeight:700,marginBottom:2}}>{q.label}</div>
+                                <div style={{fontSize:10,color:"var(--mut)",marginBottom:8}}>{q.sub}</div>
+                                {q.items.length===0?<span style={{fontSize:11,color:"var(--mut)"}}>None</span>:q.items.map((it:any,j:number)=>(
+                                  <div key={j} style={{fontSize:11,padding:"3px 0",display:"flex",alignItems:"center",gap:6,borderBottom:"1px solid rgba(255,255,255,0.04)"}}>
+                                    <span style={{color:"var(--txt)",flex:1}}>{it.name}</span>
+                                    {it.hasScore&&<span style={{fontFamily:"DM Mono",fontSize:9,color:"var(--acc)"}}>RICE {Math.round(it.rice)}</span>}
+                                    {it.blockers>0&&<span style={{fontFamily:"DM Mono",fontSize:9,color:"var(--red)"}}>🚫{it.blockers}</span>}
+                                    {it.status==="at-risk"&&<span style={{fontFamily:"DM Mono",fontSize:9,color:"var(--amb)"}}>⚠</span>}
+                                  </div>
+                                ))}
+                              </div>
+                            ))}
+                          </div>
+                        );
+                      })()}
+                      {riceScores.length===0&&<div className="infobox ib-blue" style={{marginTop:12,fontSize:11}}>Run RICE scoring to place projects in real quadrants. Without scores, all projects have impact=0 and effort=0.</div>}
                     </div>
                   </div>
                 )}
 
+                {/* OKR Alignment */}
                 <div className="card">
                   <div className="ch"><div className="ct">OKR Alignment · Vision → Goals → Features</div></div>
                   <div className="cb">
@@ -1836,7 +2028,7 @@ export default function PMDashboard(){
               </div>
             )}
 
-            {/* ROADMAP */}
+            {/* ROADMAP */}{/* ROADMAP */}
             {page==="roadmap"&&(
               <div className="col">
                 <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
