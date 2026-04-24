@@ -1,61 +1,4 @@
-                    {_sortedTodos.length===0?(
-                      <div className="card" style={{padding:32,textAlign:"center",opacity:0.5}}>
-                        <div style={{fontSize:28,marginBottom:8}}>✓</div>
-                        <div style={{fontFamily:"Syne",fontWeight:700}}>No tasks for this date</div>
-                        <div style={{fontSize:12,color:"var(--mut)",marginTop:4}}>Unscheduled tasks appear on today's view</div>
-                      </div>
-                    ):(
-                      <div className="col">
-                        {_todoGroupDefs.map(({k,label,desc,c})=>{
-                          const items=_todoGroups[k];
-                          if(!items.length)return null;
-                          return(
-                            <div key={k} className="card" style={{overflow:"hidden"}}>
-                              <div style={{padding:"9px 14px",background:c==="var(--red)"?"rgba(239,68,68,0.07)":c==="#f97316"?"rgba(249,115,22,0.07)":c==="var(--amb)"?"rgba(245,158,11,0.07)":"rgba(78,95,116,0.07)",borderBottom:"1px solid var(--bdr)",display:"flex",alignItems:"center",justifyContent:"space-between"}}>
-                                <div style={{display:"flex",alignItems:"center",gap:8}}>
-                                  <span style={{fontFamily:"DM Mono",fontSize:10,fontWeight:700,color:c,background:c==="var(--red)"?"rgba(239,68,68,0.12)":c==="#f97316"?"rgba(249,115,22,0.12)":c==="var(--amb)"?"rgba(245,158,11,0.12)":"rgba(78,95,116,0.12)",border:"1px solid "+c,padding:"2px 8px",borderRadius:100}}>{k.toUpperCase()}</span>
-                                  <span style={{fontFamily:"Syne",fontWeight:700,fontSize:12,color:"var(--txt)"}}>{label.split("—")[1]?.trim()}</span>
-                                  <span style={{fontSize:11,color:"var(--mut)"}}>{desc}</span>
-                                </div>
-                                <span style={{fontFamily:"DM Mono",fontSize:10,color:"var(--mut)"}}>{items.length} task{items.length!==1?"s":""}</span>
-                              </div>
-                              <div>
-                                {items.map((t:any)=>{
-                                  const sm=srcMeta(t.source);
-                                  const isOverdue=t.scheduled_date&&t.scheduled_date<_todayStr2&&t.status!=="done";
-                                  const ageStr=t.created_at?new Date(t.created_at).toLocaleDateString("en-US",{month:"short",day:"numeric"}):"—";
-                                  const pm=priMeta(t.priority);
-                                  return(
-                                    <div key={t.id} style={{display:"flex",alignItems:"flex-start",gap:10,padding:"10px 14px",borderBottom:"1px solid var(--bdr)"}}>
-                                      <div className={`todo-chk${t.status==="done"?" dn":""}`} style={{marginTop:2,flexShrink:0}} onClick={()=>toggleTodo(t)}>{t.status==="done"?"✓":""}</div>
-                                      <div style={{flex:1,minWidth:0}}>
-                                        <div style={{display:"flex",alignItems:"center",gap:6,flexWrap:"wrap",marginBottom:t.context?4:0}}>
-                                          <span className={"todo-txt"+(t.status==="done"?" dn":"")} style={{fontSize:13,fontWeight:t.status==="done"?400:500}}>{t.title}</span>
-                                          {t.jira_key&&<a href={t.jira_url||"#"} target="_blank" rel="noopener noreferrer" style={{fontFamily:"DM Mono",fontSize:9,color:"var(--pur)",textDecoration:"none",flexShrink:0,padding:"1px 6px",background:"rgba(124,58,237,0.08)",border:"1px solid rgba(124,58,237,0.2)",borderRadius:4}}>{t.jira_key}</a>}
-                                        </div>
-                                        {t.context&&<div style={{fontSize:11,color:"var(--mut)",lineHeight:1.5,marginTop:2}}>{t.context}</div>}
-                                        <div style={{display:"flex",alignItems:"center",gap:8,marginTop:5,flexWrap:"wrap"}}>
-                                          <span style={{fontFamily:"DM Mono",fontSize:9,color:sm.color,padding:"1px 7px",background:"rgba(78,95,116,0.1)",border:"1px solid var(--bdr2)",borderRadius:100,flexShrink:0}}>{sm.icon} {sm.label}</span>
-                                          <span style={{fontFamily:"DM Mono",fontSize:9,color:"var(--mut)"}}>Created {ageStr}</span>
-                                          {isOverdue&&<span style={{fontFamily:"DM Mono",fontSize:9,color:"var(--red)",background:"rgba(239,68,68,0.08)",border:"1px solid rgba(239,68,68,0.2)",padding:"1px 7px",borderRadius:100}}>⏰ Overdue</span>}
-                                        </div>
-                                      </div>
-                                      <select className="input select" style={{width:60,padding:"3px 20px 3px 6px",fontSize:10,fontFamily:"DM Mono",flexShrink:0}} value={t.priority.startsWith("high")?"p1":t.priority.startsWith("med")?"p2":t.priority.startsWith("low")?"p3":t.priority} onChange={e=>updatePriority(t.id,e.target.value)}>
-                                        <option value="p0">P0</option><option value="p1">P1</option><option value="p2">P2</option><option value="p3">P3</option>
-                                      </select>
-                                      <input type="date" className="input" style={{width:115,fontSize:10,padding:"3px 6px",flexShrink:0}} value={t.scheduled_date||""} onChange={e=>reschedule(t.id,e.target.value)}/>
-                                      <button className="btn btn-icon btn-danger btn-sm" style={{flexShrink:0,marginTop:2}} onClick={()=>deleteTask(t.id)}>✕</button>
-                                    </div>
-                                  );
-                                })}
-                              </div>
-                            </div>
-                          );
-                        })}
-                      </div>
-                    )}
-
-                  import { useState, useEffect, useCallback, useRef } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import type { ReactElement } from "react";
 import { supabase } from "@/integrations/supabase/client";
 
@@ -369,13 +312,13 @@ const KR_COLOR:Record<string,string>={"on-track":"var(--grn)","at-risk":"var(--a
 const KR_TAG:Record<string,string>={"on-track":"tag-grn","at-risk":"tag-amb","planning":"tag-pur"};
 const AGE_TAG:Record<string,string>={recent:"tag-grn",old:"tag-amb",stale:"tag-red"};
 const PRIORITY_META:Record<string,{label:string;color:string;bg:string;border:string;rank:number}>={
-  p0:{label:"P0",color:"#fff",bg:"rgba(239,68,68,0.85)",border:"rgba(239,68,68,0.9)",rank:0},
-  p1:{label:"P1",color:"var(--red)",bg:"rgba(239,68,68,0.1)",border:"rgba(239,68,68,0.3)",rank:1},
-  p2:{label:"P2",color:"var(--amb)",bg:"rgba(245,158,11,0.1)",border:"rgba(245,158,11,0.3)",rank:2},
-  p3:{label:"P3",color:"var(--mut)",bg:"rgba(78,95,116,0.1)",border:"rgba(78,95,116,0.2)",rank:3},
-  high:{label:"P1",color:"var(--red)",bg:"rgba(239,68,68,0.1)",border:"rgba(239,68,68,0.3)",rank:1},
-  med:{label:"P2",color:"var(--amb)",bg:"rgba(245,158,11,0.1)",border:"rgba(245,158,11,0.3)",rank:2},
-  low:{label:"P3",color:"var(--mut)",bg:"rgba(78,95,116,0.1)",border:"rgba(78,95,116,0.2)",rank:3},
+  high:{label:"High",color:"var(--red)",bg:"rgba(239,68,68,0.1)",border:"rgba(239,68,68,0.3)",rank:0},
+  med:{label:"Med",color:"var(--amb)",bg:"rgba(245,158,11,0.1)",border:"rgba(245,158,11,0.3)",rank:1},
+  low:{label:"Low",color:"var(--mut)",bg:"rgba(78,95,116,0.1)",border:"rgba(78,95,116,0.2)",rank:2},
+  p0:{label:"High",color:"var(--red)",bg:"rgba(239,68,68,0.1)",border:"rgba(239,68,68,0.3)",rank:0},
+  p1:{label:"High",color:"var(--red)",bg:"rgba(239,68,68,0.1)",border:"rgba(239,68,68,0.3)",rank:0},
+  p2:{label:"Med",color:"var(--amb)",bg:"rgba(245,158,11,0.1)",border:"rgba(245,158,11,0.3)",rank:1},
+  p3:{label:"Low",color:"var(--mut)",bg:"rgba(78,95,116,0.1)",border:"rgba(78,95,116,0.2)",rank:2},
 };
 const SOURCE_META:Record<string,{label:string;icon:string;color:string}>={
   manual:{label:"Manual",icon:"✏️",color:"var(--acc)"},
@@ -518,7 +461,7 @@ export default function PMDashboard(){
   const [todos,setTodos]=useState<any[]>([]);
   const [todosLoading,setTodosLoading]=useState(true);
   const [showAddTask,setShowAddTask]=useState(false);
-  const [newTask,setNewTask]=useState({title:"",priority:"p2",scheduled_date:"",context:"",source:"manual"});
+  const [newTask,setNewTask]=useState({title:"",priority:"med",scheduled_date:"",context:"",source:"manual"});
 
   // Projects
   const [projects,setProjects]=useState<any[]>([]);
@@ -814,6 +757,12 @@ export default function PMDashboard(){
   },[autoSync]);
   useEffect(()=>{const t=setInterval(autoSync,5*60*1000);return()=>clearInterval(t);},[autoSync]);
 
+
+  /* ── Week scheduling helpers ── */
+  const getWeekStart=(d:Date)=>{const dt=new Date(d);const day=dt.getDay();const diff=dt.getDate()-(day===0?6:day-1);dt.setDate(diff);return dt.toISOString().split("T")[0];};
+  const getWeekEnd=(d:Date)=>{const dt=new Date(d);const day=dt.getDay();const diff=dt.getDate()+(day===0?0:7-day);dt.setDate(diff);return dt.toISOString().split("T")[0];};
+  const currentWeekStart=getWeekStart(new Date());
+  const currentWeekEnd=getWeekEnd(new Date());
   /* ── Sync fns ── */
   const syncJira=async(pk?:string)=>{
     setSyncingInt("jira");
@@ -897,16 +846,26 @@ export default function PMDashboard(){
   };
   const addTask=async()=>{
     if(!newTask.title.trim())return;
-    // Dedup: check if same title+source already exists and is open
     const{data:existing}=await supabase.from("tasks").select("id").ilike("title",newTask.title.trim()).eq("status","open").limit(1);
     if(existing&&existing.length>0){alert("A task with this title already exists in your open list.");return;}
-    await supabase.from("tasks").insert({title:newTask.title.trim(),priority:newTask.priority,status:"open",source:newTask.source||"manual",context:newTask.context||null,user_id:user?.id,scheduled_date:newTask.scheduled_date||null,created_at:new Date().toISOString()});
-    setNewTask({title:"",priority:"p2",scheduled_date:"",context:"",source:"manual"});setShowAddTask(false);
+    // Auto-schedule for current week (Monday) unless PM specified a date
+    const schedDate=newTask.scheduled_date||currentWeekStart;
+    await supabase.from("tasks").insert({title:newTask.title.trim(),priority:newTask.priority,status:"open",source:newTask.source||"manual",context:newTask.context||null,user_id:user?.id,scheduled_date:schedDate,created_at:new Date().toISOString()});
+    setNewTask({title:"",priority:"med",scheduled_date:"",context:"",source:"manual"});setShowAddTask(false);
   };
   const deleteTask=async(id:string)=>{if(!window.confirm("Delete task?"))return;setTodos(p=>p.filter((t:any)=>t.id!==id));await supabase.from("tasks").delete().eq("id",id);};
   const updatePriority=async(id:string,priority:string)=>{setTodos(p=>p.map((t:any)=>t.id===id?{...t,priority}:t));await supabase.from("tasks").update({priority}).eq("id",id);};
   const reschedule=async(id:string,date:string)=>{setTodos(p=>p.map((t:any)=>t.id===id?{...t,scheduled_date:date||null}:t));await supabase.from("tasks").update({scheduled_date:date||null}).eq("id",id);};
 
+
+  const carryForwardOverdue=async()=>{
+    // Move all open tasks with past scheduled_date to current week
+    const overdue=todos.filter((t:any)=>t.status==="open"&&t.scheduled_date&&t.scheduled_date<currentWeekStart);
+    if(!overdue.length){alert("No overdue tasks to carry forward.");return;}
+    await Promise.all(overdue.map((t:any)=>supabase.from("tasks").update({scheduled_date:currentWeekStart}).eq("id",t.id)));
+    await loadTasks();
+    alert(`${overdue.length} task${overdue.length!==1?"s":""} carried forward to this week.`);
+  };
   /* ── Project CRUD ── */
   const openAddProj=()=>{setProjForm({name:"",owner:"",status:"planning",progress:0,due_date:"",priority:"med",jira_key:"",research_summary:"",competitive_summary:""});setEditProj(null);setShowAddProj(true);};
   const openEditProj=(p:any)=>{setProjForm({name:p.name,owner:p.owner||"",status:p.status,progress:p.progress,due_date:p.due_date||"",priority:p.priority||"med",jira_key:p.jira_key||"",research_summary:p.research_summary||"",competitive_summary:p.competitive_summary||""});setEditProj(p);setShowAddProj(true);};
@@ -1212,27 +1171,6 @@ export default function PMDashboard(){
   const RM_COLORS=["rgba(0,212,255,0.2)","rgba(124,58,237,0.2)","rgba(16,185,129,0.2)","rgba(245,158,11,0.2)"];
   const RM_BORDERS=["var(--acc)","var(--pur)","var(--grn)","var(--amb)"];
 
-
-  /* ── To-Do computed ── */
-  const _todayStr2=new Date().toISOString().split("T")[0];
-  const _selStr=selectedTodoDate.toISOString().split("T")[0];
-  const _openTodos=todos.filter((t:any)=>t.status==="open");
-  const _p0Tasks=_openTodos.filter((t:any)=>priMeta(t.priority).rank===0);
-  const _blockedTasks=_openTodos.filter((t:any)=>(t.context||"").toLowerCase().includes("block"));
-  const _overdueTasks=_openTodos.filter((t:any)=>t.scheduled_date&&t.scheduled_date<_todayStr2);
-  const _decisionTasks=_openTodos.filter((t:any)=>(t.context||"").toLowerCase().includes("decision")||(t.title||"").toLowerCase().includes("decide"));
-  const _filteredTodos=todos.filter((t:any)=>{if(t.scheduled_date)return t.scheduled_date===_selStr;return _selStr===_todayStr2;});
-  const _sortedTodos=[..._filteredTodos].sort((a:any,b:any)=>{const pa=priMeta(a.priority).rank,pb=priMeta(b.priority).rank;if(pa!==pb)return pa-pb;return new Date(b.created_at||0).getTime()-new Date(a.created_at||0).getTime();});
-  const _todoGroups:{p0:any[];p1:any[];p2:any[];p3:any[]}={p0:[],p1:[],p2:[],p3:[]};
-  _sortedTodos.forEach((t:any)=>{const r=priMeta(t.priority).rank;const k=(["p0","p1","p2","p3"][r]||"p3") as keyof typeof _todoGroups;_todoGroups[k].push(t);});
-  const _todoBySource=_openTodos.reduce((acc:any,t:any)=>{const s=t.source||"manual";acc[s]=(acc[s]||0)+1;return acc;},{});
-  const _todoGroupDefs=[
-    {k:"p0" as const,label:"P0 — Act Now",desc:"Critical · immediate action required",c:"var(--red)"},
-    {k:"p1" as const,label:"P1 — Today",desc:"High impact · complete today",c:"#f97316"},
-    {k:"p2" as const,label:"P2 — This Sprint",desc:"Standard priority",c:"var(--amb)"},
-    {k:"p3" as const,label:"P3 — Backlog",desc:"Low urgency",c:"var(--mut)"},
-  ];
-
   return(
     <>
       <style>{S}</style>
@@ -1334,25 +1272,138 @@ export default function PMDashboard(){
               <div className="col">
 
                 {/* Decision Engine Header */}
-                {_openTodos.length>0&&(
-                  <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr 1fr",gap:10}}>
-                    {[
-                      {v:_p0Tasks.length,l:"P0 — Act Now",c:"var(--red)",bg:"rgba(239,68,68,0.07)",bdr:"rgba(239,68,68,0.2)",icon:"🚨"},
-                      {v:_blockedTasks.length,l:"Blocked",c:"var(--amb)",bg:"rgba(245,158,11,0.07)",bdr:"rgba(245,158,11,0.2)",icon:"🚫"},
-                      {v:_overdueTasks.length,l:"Overdue",c:"var(--red)",bg:"rgba(239,68,68,0.07)",bdr:"rgba(239,68,68,0.2)",icon:"⏰"},
-                      {v:_decisionTasks.length,l:"Needs Decision",c:"var(--acc)",bg:"rgba(0,212,255,0.07)",bdr:"rgba(0,212,255,0.2)",icon:"⚡"},
-                    ].map(({v,l,c,bg,bdr,icon})=>(
-                      <div key={l} style={{background:bg,border:"1px solid "+bdr,borderRadius:10,padding:"12px 14px",display:"flex",gap:10,alignItems:"center"}}>
-                        <span style={{fontSize:18}}>{icon}</span>
-                        <div><div style={{fontFamily:"Syne",fontWeight:800,fontSize:22,color:c,lineHeight:1}}>{v}</div><div style={{fontFamily:"DM Mono",fontSize:10,color:"var(--mut)",marginTop:2}}>{l}</div></div>
-                      </div>
-                    ))}
-                  </div>
-                )}
+                {(()=>{
+                  const open=todos.filter((t:any)=>t.status==="open");
+                  const p0=open.filter((t:any)=>priMeta(t.priority).rank===0); // High priority
+                  const blocked=open.filter((t:any)=>(t.context||"").toLowerCase().includes("block"));
+                  const overdue=open.filter((t:any)=>t.scheduled_date&&t.scheduled_date<new Date().toISOString().split("T")[0]);
+                  const decisions=open.filter((t:any)=>(t.context||"").toLowerCase().includes("decision")||(t.title||"").toLowerCase().includes("decide"));
+                  if(!open.length)return null;
+                  return(
+                    <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr 1fr",gap:10}}>
+                      {[
+                        {v:p0.length,l:"High Priority",c:"var(--red)",bg:"rgba(239,68,68,0.07)",bdr:"rgba(239,68,68,0.2)",icon:"🚨"},
+                        {v:blocked.length,l:"Blocked",c:"var(--amb)",bg:"rgba(245,158,11,0.07)",bdr:"rgba(245,158,11,0.2)",icon:"🚫"},
+                        {v:overdue.length,l:"Overdue",c:"var(--red)",bg:"rgba(239,68,68,0.07)",bdr:"rgba(239,68,68,0.2)",icon:"⏰"},
+                        {v:decisions.length,l:"Needs Decision",c:"var(--acc)",bg:"rgba(0,212,255,0.07)",bdr:"rgba(0,212,255,0.2)",icon:"⚡"},
+                      ].map(({v,l,c,bg,bdr,icon})=>(
+                        <div key={l} style={{background:bg,border:`1px solid ${bdr}`,borderRadius:10,padding:"12px 14px",display:"flex",gap:10,alignItems:"center"}}>
+                          <span style={{fontSize:18}}>{icon}</span>
+                          <div><div style={{fontFamily:"Syne",fontWeight:800,fontSize:22,color:c,lineHeight:1}}>{v}</div><div style={{fontFamily:"DM Mono",fontSize:10,color:"var(--mut)",marginTop:2}}>{l}</div></div>
+                        </div>
+                      ))}
+                    </div>
+                  );
+                })()}
 
                 <div style={{display:"grid",gridTemplateColumns:"1fr 240px",gap:14,alignItems:"start"}}>
                   <div className="col">
 
+                    {/* Priority groups */}
+                    {(()=>{
+                      const selDate=selectedTodoDate.toISOString().split("T")[0];
+                      const todayDate=new Date().toISOString().split("T")[0];
+                      const selWeekStart=getWeekStart(selectedTodoDate);
+                      const selWeekEnd=getWeekEnd(selectedTodoDate);
+                      const filtered=todos.filter((t:any)=>{
+                        // Show tasks scheduled for selected week + unscheduled tasks on current week
+                        if(t.scheduled_date)return t.scheduled_date>=selWeekStart&&t.scheduled_date<=selWeekEnd;
+                        return selWeekStart===currentWeekStart;
+                      });
+                      const overdueCount=todos.filter((t:any)=>t.status==="open"&&t.scheduled_date&&t.scheduled_date<currentWeekStart).length;
+                      const sorted=[...filtered].sort((a:any,b:any)=>{
+                        const pa=priMeta(a.priority).rank,pb=priMeta(b.priority).rank;
+                        if(pa!==pb)return pa-pb;
+                        return new Date(b.created_at||0).getTime()-new Date(a.created_at||0).getTime();
+                      });
+                      const groups:{[k:string]:any[]}={high:[],med:[],low:[]};
+                      sorted.forEach((t:any)=>{
+                        const r=priMeta(t.priority).rank;
+                        const k=["high","med","low"][r]||"low";
+                        groups[k].push(t);
+                      });
+                      const groupDefs=[
+                        {k:"high",label:"High",desc:"Critical · needs attention now",c:"var(--red)"},
+                        {k:"med",label:"Medium",desc:"Important · complete this week",c:"var(--amb)"},
+                        {k:"low",label:"Low",desc:"Nice to have · backlog",c:"var(--mut)"},
+                      ];
+                      if(sorted.length===0)return(
+                        <div className="card" style={{padding:32,textAlign:"center",opacity:0.5}}>
+                          <div style={{fontSize:28,marginBottom:8}}>✓</div>
+                          <div style={{fontFamily:"Syne",fontWeight:700}}>No tasks this week</div>
+                          <div style={{fontSize:12,color:"var(--mut)",marginTop:4}}>Tasks auto-schedule to the week they are created</div>
+                        </div>
+                      );
+                      return(
+                        <div className="col">
+                          {/* Week label + carry-forward */}
+                          <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:4}}>
+                            <div style={{fontFamily:"DM Mono",fontSize:10,color:"var(--mut)"}}>
+                              Week of {new Date(selWeekStart).toLocaleDateString("en-US",{month:"short",day:"numeric"})} – {new Date(selWeekEnd).toLocaleDateString("en-US",{month:"short",day:"numeric"})}
+                              <span style={{color:"var(--acc)",marginLeft:8}}>{filtered.length} task{filtered.length!==1?"s":""}</span>
+                            </div>
+                            {overdueCount>0&&selWeekStart===currentWeekStart&&(
+                              <button className="btn btn-sm" style={{borderColor:"rgba(245,158,11,0.4)",color:"var(--amb)",fontSize:10}} onClick={carryForwardOverdue}>
+                                ⏩ Carry forward {overdueCount} overdue
+                              </button>
+                            )}
+                          </div>
+                          {groupDefs.map(({k,label,desc,c})=>{
+                            const items=groups[k];
+                            if(!items.length)return null;
+                            return(
+                              <div key={k} className="card" style={{overflow:"hidden"}}>
+                                <div style={{padding:"9px 14px",background:`${c}10`,borderBottom:"1px solid var(--bdr)",display:"flex",alignItems:"center",justifyContent:"space-between"}}>
+                                  <div style={{display:"flex",alignItems:"center",gap:8}}>
+                                    <span style={{fontFamily:"DM Mono",fontSize:10,fontWeight:700,color:c,background:`${c}18`,border:`1px solid ${c}40`,padding:"2px 8px",borderRadius:100}}>{k.toUpperCase()}</span>
+                                    <span style={{fontFamily:"Syne",fontWeight:700,fontSize:12,color:"var(--white)"}}>{label.split("—")[1]?.trim()}</span>
+                                    <span style={{fontSize:11,color:"var(--mut)"}}>{desc}</span>
+                                  </div>
+                                  <span style={{fontFamily:"DM Mono",fontSize:10,color:"var(--mut)"}}>{items.length} task{items.length!==1?"s":""}</span>
+                                </div>
+                                <div>
+                                  {items.map((t:any)=>{
+                                    const src2=srcMeta(t.source);
+                                    const isOverdue=t.scheduled_date&&t.scheduled_date<new Date().toISOString().split("T")[0]&&t.status!=="done";
+                                    const ageStr=t.created_at?new Date(t.created_at).toLocaleDateString("en-US",{month:"short",day:"numeric"}):"—";
+                                    return(
+                                      <div key={t.id} style={{display:"flex",alignItems:"flex-start",gap:10,padding:"10px 14px",borderBottom:"1px solid var(--bdr)",transition:"background 0.1s"}} className="tr">
+                                        {/* Checkbox */}
+                                        <div className={`todo-chk${t.status==="done"?" dn":""}`} style={{marginTop:2,flexShrink:0}} onClick={()=>toggleTodo(t)}>{t.status==="done"?"✓":""}</div>
+                                        {/* Content */}
+                                        <div style={{flex:1,minWidth:0}}>
+                                          <div style={{display:"flex",alignItems:"center",gap:6,flexWrap:"wrap",marginBottom:t.context?4:0}}>
+                                            <span className={`todo-txt${t.status==="done"?" dn":""}`} style={{fontSize:13,fontWeight:t.status==="done"?400:500}}>{t.title}</span>
+                                            {t.jira_key&&<a href={t.jira_url||"#"} target="_blank" rel="noopener noreferrer" style={{fontFamily:"DM Mono",fontSize:9,color:"var(--pur)",textDecoration:"none",flexShrink:0,padding:"1px 6px",background:"rgba(124,58,237,0.08)",border:"1px solid rgba(124,58,237,0.2)",borderRadius:4}}>{t.jira_key}</a>}
+                                          </div>
+                                          {t.context&&<div style={{fontSize:11,color:"var(--mut)",lineHeight:1.5,marginTop:2}}>{t.context}</div>}
+                                          <div style={{display:"flex",alignItems:"center",gap:8,marginTop:5,flexWrap:"wrap"}}>
+                                            {/* Source badge */}
+                                            <span style={{fontFamily:"DM Mono",fontSize:9,color:src2.color,background:`${src2.color}10`,border:`1px solid ${src2.color}25`,padding:"1px 7px",borderRadius:100,flexShrink:0}}>{src2.icon} {src2.label}</span>
+                                            {/* Created date */}
+                                            <span style={{fontFamily:"DM Mono",fontSize:9,color:"var(--mut)"}}>Created {ageStr}</span>
+                                            {/* Overdue */}
+                                            {isOverdue&&<span style={{fontFamily:"DM Mono",fontSize:9,color:"var(--red)",background:"rgba(239,68,68,0.08)",border:"1px solid rgba(239,68,68,0.2)",padding:"1px 7px",borderRadius:100}}>⏰ Overdue</span>}
+                                          </div>
+                                        </div>
+                                        {/* Priority selector */}
+                                        <select className="input select" style={{width:60,padding:"3px 20px 3px 6px",fontSize:10,fontFamily:"DM Mono",flexShrink:0,color:priMeta(t.priority).color,background:priMeta(t.priority).bg,border:`1px solid ${priMeta(t.priority).border}`,borderRadius:6}} value={t.priority.startsWith("high")?"p1":t.priority.startsWith("med")?"p2":t.priority.startsWith("low")?"p3":t.priority} onChange={e=>updatePriority(t.id,e.target.value)}>
+                                          <option value="high">High</option><option value="med">Med</option><option value="low">Low</option>
+                                        </select>
+                                        {/* Schedule date */}
+                                        <input type="date" className="input" style={{width:115,fontSize:10,padding:"3px 6px",flexShrink:0}} title="Schedule" value={t.scheduled_date||""} onChange={e=>reschedule(t.id,e.target.value)}/>
+                                        {/* Delete */}
+                                        <button className="btn btn-icon btn-danger btn-sm" style={{flexShrink:0,marginTop:2}} onClick={()=>deleteTask(t.id)}>✕</button>
+                                      </div>
+                                    );
+                                  })}
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      );
+                    })()}
 
                   </div>
 
@@ -1367,17 +1418,23 @@ export default function PMDashboard(){
                     <div className="card">
                       <div className="ch"><div className="ct">By Source</div></div>
                       <div className="cb" style={{padding:"6px 12px"}}>
-                        {Object.entries(_todoBySource).sort((a:any,b:any)=>b[1]-a[1]).map(([s,n])=>{
-                          const m=srcMeta(s);const total=_openTodos.length||1;
-                          return(
-                            <div key={s} style={{display:"flex",alignItems:"center",gap:8,padding:"6px 0",borderBottom:"1px solid var(--bdr)"}}>
-                              <span style={{fontSize:12}}>{m.icon}</span>
-                              <span style={{fontSize:12,flex:1}}>{m.label}</span>
-                              <div style={{width:60,height:4,background:"var(--bdr2)",borderRadius:2,overflow:"hidden"}}><div style={{height:"100%",width:((n as number)/total*100)+"%",background:m.color,borderRadius:2}}/></div>
-                              <span style={{fontFamily:"DM Mono",fontSize:10,color:"var(--mut)",width:20,textAlign:"right"}}>{n as number}</span>
-                            </div>
-                          );
-                        })}
+                        {(()=>{
+                          const open=todos.filter((t:any)=>t.status==="open");
+                          const bySource:{[k:string]:number}={};
+                          open.forEach((t:any)=>{const s=t.source||"manual";bySource[s]=(bySource[s]||0)+1;});
+                          const total=open.length||1;
+                          return Object.entries(bySource).sort((a:any,b:any)=>b[1]-a[1]).map(([s,n])=>{
+                            const m=srcMeta(s);
+                            return(
+                              <div key={s} style={{display:"flex",alignItems:"center",gap:8,padding:"6px 0",borderBottom:"1px solid var(--bdr)"}}>
+                                <span style={{fontSize:12}}>{m.icon}</span>
+                                <span style={{fontSize:12,flex:1}}>{m.label}</span>
+                                <div style={{width:60,height:4,background:"var(--bdr2)",borderRadius:2,overflow:"hidden"}}><div style={{height:"100%",width:`${(n as number/total)*100}%`,background:m.color,borderRadius:2}}/></div>
+                                <span style={{fontFamily:"DM Mono",fontSize:10,color:"var(--mut)",width:20,textAlign:"right"}}>{n as number}</span>
+                              </div>
+                            );
+                          });
+                        })()}
                       </div>
                     </div>
 
@@ -1405,7 +1462,7 @@ export default function PMDashboard(){
                       <div className="cb" style={{padding:"6px 12px"}}>
                         {[
                           ["Total open",todos.filter((t:any)=>t.status==="open").length],
-                          ["Done today",todos.filter((t:any)=>t.status==="done").length],
+                          ["Done today",todos.filter((t:any)=>t.status==="done"&&t.updated_at?.startsWith(new Date().toISOString().split("T")[0])).length],
                           ["Scheduled",todos.filter((t:any)=>t.scheduled_date&&t.scheduled_date>new Date().toISOString().split("T")[0]).length],
                           ["From Jira",todos.filter((t:any)=>t.source==="jira").length],
                           ["From Meetings",todos.filter((t:any)=>t.source==="meeting-scribe").length],
@@ -3725,7 +3782,7 @@ export default function PMDashboard(){
           </div>
         </Modal>)}
 
-        {showAddTask&&(<Modal title="Add Task" onClose={()=>setShowAddTask(false)}><div className="form-row"><label className="form-label">Title</label><input className="input" value={newTask.title} onChange={e=>setNewTask(p=>({...p,title:e.target.value}))} placeholder="e.g. Resolve RTVT-103 DB migration blocker" autoFocus onKeyDown={e=>e.key==="Enter"&&addTask()}/></div><div className="form-row"><label className="form-label">Context / Why (optional)</label><input className="input" value={newTask.context} onChange={e=>setNewTask(p=>({...p,context:e.target.value}))} placeholder="Blocking Sprint 14 · Kevin Wu needs unblocking · Decision needed from Raj"/></div><div className="form-grid"><div className="form-row"><label className="form-label">Priority</label><select className="input select" value={newTask.priority} onChange={e=>setNewTask(p=>({...p,priority:e.target.value}))}><option value="p0">P0 — Act now (blocker / critical)</option><option value="p1">P1 — Today (high impact)</option><option value="p2">P2 — This sprint (standard)</option><option value="p3">P3 — Backlog (low urgency)</option></select></div><div className="form-row"><label className="form-label">Source</label><select className="input select" value={newTask.source} onChange={e=>setNewTask(p=>({...p,source:e.target.value}))}><option value="manual">Manual</option><option value="jira">Jira</option><option value="meeting-scribe">Meeting</option><option value="agent">Agent</option></select></div><div className="form-row" style={{gridColumn:"1/-1"}}><label className="form-label">Schedule for date (optional)</label><input className="input" type="date" value={newTask.scheduled_date} onChange={e=>setNewTask(p=>({...p,scheduled_date:e.target.value}))}/></div></div><div className="form-actions"><button className="btn" onClick={()=>setShowAddTask(false)}>Cancel</button><button className="btn btn-primary" onClick={addTask}>Add Task</button></div></Modal>)}
+        {showAddTask&&(<Modal title="Add Task" onClose={()=>setShowAddTask(false)}><div className="form-row"><label className="form-label">Title</label><input className="input" value={newTask.title} onChange={e=>setNewTask(p=>({...p,title:e.target.value}))} placeholder="e.g. Resolve RTVT-103 DB migration blocker" autoFocus onKeyDown={e=>e.key==="Enter"&&addTask()}/></div><div className="form-row"><label className="form-label">Context / Why (optional)</label><input className="input" value={newTask.context} onChange={e=>setNewTask(p=>({...p,context:e.target.value}))} placeholder="Blocking Sprint 14 · Kevin Wu needs unblocking · Decision needed from Raj"/></div><div className="form-grid"><div className="form-row"><label className="form-label">Priority</label><select className="input select" value={newTask.priority} onChange={e=>setNewTask(p=>({...p,priority:e.target.value}))}><option value="high">High — needs attention this week</option><option value="med">Med — standard, complete this week</option><option value="low">Low — backlog, when capacity allows</option></select></div><div className="form-row"><label className="form-label">Source</label><select className="input select" value={newTask.source} onChange={e=>setNewTask(p=>({...p,source:e.target.value}))}><option value="manual">Manual</option><option value="jira">Jira</option><option value="meeting-scribe">Meeting</option><option value="agent">Agent</option></select></div><div className="form-row" style={{gridColumn:"1/-1"}}><label className="form-label">Schedule</label><input className="input" type="date" value={newTask.scheduled_date} onChange={e=>setNewTask(p=>({...p,scheduled_date:e.target.value}))}/><div style={{fontSize:10,color:"var(--mut)",marginTop:3,fontFamily:"DM Mono"}}>Auto-schedules to current week · carry forward if not completed</div></div></div><div className="form-actions"><button className="btn" onClick={()=>setShowAddTask(false)}>Cancel</button><button className="btn btn-primary" onClick={addTask}>Add Task</button></div></Modal>)}
 
         {showAddProj&&(<Modal title={editProj?"Edit Project":"Add Project"} onClose={()=>setShowAddProj(false)}>
           <div className="form-grid">
