@@ -1113,7 +1113,7 @@ export default function PMDashboard(){
   const deleteRm=async(id:string)=>{await supabase.from("roadmap_items").delete().eq("id",id);loadRoadmap();};
 
   /* ── Sprint Intelligence ── */
-  const SI_STEPS=["Fetching Jira sprint issues…","Analyzing velocity trend across sprints…","Deep-diving blockers and durations…","Checking assignee workload distribution…","Correlating meeting actions with blockers…","Assessing OKR impact of delays…","Running autonomous action tools…","Self-evaluating and finalizing…"];
+  const SI_STEPS=["📧 Reading Gmail signals for stakeholder context…","Fetching Jira sprint issues…","Analyzing velocity trend across sprints…","Deep-diving blockers and durations…","Checking assignee workload distribution…","Correlating meeting actions with blockers…","🔷 Writing Jira comments on blockers…","Running autonomous action tools…","Self-evaluating and finalizing…"];
   const runSprintIntelligence=async()=>{
     if(!siProject)return;
     const proj=projects.find(p=>p.name===siProject);
@@ -1324,12 +1324,16 @@ export default function PMDashboard(){
                     {todayBriefing&&!briefingLoading&&(
                       <div style={{display:"flex",gap:10,flexWrap:"wrap"}}>
                         {todayBriefing.actions.map((a:any,i:number)=>(
-                          <div key={i} style={{flex:"1 1 200px",padding:"10px 13px",background:"rgba(0,0,0,0.3)",borderRadius:9,border:"1px solid var(--bdr2)",display:"flex",gap:9,alignItems:"flex-start",minWidth:180}}>
+                          <div key={i} style={{flex:"1 1 200px",padding:"10px 13px",background:"rgba(0,0,0,0.3)",borderRadius:9,border:"1px solid var(--bdr2)",display:"flex",gap:9,alignItems:"flex-start",minWidth:180,cursor:a.deep_link?"pointer":"default",transition:"border-color 0.15s"}} onClick={()=>a.deep_link&&setPage(a.deep_link)} onMouseEnter={e=>{if(a.deep_link)(e.currentTarget as HTMLDivElement).style.borderColor="var(--acc)";}} onMouseLeave={e=>{(e.currentTarget as HTMLDivElement).style.borderColor="var(--bdr2)";}}>
                             <span style={{fontSize:16,flexShrink:0}}>{a.icon}</span>
                             <div style={{flex:1,minWidth:0}}>
                               <div style={{fontFamily:"DM Mono",fontSize:9,color:a.urgency.includes("🔴")?"var(--red)":a.urgency.includes("🟡")?"var(--amb)":"var(--acc)",marginBottom:3}}>{a.urgency}</div>
                               <div style={{fontSize:12,color:"var(--txt)",lineHeight:1.5}}>{a.text}</div>
-                              <div style={{fontFamily:"DM Mono",fontSize:9,color:"var(--mut)",marginTop:4}}>via {a.source}</div>
+                              {a.why&&<div style={{fontSize:10,color:"var(--mut)",marginTop:3,fontStyle:"italic"}}>{a.why}</div>}
+                              <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginTop:5}}>
+                                <span style={{fontFamily:"DM Mono",fontSize:9,color:"var(--mut)"}}>via {a.source}</span>
+                                {a.deep_link&&<span style={{fontFamily:"DM Mono",fontSize:9,color:"var(--acc)"}}>→ open</span>}
+                              </div>
                             </div>
                           </div>
                         ))}
