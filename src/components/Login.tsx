@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { forwardRef, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 
 const S = `
@@ -140,7 +140,7 @@ const S = `
   }
 `;
 
-export default function Login() {
+const Login = forwardRef<HTMLDivElement, Record<string, never>>(function Login(_props, _ref) {
   const [mode, setMode]         = useState<"login" | "signup">("login");
   const [email, setEmail]       = useState("");
   const [password, setPassword] = useState("");
@@ -254,4 +254,8 @@ export default function Login() {
       </div>
     </>
   );
-}
+});
+
+Login.displayName = "Login";
+
+export default Login;

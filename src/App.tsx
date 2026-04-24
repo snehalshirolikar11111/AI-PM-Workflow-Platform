@@ -1,9 +1,9 @@
-import { useEffect, useState } from "react";
+import { forwardRef, useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import Login from "@/components/Login";
 import Index from "@/pages/Index";
 
-export default function App() {
+const App = forwardRef<HTMLDivElement, Record<string, never>>(function App(_props, _ref) {
   const [ready, setReady] = useState(false);
   const [user, setUser]   = useState(null);
 
@@ -38,4 +38,8 @@ export default function App() {
   if (!user) return <Login />;
 
   return <Index />;
-}
+});
+
+App.displayName = "App";
+
+export default App;
