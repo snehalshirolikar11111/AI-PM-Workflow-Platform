@@ -470,6 +470,8 @@ export default function PMDashboard(){
   const [editProj,setEditProj]=useState<any>(null);
   const [projForm,setProjForm]=useState({name:"",owner:"",status:"planning",progress:0,due_date:"",priority:"med",jira_key:"",research_summary:"",competitive_summary:""});
   const [expandedProj,setExpandedProj]=useState<string|null>(null);
+  const [projEnriching,setProjEnriching]=useState(false);
+  const [projEnrichResult,setProjEnrichResult]=useState<any>(null);
 
   // Meetings
   const [meetings,setMeetings]=useState<any[]>([]);
@@ -867,21 +869,52 @@ export default function PMDashboard(){
     alert(`${overdue.length} task${overdue.length!==1?"s":""} carried forward to this week.`);
   };
   /* ── Project CRUD ── */
-  const openAddProj=()=>{setProjForm({name:"",owner:"",status:"planning",progress:0,due_date:"",priority:"med",jira_key:"",research_summary:"",competitive_summary:""});setEditProj(null);setShowAddProj(true);};
+  const openAddProj=()=>{setProjForm({name:"",owner:"",status:"planning",progress:0,due_date:"",priority:"med",jira_key:"",research_summary:"",competitive_summary:""});setEditProj(null);setProjEnrichResult(null);setShowAddProj(true);};
   const openEditProj=(p:any)=>{setProjForm({name:p.name,owner:p.owner||"",status:p.status,progress:p.progress,due_date:p.due_date||"",priority:p.priority||"med",jira_key:p.jira_key||"",research_summary:p.research_summary||"",competitive_summary:p.competitive_summary||""});setEditProj(p);setShowAddProj(true);};
   const saveProject=async()=>{
     if(!projForm.name.trim())return;
-    const payload={name:projForm.name.trim(),owner:projForm.owner,status:projForm.status,progress:parseInt(String(projForm.progress))||0,due_date:projForm.due_date||null,priority:projForm.priority,jira_key:projForm.jira_key.trim().toUpperCase()||null,research_summary:projForm.research_summary||null,competitive_summary:projForm.competitive_summary||null};
+    const jiraKey=projForm.jira_key.trim().toUpperCase()||null;
     if(editProj){
+      // Edit: apply enriched or manual overrides
+      const payload={name:projForm.name.trim(),owner:projForm.owner,status:projForm.status,progress:parseInt(String(projForm.progress))||0,due_date:projForm.due_date||null,priority:projForm.priority,jira_key:jiraKey,research_summary:projForm.research_summary||null,competitive_summary:projForm.competitive_summary||null};
       await supabase.from("projects").update(payload).eq("id",editProj.id);
-      if(payload.jira_key)await supabase.from("projects").update({jira_key:payload.jira_key}).eq("id",editProj.id);
-      if(editProj.jira_key)supabase.functions.invoke("jira-sync",{body:{action:"update_issue",issueData:{jiraKey:editProj.jira_key,fields:{summary:payload.name}}}}).catch(()=>{});
     }else{
-      const{data:np}=await supabase.from("projects").insert({...payload,user_id:user?.id}).select().single();
-      const{data:jd}=await supabase.functions.invoke("jira-sync",{body:{action:"create_issue",issueData:{summary:payload.name,description:`Owner: ${payload.owner||"TBD"}`,projectKey:"PM",priority:"med",issueType:"Epic"}}}).catch(()=>({data:null}));
-      if(jd?.jira_key&&np?.id)await supabase.from("projects").update({jira_key:jd.jira_key}).eq("id",np.id);
+      // New project: seed with name + jira_key first
+      const{data:np}=await supabase.from("projects").insert({name:projForm.name.trim(),jira_key:jiraKey,status:"planning",progress:0,user_id:user?.id}).select().single();
+      if(np?.id&&jiraKey){
+        // Pull full project metadata from Jira
+        setProjEnriching(true);
+        const{data:jd}=await supabase.functions.invoke("jira-sync",{body:{action:"pull",projectKey:jiraKey}});
+        // Get issues for this project to compute progress, priority, owner
+        const{data:issues}=await supabase.from("jira_issues").select("*").eq("project_key",jiraKey);
+        const issueList=issues||[];
+        const total=issueList.length;
+        const done=issueList.filter((i:any)=>["done","closed","resolved"].includes((i.status||"").toLowerCase())).length;
+        const progress=total>0?Math.round(done/total*100):0;
+        const highBugs=issueList.filter((i:any)=>i.priority==="high").length;
+        const priority=highBugs>3?"high":highBugs>1?"med":"low";
+        const assignees=[...new Set(issueList.map((i:any)=>i.assignee).filter(Boolean))];
+        const owner=(assignees[0] as string)||"";
+        // Estimate due date from issue due dates or sprint end
+        const dueDates=issueList.map((i:any)=>i.due_date).filter(Boolean).sort();
+        const due_date=dueDates[dueDates.length-1]||null;
+        // Determine status from completion + blockers
+        const blockers=issueList.filter((i:any)=>(i.status||"").toLowerCase().includes("block")).length;
+        const status=blockers>2?"at-risk":progress>=60?"on-track":"planning";
+        // AI-fill gaps: if key fields still missing, invoke weekly-digest to analyze
+        let research_summary="";let competitive_summary="";
+        if(!owner||!due_date){
+          const{data:aiData}=await supabase.functions.invoke("weekly-digest",{body:{okrContext:{objective:`Analyze project metadata gaps for ${projForm.name.trim()}`,krs:issueList.slice(0,10).map((i:any)=>({name:i.summary,current_val:i.status==="done"?1:0,target_val:1,unit:""})),type:"weekly"}}});
+          research_summary=aiData?.summary||"";
+        }
+        await supabase.from("projects").update({owner,status,progress,priority,due_date,research_summary:research_summary||null}).eq("id",np.id);
+        setProjEnrichResult({synced:jd?.synced||0,owner,status,progress,priority,due_date,issueCount:total});
+        setProjEnriching(false);
+      }
+      await loadProjects();await loadJira();
     }
-    setShowAddProj(false);loadProjects();
+    setShowAddProj(false);
+    loadProjects();
   };
   const deleteProject=async(id:string)=>{if(!window.confirm("Delete project?"))return;await supabase.from("projects").delete().eq("id",id);loadProjects();};
 
@@ -1517,6 +1550,7 @@ export default function PMDashboard(){
                               <div style={{fontSize:11,color:"var(--mut)"}}>Owner: {p.owner||"—"} · Due: {p.due_date?new Date(p.due_date).toLocaleDateString("en-GB",{day:"numeric",month:"short"}):"—"}</div>
                             </div>
                             <div style={{display:"flex",gap:4,alignItems:"center"}} onClick={e=>e.stopPropagation()}>
+                              {p.jira_key&&<button className="btn btn-sm" style={{fontFamily:"DM Mono",fontSize:9,color:"var(--pur)",borderColor:"rgba(124,58,237,0.25)"}} disabled={syncingInt==="jira"} onClick={()=>syncJira(p.jira_key)}>⟳ Jira</button>}
                               <button className="btn btn-sm" onClick={()=>openEditProj(p)}>✎</button>
                               <button className="btn btn-danger btn-sm" onClick={()=>deleteProject(p.id)}>✕</button>
                               <span style={{fontSize:11,color:"var(--mut)",marginLeft:2}}>{isExp?"▾":"▸"}</span>
@@ -3784,19 +3818,62 @@ export default function PMDashboard(){
 
         {showAddTask&&(<Modal title="Add Task" onClose={()=>setShowAddTask(false)}><div className="form-row"><label className="form-label">Title</label><input className="input" value={newTask.title} onChange={e=>setNewTask(p=>({...p,title:e.target.value}))} placeholder="e.g. Resolve RTVT-103 DB migration blocker" autoFocus onKeyDown={e=>e.key==="Enter"&&addTask()}/></div><div className="form-row"><label className="form-label">Context / Why (optional)</label><input className="input" value={newTask.context} onChange={e=>setNewTask(p=>({...p,context:e.target.value}))} placeholder="Blocking Sprint 14 · Kevin Wu needs unblocking · Decision needed from Raj"/></div><div className="form-grid"><div className="form-row"><label className="form-label">Priority</label><select className="input select" value={newTask.priority} onChange={e=>setNewTask(p=>({...p,priority:e.target.value}))}><option value="high">High — needs attention this week</option><option value="med">Med — standard, complete this week</option><option value="low">Low — backlog, when capacity allows</option></select></div><div className="form-row"><label className="form-label">Source</label><select className="input select" value={newTask.source} onChange={e=>setNewTask(p=>({...p,source:e.target.value}))}><option value="manual">Manual</option><option value="jira">Jira</option><option value="meeting-scribe">Meeting</option><option value="agent">Agent</option></select></div><div className="form-row" style={{gridColumn:"1/-1"}}><label className="form-label">Schedule</label><input className="input" type="date" value={newTask.scheduled_date} onChange={e=>setNewTask(p=>({...p,scheduled_date:e.target.value}))}/><div style={{fontSize:10,color:"var(--mut)",marginTop:3,fontFamily:"DM Mono"}}>Auto-schedules to current week · carry forward if not completed</div></div></div><div className="form-actions"><button className="btn" onClick={()=>setShowAddTask(false)}>Cancel</button><button className="btn btn-primary" onClick={addTask}>Add Task</button></div></Modal>)}
 
-        {showAddProj&&(<Modal title={editProj?"Edit Project":"Add Project"} onClose={()=>setShowAddProj(false)}>
-          <div className="form-grid">
-            <div className="form-row"><label className="form-label">Project Name</label><input className="input" value={projForm.name} onChange={e=>setProjForm(p=>({...p,name:e.target.value}))} autoFocus placeholder="e.g. Mobile Onboarding V2"/></div>
-            <div className="form-row"><label className="form-label">Jira Project Key</label><input className="input" value={projForm.jira_key} onChange={e=>setProjForm(p=>({...p,jira_key:e.target.value.toUpperCase()}))} placeholder="e.g. RTVT, DET, MSP"/></div>
-            <div className="form-row"><label className="form-label">Owner</label><input className="input" value={projForm.owner} onChange={e=>setProjForm(p=>({...p,owner:e.target.value}))} placeholder="Ana + Raj"/></div>
-            <div className="form-row"><label className="form-label">Status</label><select className="input select" value={projForm.status} onChange={e=>setProjForm(p=>({...p,status:e.target.value}))}><option value="planning">Planning</option><option value="on-track">On Track</option><option value="at-risk">At Risk</option><option value="delayed">Delayed</option></select></div>
-            <div className="form-row"><label className="form-label">Progress (%)</label><input className="input" type="number" min="0" max="100" value={projForm.progress} onChange={e=>setProjForm(p=>({...p,progress:e.target.value as any}))}/></div>
-            <div className="form-row"><label className="form-label">Priority</label><select className="input select" value={projForm.priority} onChange={e=>setProjForm(p=>({...p,priority:e.target.value}))}><option value="high">High</option><option value="med">Medium</option><option value="low">Low</option></select></div>
-            <div className="form-row"><label className="form-label">Due Date</label><input className="input" type="date" value={projForm.due_date} onChange={e=>setProjForm(p=>({...p,due_date:e.target.value}))}/></div>
-            <div className="form-row" style={{gridColumn:"1/-1"}}><label className="form-label">User Research Summary (optional)</label><textarea className="input" value={projForm.research_summary} onChange={e=>setProjForm(p=>({...p,research_summary:e.target.value}))} style={{minHeight:70,resize:"vertical" as any}} placeholder="Key user research findings, pain points, themes..."/></div>
-            <div className="form-row" style={{gridColumn:"1/-1"}}><label className="form-label">Competitive Intelligence Summary (optional)</label><textarea className="input" value={projForm.competitive_summary} onChange={e=>setProjForm(p=>({...p,competitive_summary:e.target.value}))} style={{minHeight:70,resize:"vertical" as any}} placeholder="Competitor positioning, feature gaps, market signals..."/></div>
-          </div>
-          <div className="form-actions"><button className="btn" onClick={()=>setShowAddProj(false)}>Cancel</button><button className="btn btn-primary" onClick={saveProject}>{editProj?"Save Changes":"Add Project"}</button></div>
+        {showAddProj&&(<Modal title={editProj?"Edit Project":"Add Project"} onClose={()=>{setShowAddProj(false);setProjEnrichResult(null);}}>
+          {!editProj?(
+            <>
+              {/* ADD mode: name + jira key only */}
+              <div style={{padding:"10px 14px",background:"rgba(0,212,255,0.05)",border:"1px solid rgba(0,212,255,0.12)",borderRadius:8,fontSize:12,color:"var(--mut)",lineHeight:1.7,marginBottom:4}}>
+                <strong style={{color:"var(--acc)"}}>Jira-first setup:</strong> Enter the project name and Jira key. Owner, status, due date, progress and priority are pulled automatically from Jira. Any gaps are filled by AI analysis.
+              </div>
+              <div className="form-row"><label className="form-label">Project Name</label><input className="input" value={projForm.name} onChange={e=>setProjForm(p=>({...p,name:e.target.value}))} autoFocus placeholder="e.g. Real-Time Order Tracking V2"/></div>
+              <div className="form-row">
+                <label className="form-label">Jira Project Key <span style={{color:"var(--mut)",fontWeight:400}}>(optional — skip to create without Jira)</span></label>
+                <input className="input" value={projForm.jira_key} onChange={e=>setProjForm(p=>({...p,jira_key:e.target.value.toUpperCase()}))} placeholder="e.g. RTVT, DET, MSP"/>
+              </div>
+              {projEnriching&&(
+                <div style={{display:"flex",alignItems:"center",gap:10,padding:"10px 14px",background:"rgba(124,58,237,0.06)",border:"1px solid rgba(124,58,237,0.15)",borderRadius:8}}>
+                  <span className="spin" style={{width:14,height:14,borderWidth:2,flexShrink:0}}/>
+                  <span style={{fontSize:12,color:"var(--pur)"}}>Pulling from Jira · computing progress · AI-filling gaps…</span>
+                </div>
+              )}
+              {projEnrichResult&&!projEnriching&&(
+                <div style={{padding:"10px 14px",background:"rgba(16,185,129,0.06)",border:"1px solid rgba(16,185,129,0.15)",borderRadius:8,fontSize:12}}>
+                  <div style={{fontFamily:"DM Mono",fontSize:9,color:"var(--grn)",marginBottom:6,letterSpacing:".1em"}}>✓ ENRICHED FROM JIRA</div>
+                  <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:"4px 16px"}}>
+                    {[["Owner",projEnrichResult.owner||"—"],["Status",projEnrichResult.status||"—"],["Progress",projEnrichResult.progress+"%"],["Priority",projEnrichResult.priority||"—"],["Due Date",projEnrichResult.due_date||"AI-estimated"],["Jira Issues",projEnrichResult.issueCount+" synced"]].map(([l,v])=>(
+                      <div key={l} style={{display:"flex",gap:6,padding:"2px 0"}}><span style={{color:"var(--mut)",minWidth:70}}>{l}:</span><span style={{color:"var(--txt)",fontWeight:500}}>{v}</span></div>
+                    ))}
+                  </div>
+                  {!projEnrichResult.owner&&<div style={{marginTop:6,color:"var(--amb)",fontFamily:"DM Mono",fontSize:10}}>⚠ Owner missing in Jira — assign in the edit view or update in Jira</div>}
+                </div>
+              )}
+              <div className="form-actions">
+                <button className="btn" onClick={()=>{setShowAddProj(false);setProjEnrichResult(null);}}>Cancel</button>
+                <button className="btn btn-primary" onClick={saveProject} disabled={projEnriching||!projForm.name.trim()}>{projEnriching?"Enriching…":"Add Project"}</button>
+              </div>
+            </>
+          ):(
+            <>
+              {/* EDIT mode: all fields editable */}
+              <div style={{fontFamily:"DM Mono",fontSize:9,color:"var(--mut)",marginBottom:8,letterSpacing:".08em"}}>EDIT — fields auto-populated from Jira · override as needed</div>
+              <div className="form-grid">
+                <div className="form-row"><label className="form-label">Project Name</label><input className="input" value={projForm.name} onChange={e=>setProjForm(p=>({...p,name:e.target.value}))} autoFocus/></div>
+                <div className="form-row"><label className="form-label">Jira Project Key</label><input className="input" value={projForm.jira_key} onChange={e=>setProjForm(p=>({...p,jira_key:e.target.value.toUpperCase()}))} placeholder="e.g. RTVT"/></div>
+                <div className="form-row"><label className="form-label">Owner</label><input className="input" value={projForm.owner} onChange={e=>setProjForm(p=>({...p,owner:e.target.value}))} placeholder="From Jira assignees"/></div>
+                <div className="form-row"><label className="form-label">Status</label><select className="input select" value={projForm.status} onChange={e=>setProjForm(p=>({...p,status:e.target.value}))}><option value="planning">Planning</option><option value="on-track">On Track</option><option value="at-risk">At Risk</option><option value="delayed">Delayed</option></select></div>
+                <div className="form-row"><label className="form-label">Progress (%)</label><input className="input" type="number" min="0" max="100" value={projForm.progress} onChange={e=>setProjForm(p=>({...p,progress:e.target.value as any}))}/></div>
+                <div className="form-row"><label className="form-label">Priority</label><select className="input select" value={projForm.priority} onChange={e=>setProjForm(p=>({...p,priority:e.target.value}))}><option value="high">High</option><option value="med">Med</option><option value="low">Low</option></select></div>
+                <div className="form-row"><label className="form-label">Due Date</label><input className="input" type="date" value={projForm.due_date} onChange={e=>setProjForm(p=>({...p,due_date:e.target.value}))}/></div>
+                <div className="form-row" style={{gridColumn:"1/-1"}}><label className="form-label">Research Summary</label><textarea className="input" value={projForm.research_summary} onChange={e=>setProjForm(p=>({...p,research_summary:e.target.value}))} style={{minHeight:60,resize:"vertical" as any}} placeholder="Key user research findings…"/></div>
+                <div className="form-row" style={{gridColumn:"1/-1"}}><label className="form-label">Competitive Intelligence</label><textarea className="input" value={projForm.competitive_summary} onChange={e=>setProjForm(p=>({...p,competitive_summary:e.target.value}))} style={{minHeight:60,resize:"vertical" as any}} placeholder="Competitor positioning, gaps…"/></div>
+              </div>
+              <div className="form-actions">
+                <button className="btn" onClick={()=>setShowAddProj(false)}>Cancel</button>
+                <button className="btn btn-sm" style={{borderColor:"rgba(0,212,255,0.3)",color:"var(--acc)"}} onClick={async()=>{if(!projForm.jira_key)return;const{data}=await supabase.functions.invoke("jira-sync",{body:{action:"pull",projectKey:projForm.jira_key}});await loadJira();await loadProjects();alert("Synced "+data?.synced+" issues from Jira");}}>⟳ Re-sync Jira</button>
+                <button className="btn btn-primary" onClick={saveProject}>Save Changes</button>
+              </div>
+            </>
+          )}
         </Modal>)}
 
         {showAddMeet&&(<Modal title="New Meeting" onClose={()=>setShowAddMeet(false)} wide><div className="form-row"><label className="form-label">Title</label><input className="input" value={meetForm.title} onChange={e=>setMeetForm(p=>({...p,title:e.target.value}))} autoFocus placeholder="Sprint Planning — Mobile Team"/></div><div className="form-row"><label className="form-label">Date & Time (optional)</label><input className="input" type="datetime-local" value={meetForm.meeting_time} onChange={e=>setMeetForm(p=>({...p,meeting_time:e.target.value}))}/></div><div className="form-row"><label className="form-label">Paste Transcript</label><textarea className="input" value={meetForm.raw_transcript} onChange={e=>setMeetForm(p=>({...p,raw_transcript:e.target.value}))} placeholder="Paste transcript here. AI will extract action items, decisions and owners automatically..." style={{minHeight:160,resize:"vertical" as any}}/></div><div className="form-actions"><button className="btn" onClick={()=>setShowAddMeet(false)}>Cancel</button><button className="btn btn-primary" onClick={saveMeeting} disabled={meetProcessing}>{meetProcessing?<><span className="spin" style={{width:13,height:13,borderWidth:1.5,display:"inline-block",verticalAlign:"middle",marginRight:6}}/>Processing...</>:meetForm.raw_transcript.trim()?"Save & Extract with AI":"Save Meeting"}</button></div></Modal>)}
