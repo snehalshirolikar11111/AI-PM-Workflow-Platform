@@ -710,7 +710,7 @@ export default function PMDashboard(){
       .on("postgres_changes",{event:"*",schema:"public",table:"schedule_blocks"},()=>loadCal())
       .on("postgres_changes",{event:"*",schema:"public",table:"agent_runs"},()=>loadAgentRuns())
       .subscribe();
-    return()=>supabase.removeChannel(ch);
+    return()=>{ void supabase.removeChannel(ch); };
   },[loadProjects,loadIntegrations,loadJira,loadTasks,loadCal,loadAgentRuns]);
 
   /* ── Auto-sync ── */
@@ -981,17 +981,17 @@ export default function PMDashboard(){
     if(!newAlignText.trim())return;
     const updated={...okrAlign,[section]:[...(okrAlign as any)[section],newAlignText.trim()]};
     setOkrAlign(updated);setNewAlignText("");setShowAddAlign(null);
-    await supabase.from("okr_alignment").upsert({user_id:user?.id,...updated},{onConflict:"user_id"}).catch(()=>{});
+    await supabase.from("okr_alignment").upsert({user_id:user?.id,...updated},{onConflict:"user_id"});
   };
   const removeAlignItem=async(section:string,idx:number)=>{
     const arr=[...(okrAlign as any)[section]];arr.splice(idx,1);
     const updated={...okrAlign,[section]:arr};setOkrAlign(updated);
-    await supabase.from("okr_alignment").upsert({user_id:user?.id,...updated},{onConflict:"user_id"}).catch(()=>{});
+    await supabase.from("okr_alignment").upsert({user_id:user?.id,...updated},{onConflict:"user_id"});
   };
 
   /* ── Roadmap ── */
-  const saveRm=async()=>{if(!rmForm.title.trim())return;await supabase.from("roadmap_items").insert({...rmForm,year:rmYear,user_id:user?.id}).catch(()=>{});setShowAddRoadmap(false);setRmForm({title:"",project:"",startQ:0,endQ:1,color:"#00d4ff"});loadRoadmap();};
-  const deleteRm=async(id:string)=>{await supabase.from("roadmap_items").delete().eq("id",id).catch(()=>{});loadRoadmap();};
+  const saveRm=async()=>{if(!rmForm.title.trim())return;await supabase.from("roadmap_items").insert({...rmForm,year:rmYear,user_id:user?.id});setShowAddRoadmap(false);setRmForm({title:"",project:"",startQ:0,endQ:1,color:"#00d4ff"});loadRoadmap();};
+  const deleteRm=async(id:string)=>{await supabase.from("roadmap_items").delete().eq("id",id);loadRoadmap();};
 
   /* ── Sprint Intelligence ── */
   const SI_STEPS=["Fetching Jira sprint issues…","Analyzing velocity trend across sprints…","Deep-diving blockers and durations…","Checking assignee workload distribution…","Correlating meeting actions with blockers…","Assessing OKR impact of delays…","Running autonomous action tools…","Self-evaluating and finalizing…"];
@@ -1053,7 +1053,7 @@ export default function PMDashboard(){
     setShowAddDecision(false);setDecisionForm({title:"",decision:"",rationale:"",trade_offs:"",project_id:"",tags:""});loadDecisions();
   };
   const logFeedback=async(agentName:string,eventType:string,field:string,original:string,corrected:string)=>{
-    await supabase.from("feedback_events").insert({user_id:user?.id,agent_name:agentName,event_type:eventType,field,original,corrected}).catch(()=>{});loadFeedback();
+    await supabase.from("feedback_events").insert({user_id:user?.id,agent_name:agentName,event_type:eventType,field,original,corrected});loadFeedback();
   };
   const saveKnowledgeItem=async()=>{
     if(!knowledgeForm.title.trim()||!knowledgeForm.content.trim())return;
@@ -1412,7 +1412,7 @@ export default function PMDashboard(){
                           <div key={k} className="mos-bucket">
                             <div className="mos-hd"><span style={{fontFamily:"Syne",fontWeight:700,fontSize:13,color:c}}>{l}</span><span className="tag tag-dim" style={{fontSize:9}}>{items.length}</span></div>
                             {items.length===0&&<div style={{padding:"12px 14px",fontSize:12,color:"var(--mut)"}}>No items</div>}
-                            {items.map((it:any)=>(<div key={it.id} className="mos-item"><div style={{flex:1}}>{it.title}</div>{it.project&&<span className="tag tag-dim" style={{fontSize:9}}>{it.project}</span>}<button className="btn btn-icon btn-danger btn-sm" onClick={async()=>{await supabase.from("moscow_items").delete().eq("id",it.id).catch(()=>{});loadMoscow();}}>✕</button></div>))}
+                            {items.map((it:any)=>(<div key={it.id} className="mos-item"><div style={{flex:1}}>{it.title}</div>{it.project&&<span className="tag tag-dim" style={{fontSize:9}}>{it.project}</span>}<button className="btn btn-icon btn-danger btn-sm" onClick={async()=>{await supabase.from("moscow_items").delete().eq("id",it.id);loadMoscow();}}>✕</button></div>))}
                           </div>
                         );
                       })}
@@ -2452,7 +2452,7 @@ export default function PMDashboard(){
                         </div>
                         <div style={{display:"flex",gap:5,alignItems:"center",flexShrink:0}}>
                           <span className={`tag ${d.outcome_status==="validated"?"tag-grn":d.outcome_status==="reversed"?"tag-red":"tag-dim"}`} style={{fontSize:9}}>{d.outcome_status}</span>
-                          <button className="btn btn-danger btn-sm" onClick={async()=>{if(!window.confirm("Delete?"))return;await supabase.from("decision_log").delete().eq("id",d.id).catch(()=>{});loadDecisions();}}>✕</button>
+                          <button className="btn btn-danger btn-sm" onClick={async()=>{if(!window.confirm("Delete?"))return;await supabase.from("decision_log").delete().eq("id",d.id);loadDecisions();}}>✕</button>
                         </div>
                       </div>
                       <div style={{fontSize:13,lineHeight:1.7,marginBottom:10,padding:"8px 10px",background:"rgba(0,212,255,0.04)",borderRadius:7,borderLeft:"2px solid var(--acc)"}}>{d.decision}</div>
@@ -2482,7 +2482,7 @@ export default function PMDashboard(){
                     <div key={k.id} className="card" style={{padding:"14px 16px"}}>
                       <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:8}}>
                         <span className={`tag ${k.type==="prd"?"tag-pur":k.type==="insight"?"tag-blu":k.type==="competitive"?"tag-amb":k.type==="learning"?"tag-grn":"tag-dim"}`} style={{fontSize:9}}>{k.type}</span>
-                        <button className="btn btn-danger btn-sm" onClick={async()=>{await supabase.from("knowledge_items").delete().eq("id",k.id).catch(()=>{});loadKnowledge();}}>✕</button>
+                        <button className="btn btn-danger btn-sm" onClick={async()=>{await supabase.from("knowledge_items").delete().eq("id",k.id);loadKnowledge();}}>✕</button>
                       </div>
                       <div style={{fontFamily:"Syne",fontWeight:700,fontSize:13,marginBottom:6}}>{k.title}</div>
                       <div style={{fontSize:12,color:"var(--mut)",lineHeight:1.6,marginBottom:8}}>{k.content.slice(0,200)}{k.content.length>200?"...":""}</div>
@@ -2530,7 +2530,7 @@ export default function PMDashboard(){
                           <span className="mono dim" style={{fontSize:11}}>{o.target_value||"—"}</span>
                           <span className="mono" style={{fontSize:11,color:o.actual_value>=o.target_value?"var(--grn)":o.actual_value>0?"var(--amb)":"var(--mut)"}}>{o.actual_value||"—"}</span>
                           <div style={{display:"flex",gap:4,alignItems:"center"}}>
-                            <input type="number" className="input input-sm" style={{width:70,fontSize:10}} placeholder="Actual" defaultValue={o.actual_value||""} onBlur={async(e:any)=>{const v=parseFloat(e.target.value);if(!isNaN(v)){const st=v>=o.target_value?"achieved":v>0?"tracking":"missed";await supabase.from("outcomes").update({actual_value:v,status:st}).eq("id",o.id).catch(()=>{});loadOutcomes();}}}/>
+                            <input type="number" className="input input-sm" style={{width:70,fontSize:10}} placeholder="Actual" defaultValue={o.actual_value||""} onBlur={async(e:any)=>{const v=parseFloat(e.target.value);if(!isNaN(v)){const st=v>=o.target_value?"achieved":v>0?"tracking":"missed";await supabase.from("outcomes").update({actual_value:v,status:st}).eq("id",o.id);loadOutcomes();}}}/>
                             <span className={`tag ${o.status==="achieved"||o.status==="exceeded"?"tag-grn":o.status==="missed"?"tag-red":o.status==="tracking"?"tag-amb":"tag-dim"}`} style={{fontSize:9}}>{o.status}</span>
                           </div>
                         </div>
@@ -2553,7 +2553,7 @@ export default function PMDashboard(){
                           <div style={{fontSize:12,marginBottom:3}}>{r.prediction}</div>
                           {r.recommended_action&&<div style={{fontSize:11,color:"var(--acc)"}}>→ {r.recommended_action}</div>}
                         </div>
-                        <button className="btn btn-sm" onClick={async()=>{await supabase.from("risk_predictions").update({status:"dismissed"}).eq("id",r.id).catch(()=>{});loadRiskPreds();}}>Dismiss</button>
+                        <button className="btn btn-sm" onClick={async()=>{await supabase.from("risk_predictions").update({status:"dismissed"}).eq("id",r.id);loadRiskPreds();}}>Dismiss</button>
                       </div>
                     ))}
                   </div>
@@ -3588,7 +3588,7 @@ export default function PMDashboard(){
 
         {showAddCal&&(<Modal title="Add Calendar Event" onClose={()=>setShowAddCal(false)}><div className="form-grid"><div className="form-row" style={{gridColumn:"1/-1"}}><label className="form-label">Title</label><input className="input" value={calForm.title} onChange={e=>setCalForm(p=>({...p,title:e.target.value}))} autoFocus placeholder="Sprint Planning — Mobile Team"/></div><div className="form-row"><label className="form-label">Start Time</label><input className="input" type="time" value={calForm.startTime} onChange={e=>setCalForm(p=>({...p,startTime:e.target.value}))}/></div><div className="form-row"><label className="form-label">End Time</label><input className="input" type="time" value={calForm.endTime} onChange={e=>setCalForm(p=>({...p,endTime:e.target.value}))}/></div><div className="form-row" style={{gridColumn:"1/-1"}}><label className="form-label">Attendees (comma-separated)</label><input className="input" value={calForm.attendees} onChange={e=>setCalForm(p=>({...p,attendees:e.target.value}))} placeholder="ana@company.com, chen@company.com"/></div><div className="form-row" style={{gridColumn:"1/-1"}}><label className="form-label">Description</label><input className="input" value={calForm.description} onChange={e=>setCalForm(p=>({...p,description:e.target.value}))} placeholder="Agenda or context..."/></div></div><div style={{fontSize:11,color:"var(--mut)"}}>A Google Meet link will be auto-generated.</div><div className="form-actions"><button className="btn" onClick={()=>setShowAddCal(false)}>Cancel</button><button className="btn btn-primary" onClick={createCalEvent} disabled={syncingInt==="cal-create"}>{syncingInt==="cal-create"?"Creating...":"Create Event + Meet Link"}</button></div></Modal>)}
 
-        {showAddMoscow&&(<Modal title="Add MoSCoW Item" onClose={()=>setShowAddMoscow(false)}><div className="form-row"><label className="form-label">Feature / Initiative</label><input className="input" value={moscowForm.title} onChange={e=>setMoscowForm(p=>({...p,title:e.target.value}))} autoFocus placeholder="e.g. Real-time notifications"/></div><div className="form-grid"><div className="form-row"><label className="form-label">Bucket</label><select className="input select" value={moscowForm.bucket} onChange={e=>setMoscowForm(p=>({...p,bucket:e.target.value}))}><option value="must">Must Have</option><option value="should">Should Have</option><option value="could">Could Have</option><option value="wont">Won't Have</option></select></div><div className="form-row"><label className="form-label">Project</label><select className="input select" value={moscowForm.project} onChange={e=>setMoscowForm(p=>({...p,project:e.target.value}))}><option value="">All</option>{projects.map(p=><option key={p.id} value={p.name}>{p.name}</option>)}</select></div></div><div className="form-actions"><button className="btn" onClick={()=>setShowAddMoscow(false)}>Cancel</button><button className="btn btn-primary" onClick={async()=>{if(!moscowForm.title.trim())return;await supabase.from("moscow_items").insert({...moscowForm,user_id:user?.id}).catch(()=>{});setShowAddMoscow(false);setMoscowForm({title:"",bucket:"must",project:""});loadMoscow();}}>Add Item</button></div></Modal>)}
+        {showAddMoscow&&(<Modal title="Add MoSCoW Item" onClose={()=>setShowAddMoscow(false)}><div className="form-row"><label className="form-label">Feature / Initiative</label><input className="input" value={moscowForm.title} onChange={e=>setMoscowForm(p=>({...p,title:e.target.value}))} autoFocus placeholder="e.g. Real-time notifications"/></div><div className="form-grid"><div className="form-row"><label className="form-label">Bucket</label><select className="input select" value={moscowForm.bucket} onChange={e=>setMoscowForm(p=>({...p,bucket:e.target.value}))}><option value="must">Must Have</option><option value="should">Should Have</option><option value="could">Could Have</option><option value="wont">Won't Have</option></select></div><div className="form-row"><label className="form-label">Project</label><select className="input select" value={moscowForm.project} onChange={e=>setMoscowForm(p=>({...p,project:e.target.value}))}><option value="">All</option>{projects.map(p=><option key={p.id} value={p.name}>{p.name}</option>)}</select></div></div><div className="form-actions"><button className="btn" onClick={()=>setShowAddMoscow(false)}>Cancel</button><button className="btn btn-primary" onClick={async()=>{if(!moscowForm.title.trim())return;await supabase.from("moscow_items").insert({...moscowForm,user_id:user?.id});setShowAddMoscow(false);setMoscowForm({title:"",bucket:"must",project:""});loadMoscow();}}>Add Item</button></div></Modal>)}
 
         {showAddRoadmap&&(<Modal title="Add Initiative" onClose={()=>setShowAddRoadmap(false)}><div className="form-row"><label className="form-label">Title</label><input className="input" value={rmForm.title} onChange={e=>setRmForm(p=>({...p,title:e.target.value}))} autoFocus placeholder="e.g. Mobile App v2"/></div><div className="form-grid"><div className="form-row"><label className="form-label">Project</label><select className="input select" value={rmForm.project} onChange={e=>setRmForm(p=>({...p,project:e.target.value}))}><option value="">None</option>{projects.map(p=><option key={p.id} value={p.name}>{p.name}</option>)}</select></div><div className="form-row"><label className="form-label">Color</label><div style={{display:"flex",gap:6,paddingTop:4}}>{["#00d4ff","#7c3aed","#10b981","#f59e0b","#ef4444"].map(c=><div key={c} onClick={()=>setRmForm(p=>({...p,color:c}))} style={{width:24,height:24,borderRadius:6,background:c,cursor:"pointer",border:rmForm.color===c?"2px solid #fff":"2px solid transparent"}}/>)}</div></div><div className="form-row"><label className="form-label">Start Quarter</label><select className="input select" value={rmForm.startQ} onChange={e=>setRmForm(p=>({...p,startQ:parseInt(e.target.value)}))}>{["Q1","Q2","Q3","Q4"].map((q,i)=><option key={q} value={i}>{q}</option>)}</select></div><div className="form-row"><label className="form-label">End Quarter</label><select className="input select" value={rmForm.endQ} onChange={e=>setRmForm(p=>({...p,endQ:parseInt(e.target.value)}))}>{["Q1","Q2","Q3","Q4"].map((q,i)=><option key={q} value={i}>{q}</option>)}</select></div></div><div className="form-actions"><button className="btn" onClick={()=>setShowAddRoadmap(false)}>Cancel</button><button className="btn btn-primary" onClick={saveRm}>Add Initiative</button></div></Modal>)}
 
