@@ -1,7 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from "react";
-import { supabase } from "@/integrations/supabase/client";
 import type { ReactElement } from "react";
-
+import { supabase } from "@/integrations/supabase/client";
 
 const S = `
   @import url('https://fonts.googleapis.com/css2?family=Syne:wght@700;800&family=DM+Mono:wght@400;500&family=DM+Sans:ital,wght@0,300;0,400;0,500;1,400&display=swap');
@@ -369,7 +368,7 @@ function MiniCalendar({selectedDate,onSelect,eventDates=[]}:{selectedDate:Date;o
   while(cells.length<42)cells.push({date:new Date(y,m+1,cells.length-dim-firstDay+1),other:true});
 
   // Mini compact grid
-  const miniItems: ReactElement[] = [];
+  const miniItems:ReactElement[]=[];
   for(let d=1;d<=dim;d++){
     const date=new Date(y,m,d);
     const isTod=fmt(date)===fmt(today),isSel=fmt(date)===fmt(selectedDate),hasEv=eventDates.includes(fmt(date));
@@ -663,12 +662,12 @@ export default function PMDashboard(){
   const loadMoscow=useCallback(async()=>{const{data,error}=await supabase.from("moscow_items").select("*");if(error)console.error("loadMoscow:",error.message);if(data)setMoscowItems(data);},[]);
   const loadRoadmap=useCallback(async()=>{const{data}=await supabase.from("roadmap_items").select("*").order("start_quarter");if(data)setRoadmapItems(data);},[]);
   const loadAlign=useCallback(async()=>{const{data}=await supabase.from("okr_alignment").select("*").limit(1);if(data&&data[0])setOkrAlign(data[0]);},[]);
-  const loadDecisions=useCallback(async()=>{const{data}=await supabase.from("decision_log").select("*,projects(name)").order("created_at",{ascending:false}).catch(()=>({data:[]}));if(data)setDecisions(data);},[]);
-  const loadKnowledge=useCallback(async()=>{const{data}=await supabase.from("knowledge_items").select("*").order("created_at",{ascending:false}).catch(()=>({data:[]}));if(data)setKnowledgeItems(data);},[]);
-  const loadOutcomes=useCallback(async()=>{const{data}=await supabase.from("outcomes").select("*,projects(name),okrs(objective)").order("created_at",{ascending:false}).catch(()=>({data:[]}));if(data)setOutcomes(data);},[]);
-  const loadRiskPreds=useCallback(async()=>{const{data}=await supabase.from("risk_predictions").select("*,projects(name)").eq("status","active").order("detected_at",{ascending:false}).catch(()=>({data:[]}));if(data)setRiskPredictions(data);},[]);
+  const loadDecisions=useCallback(async()=>{const{data,error}=await supabase.from("decision_log").select("*,projects(name)").order("created_at",{ascending:false});if(error)console.error("loadDecisions:",error.message);if(data)setDecisions(data);},[]);
+  const loadKnowledge=useCallback(async()=>{const{data,error}=await supabase.from("knowledge_items").select("*").order("created_at",{ascending:false});if(error)console.error("loadKnowledge:",error.message);if(data)setKnowledgeItems(data);},[]);
+  const loadOutcomes=useCallback(async()=>{const{data}=await supabase.from("outcomes").select("*,projects(name),okrs(objective)").order("created_at",{ascending:false});if(data)setOutcomes(data);},[]);
+  const loadRiskPreds=useCallback(async()=>{const{data}=await supabase.from("risk_predictions").select("*,projects(name)").eq("status","active").order("detected_at",{ascending:false});if(data)setRiskPredictions(data);},[]);
   const loadCostAnomalies=useCallback(async()=>{const{data}=await supabase.from("v_cost_anomalies").select("*").limit(10).catch(()=>({data:[]}));if(data)setCostAnomalies(data);const{data:bs}=await supabase.from("v_budget_status").select("*").limit(1).catch(()=>({data:[]}));if(bs&&bs[0])setBudgetStatus(bs[0]);},[]);
-  const loadFeedback=useCallback(async()=>{const{data}=await supabase.from("feedback_events").select("*").order("created_at",{ascending:false}).limit(30).catch(()=>({data:[]}));if(data)setFeedbackEvents(data);},[]);
+  const loadFeedback=useCallback(async()=>{const{data}=await supabase.from("feedback_events").select("*").order("created_at",{ascending:false}).limit(30);if(data)setFeedbackEvents(data);},[]);
   const loadTokens=useCallback(async()=>{
     setTokenLoading(true);
     const[a,b,c]=await Promise.allSettled([
