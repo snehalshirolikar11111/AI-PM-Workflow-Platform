@@ -458,6 +458,9 @@ export default function PMDashboard(){
   const [user,setUser]=useState<any>(null);
   const [isSyncing,setIsSyncing]=useState(false);
   const syncRunning=useRef(false);
+  const [todayBriefing,setTodayBriefing]=useState<any>(null);
+  const [briefingLoading,setBriefingLoading]=useState(false);
+  const [briefingDismissed,setBriefingDismissed]=useState(false);
 
   // Tasks
   const [todos,setTodos]=useState<any[]>([]);
@@ -580,6 +583,7 @@ export default function PMDashboard(){
   const [siResult,setSiResult]=useState<any>(null);
   const [siError,setSiError]=useState<string|null>(null);
   const [siStep,setSiStep]=useState(0);
+  const [pendingJiraActions,setPendingJiraActions]=useState<any[]>([]);
 
   // Release Readiness
   const [rrProject,setRrProject]=useState("");
@@ -718,6 +722,12 @@ export default function PMDashboard(){
   useEffect(()=>{
     if(user){loadOkrs();loadRice();loadRoadmap();loadAlign();}
   },[user,loadOkrs,loadRice,loadRoadmap,loadAlign]);
+  // Auto-run 3 Things Today when core data is ready
+  useEffect(()=>{
+    if(user&&todos.length>0&&!todayBriefing&&!briefingLoading&&!briefingDismissed){
+      runTodayBriefing();
+    }
+  },[user,todos.length>0]);
 
   useEffect(()=>{
     if(!user)return;
@@ -738,6 +748,39 @@ export default function PMDashboard(){
       .subscribe();
     return()=>{ void supabase.removeChannel(ch); };
   },[loadProjects,loadIntegrations,loadJira,loadTasks,loadCal,loadAgentRuns]);
+
+
+  /* ── 3 Things Today ── */
+  const runTodayBriefing=useCallback(async()=>{
+    setBriefingLoading(true);
+    try{
+      const{data,error}=await supabase.functions.invoke("three-things-today",{});
+      if(data&&!error&&data.things?.length){
+        const URGENCY_ICON:Record<string,string>={critical:"🔴",high:"🟡",normal:"🔵"};
+        const SOURCE_ICON:Record<string,string>={jira:"🔷",email:"📧",risk:"🔔",okr:"◎",meeting:"👥",task:"☑",default:"◈"};
+        const actions=data.things.slice(0,3).map((t:any)=>({
+          urgency:(URGENCY_ICON[t.urgency]||"🔵")+" "+(t.urgency==="critical"?"Now":t.urgency==="high"?"Today":"This week"),
+          icon:SOURCE_ICON[t.source]||SOURCE_ICON.default,
+          text:t.action,why:t.why,source:t.project||t.source||"",deep_link:t.deep_link||"todos",
+        }));
+        setTodayBriefing({actions,headline:data.context_summary||"Here's what needs your attention today.",generated:true,quiet_day:data.quiet_day||false});
+      }else{
+        const today=new Date().toISOString().split("T")[0];
+        const actions:any[]=[];
+        const atRisk=projects.filter((p:any)=>p.status==="at-risk");
+        const unread=gmailThreads.filter((t:any)=>!t.is_read);
+        const overdue=todos.filter((t:any)=>t.status==="open"&&t.scheduled_date&&t.scheduled_date<today);
+        const highTasks=todos.filter((t:any)=>t.status==="open"&&["high","p0","p1"].includes(t.priority));
+        if(atRisk[0])actions.push({urgency:"🔴 Now",icon:"🚫",text:`${atRisk[0].name} is at-risk — run Sprint Intelligence`,why:"Active project needs attention",source:atRisk[0].name,deep_link:"sprint"});
+        if(overdue.length>0)actions.push({urgency:"🔴 Now",icon:"⏰",text:`${overdue.length} overdue task${overdue.length!==1?"s":""} — carry forward or close`,why:"Past due",source:"Tasks",deep_link:"todos"});
+        if(unread[0])actions.push({urgency:"🟡 Today",icon:"📧",text:`Unread: "${unread[0].subject}" from ${unread[0].from_email?.split("@")[0]}`,why:"Stakeholder email",source:"Gmail",deep_link:"integrations"});
+        if(highTasks[0]&&actions.length<3)actions.push({urgency:"🟡 Today",icon:"☑",text:highTasks[0].title,why:"High priority task",source:highTasks[0].source||"Tasks",deep_link:"todos"});
+        if(riskPredictions[0]&&actions.length<3)actions.push({urgency:"🔵 Later",icon:"🔔",text:riskPredictions[0].prediction,why:"Active risk prediction",source:"Risk Monitor",deep_link:"risk"});
+        setTodayBriefing({actions:actions.slice(0,3),headline:"Here's what needs your attention today.",generated:false,quiet_day:false});
+      }
+    }catch(e){console.error("briefing failed",e);}
+    setBriefingLoading(false);
+  },[todos,riskPredictions,calendarEvents,gmailThreads,projects,user]);
 
   /* ── Auto-sync ── */
   const autoSync=useCallback(async()=>{
@@ -1082,6 +1125,9 @@ export default function PMDashboard(){
       const{data,error}=await supabase.functions.invoke("sprint-intelligence-agent",{body:{projectName:siProject,projectKey:key,projectId:proj?.id||null,userId:user?.id}});
       if(error)throw new Error(error.message);if(data?.error)throw new Error(data.error);
       setSiResult(data);loadDecisions();loadRiskPreds();loadAgentRuns();loadTasks();
+      // Load any pending Jira actions proposed by the agent
+      const{data:pending}=await supabase.from("decision_log").select("*").contains("tags",["agent-proposed","pending-approval"]).order("created_at",{ascending:false}).limit(5);
+      if(pending)setPendingJiraActions(pending);
     }catch(e:any){setSiError(e.message);}
     finally{clearInterval(iv);setSiStep(SI_STEPS.length-1);setSiRunning(false);}
   };
@@ -1249,6 +1295,57 @@ export default function PMDashboard(){
 
             {/* SCHEDULE */}
             {page==="schedule"&&(
+              <div className="col">
+
+                {/* 3 THINGS TODAY — proactive briefing */}
+                {!briefingDismissed&&(
+                  <div style={{background:"linear-gradient(135deg,rgba(124,58,237,0.1),rgba(0,212,255,0.07))",border:"1px solid rgba(124,58,237,0.25)",borderRadius:12,padding:"16px 20px",position:"relative"}}>
+                    <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:briefingLoading?8:10}}>
+                      <div style={{display:"flex",alignItems:"center",gap:10}}>
+                        <span style={{fontSize:20}}>🎯</span>
+                        <div>
+                          <div style={{fontFamily:"Syne",fontWeight:800,fontSize:15,color:"var(--white)"}}>
+                            {briefingLoading?"Analyzing your day…":todayBriefing?.headline||"3 Things That Need Your Attention"}
+                          </div>
+                          {todayBriefing?.generated&&<div style={{fontFamily:"DM Mono",fontSize:9,color:"var(--mut)",marginTop:2}}>Generated {todayBriefing.generated} · from Tasks, Projects, Risks, Gmail, Calendar</div>}
+                        </div>
+                      </div>
+                      <div style={{display:"flex",gap:6,alignItems:"center",flexShrink:0}}>
+                        {!briefingLoading&&<button className="btn btn-sm" style={{fontSize:10,borderColor:"rgba(124,58,237,0.3)",color:"var(--pur)"}} onClick={runTodayBriefing}>⟳ Refresh</button>}
+                        <button className="btn btn-sm" style={{fontSize:10}} onClick={()=>setBriefingDismissed(true)}>✕</button>
+                      </div>
+                    </div>
+                    {briefingLoading&&(
+                      <div style={{display:"flex",alignItems:"center",gap:8,padding:"8px 0"}}>
+                        <span className="spin" style={{width:13,height:13,borderWidth:2,flexShrink:0}}/>
+                        <span style={{fontSize:12,color:"var(--mut)"}}>Reading tasks · risks · email signals · calendar…</span>
+                      </div>
+                    )}
+                    {todayBriefing&&!briefingLoading&&(
+                      <div style={{display:"flex",gap:10,flexWrap:"wrap"}}>
+                        {todayBriefing.actions.map((a:any,i:number)=>(
+                          <div key={i} style={{flex:"1 1 200px",padding:"10px 13px",background:"rgba(0,0,0,0.3)",borderRadius:9,border:"1px solid var(--bdr2)",display:"flex",gap:9,alignItems:"flex-start",minWidth:180}}>
+                            <span style={{fontSize:16,flexShrink:0}}>{a.icon}</span>
+                            <div style={{flex:1,minWidth:0}}>
+                              <div style={{fontFamily:"DM Mono",fontSize:9,color:a.urgency.includes("🔴")?"var(--red)":a.urgency.includes("🟡")?"var(--amb)":"var(--acc)",marginBottom:3}}>{a.urgency}</div>
+                              <div style={{fontSize:12,color:"var(--txt)",lineHeight:1.5}}>{a.text}</div>
+                              <div style={{fontFamily:"DM Mono",fontSize:9,color:"var(--mut)",marginTop:4}}>via {a.source}</div>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                    {!todayBriefing&&!briefingLoading&&(
+                      <button className="btn btn-primary btn-sm" onClick={runTodayBriefing} style={{marginTop:4}}>⚡ Generate Briefing</button>
+                    )}
+                  </div>
+                )}
+                {briefingDismissed&&(
+                  <div style={{display:"flex",justifyContent:"flex-end"}}>
+                    <button className="btn btn-sm" style={{fontSize:10,color:"var(--mut)"}} onClick={()=>{setBriefingDismissed(false);runTodayBriefing();}}>🎯 Show Today's Briefing</button>
+                  </div>
+                )}
+
               <div className="g2" style={{gridTemplateColumns:"1fr 280px"}}>
                 <div className="card">
                   <div className="ch">
@@ -1299,6 +1396,7 @@ export default function PMDashboard(){
                     </div>
                   </div>
                 </div>
+              </div>
               </div>
             )}
 
@@ -2189,6 +2287,73 @@ export default function PMDashboard(){
                           </div>
                         )}
                       </div>
+
+                      {/* Pending Jira Actions — Agent proposed, PM approves */}
+                      {pendingJiraActions.length>0&&(
+                        <div className="card" style={{border:"1px solid rgba(0,212,255,0.25)"}}>
+                          <div className="ch">
+                            <div className="ct" style={{color:"var(--acc)"}}>⚡ Jira Actions — Agent Proposed · Pending Your Approval</div>
+                            <span className="tag tag-blu" style={{fontSize:9}}>{pendingJiraActions.length} action{pendingJiraActions.length!==1?"s":""}</span>
+                          </div>
+                          <div className="cb">
+                            <div style={{fontSize:12,color:"var(--mut)",marginBottom:10}}>The Sprint Intelligence Agent identified these Jira changes. Review and approve — nothing is executed automatically.</div>
+                            {pendingJiraActions.map((a:any)=>(
+                              <div key={a.id} style={{padding:"10px 12px",background:"rgba(0,212,255,0.04)",border:"1px solid rgba(0,212,255,0.12)",borderRadius:8,marginBottom:8}}>
+                                <div style={{fontWeight:600,fontSize:13,marginBottom:4}}>{a.title}</div>
+                                <div style={{fontSize:12,color:"var(--mut)",marginBottom:8}}>{a.decision}</div>
+                                <div style={{display:"flex",gap:6}}>
+                                  <button className="btn btn-primary btn-sm" onClick={async()=>{
+                                    // Extract jira_key from title and execute
+                                    const match=a.title.match(/([A-Z]+-\d+)/);
+                                    if(match){
+                                      setSyncingInt("jira");
+                                      await supabase.functions.invoke("jira-sync",{body:{action:"transition_issue",issueData:{jiraKey:match[1],transitionName:"in progress"}}});
+                                      await supabase.functions.invoke("jira-sync",{body:{action:"add_comment",issueData:{jiraKey:match[1],comment:`[Sprint Intelligence Agent] ${a.decision}`}}});
+                                      setSyncingInt(null);
+                                    }
+                                    await supabase.from("decision_log").update({outcome_status:"validated",tags:["jira-action","approved"]}).eq("id",a.id);
+                                    setPendingJiraActions(p=>p.filter((x:any)=>x.id!==a.id));
+                                    alert("Executed in Jira ✓");
+                                  }}>✓ Approve &amp; Execute in Jira</button>
+                                  <button className="btn btn-sm" onClick={async()=>{
+                                    await supabase.from("decision_log").update({outcome_status:"reversed",tags:["jira-action","dismissed"]}).eq("id",a.id);
+                                    setPendingJiraActions(p=>p.filter((x:any)=>x.id!==a.id));
+                                  }}>✕ Dismiss</button>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Pending Jira Actions — Agent proposed, PM approves */}
+                      {pendingJiraActions.length>0&&(
+                        <div className="card" style={{border:"1px solid rgba(0,212,255,0.25)"}}>
+                          <div className="ch">
+                            <div className="ct" style={{color:"var(--acc)"}}>⚡ Agent-Proposed Jira Actions · Pending Approval</div>
+                            <span className="tag tag-blu" style={{fontSize:9}}>{pendingJiraActions.length} pending</span>
+                          </div>
+                          <div className="cb">
+                            <div style={{fontSize:12,color:"var(--mut)",marginBottom:10}}>Sprint Intelligence Agent identified these changes. Nothing executes until you approve.</div>
+                            {pendingJiraActions.map((a:any)=>(
+                              <div key={a.id} style={{padding:"10px 12px",background:"rgba(0,212,255,0.04)",border:"1px solid rgba(0,212,255,0.12)",borderRadius:8,marginBottom:8}}>
+                                <div style={{fontWeight:600,fontSize:13,marginBottom:4}}>{a.title}</div>
+                                <div style={{fontSize:12,color:"var(--mut)",marginBottom:8}}>{a.decision}</div>
+                                <div style={{display:"flex",gap:6}}>
+                                  <button className="btn btn-primary btn-sm" onClick={async()=>{
+                                    const m=a.title.match(/([A-Z]+-[0-9]+)/);
+                                    if(m){setSyncingInt("jira");await supabase.functions.invoke("jira-sync",{body:{action:"transition_issue",issueData:{jiraKey:m[1],transitionName:"in progress"}}});setSyncingInt(null);}
+                                    await supabase.from("decision_log").update({outcome_status:"validated"}).eq("id",a.id);
+                                    setPendingJiraActions((p:any[])=>p.filter((x:any)=>x.id!==a.id));
+                                    alert("Executed in Jira ✓");
+                                  }}>✓ Approve &amp; Execute</button>
+                                  <button className="btn btn-sm" onClick={async()=>{await supabase.from("decision_log").update({outcome_status:"reversed"}).eq("id",a.id);setPendingJiraActions((p:any[])=>p.filter((x:any)=>x.id!==a.id));}}>✕ Dismiss</button>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
 
                       {/* Stakeholder alert if drafted */}
                       {siResult.stakeholder_alert?.generated&&(
