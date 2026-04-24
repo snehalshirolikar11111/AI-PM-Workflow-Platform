@@ -343,10 +343,12 @@ const computeHealth=(issues:any[])=>{
   const total=issues.length;
   const done=issues.filter(i=>["done","closed","resolved"].includes(i.status?.toLowerCase()||"")).length;
   const blocked=issues.filter(i=>(i.status||"").toLowerCase().includes("block")).length;
-  const highBugs=issues.filter(i=>i.issue_type==="Bug"&&i.priority==="high").length;
+  const openBugs=issues.filter(i=>i.issue_type==="Bug"&&i.priority==="high"&&!["done","closed","resolved"].includes(i.status?.toLowerCase()||"")).length;
   const rate=done/total;
-  if(blocked>2||highBugs>3||rate<0.3)return"red";
-  if(blocked>0||highBugs>1||rate<0.6)return"yellow";
+  // 100% complete = always green regardless of bugs (they're resolved)
+  if(rate>=1)return"green";
+  if(blocked>2||openBugs>3||rate<0.3)return"red";
+  if(blocked>0||openBugs>1||rate<0.6)return"yellow";
   return"green";
 };
 
