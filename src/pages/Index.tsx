@@ -666,7 +666,7 @@ export default function PMDashboard(){
   const loadKnowledge=useCallback(async()=>{const{data,error}=await supabase.from("knowledge_items").select("*").order("created_at",{ascending:false});if(error)console.error("loadKnowledge:",error.message);if(data)setKnowledgeItems(data);},[]);
   const loadOutcomes=useCallback(async()=>{const{data}=await supabase.from("outcomes").select("*,projects(name),okrs(objective)").order("created_at",{ascending:false});if(data)setOutcomes(data);},[]);
   const loadRiskPreds=useCallback(async()=>{const{data}=await supabase.from("risk_predictions").select("*,projects(name)").eq("status","active").order("detected_at",{ascending:false});if(data)setRiskPredictions(data);},[]);
-  const loadCostAnomalies=useCallback(async()=>{const{data}=await supabase.from("v_cost_anomalies").select("*").limit(10).catch(()=>({data:[]}));if(data)setCostAnomalies(data);const{data:bs}=await supabase.from("v_budget_status").select("*").limit(1).catch(()=>({data:[]}));if(bs&&bs[0])setBudgetStatus(bs[0]);},[]);
+  const loadCostAnomalies=useCallback(async()=>{const{data}=await supabase.from("v_cost_anomalies").select("*").limit(10);if(data)setCostAnomalies(data);const{data:bs}=await supabase.from("v_budget_status").select("*").limit(1);if(bs&&bs[0])setBudgetStatus(bs[0]);},[]);
   const loadFeedback=useCallback(async()=>{const{data}=await supabase.from("feedback_events").select("*").order("created_at",{ascending:false}).limit(30);if(data)setFeedbackEvents(data);},[]);
   const loadTokens=useCallback(async()=>{
     setTokenLoading(true);
@@ -826,7 +826,7 @@ export default function PMDashboard(){
   const reschedule=async(id:string,date:string)=>{setTodos(p=>p.map((t:any)=>t.id===id?{...t,scheduled_date:date||null}:t));await supabase.from("tasks").update({scheduled_date:date||null}).eq("id",id);};
 
   /* ── Project CRUD ── */
-  const openAddProj=()=>{setProjForm({name:"",owner:"",status:"planning",progress:0,due_date:"",priority:"med",research_summary:"",competitive_summary:""});setEditProj(null);setShowAddProj(true);};
+  const openAddProj=()=>{setProjForm({name:"",owner:"",status:"planning",progress:0,due_date:"",priority:"med",jira_key:"",research_summary:"",competitive_summary:""});setEditProj(null);setShowAddProj(true);};
   const openEditProj=(p:any)=>{setProjForm({name:p.name,owner:p.owner||"",status:p.status,progress:p.progress,due_date:p.due_date||"",priority:p.priority||"med",jira_key:p.jira_key||"",research_summary:p.research_summary||"",competitive_summary:p.competitive_summary||""});setEditProj(p);setShowAddProj(true);};
   const saveProject=async()=>{
     if(!projForm.name.trim())return;
@@ -1048,7 +1048,8 @@ export default function PMDashboard(){
   /* ── Decision Log ── */
   const saveDecision=async()=>{
     if(!decisionForm.title.trim()||!decisionForm.decision.trim())return;
-    await supabase.from("decision_log").insert({...decisionForm,user_id:user?.id,trade_offs:decisionForm.trade_offs?decisionForm.trade_offs.split("\n").filter(Boolean):undefined,tags:decisionForm.tags?decisionForm.tags.split(",").map((t:string)=>t.trim()).filter(Boolean):undefined,project_id:decisionForm.project_id||null}).catch(()=>{});
+    const{error}=await supabase.from("decision_log").insert({...decisionForm,user_id:user?.id,trade_offs:decisionForm.trade_offs?decisionForm.trade_offs.split("\n").filter(Boolean):undefined,tags:decisionForm.tags?decisionForm.tags.split(",").map((t:string)=>t.trim()).filter(Boolean):undefined,project_id:decisionForm.project_id||null});
+    if(error){alert("Save failed: "+error.message+" — run the RLS fix SQL in Supabase");return;}
     setShowAddDecision(false);setDecisionForm({title:"",decision:"",rationale:"",trade_offs:"",project_id:"",tags:""});loadDecisions();
   };
   const logFeedback=async(agentName:string,eventType:string,field:string,original:string,corrected:string)=>{
@@ -1056,12 +1057,14 @@ export default function PMDashboard(){
   };
   const saveKnowledgeItem=async()=>{
     if(!knowledgeForm.title.trim()||!knowledgeForm.content.trim())return;
-    await supabase.from("knowledge_items").insert({...knowledgeForm,user_id:user?.id,tags:knowledgeForm.tags?knowledgeForm.tags.split(",").map((t:string)=>t.trim()).filter(Boolean):[]}).catch(()=>{});
+    const{error:ke}=await supabase.from("knowledge_items").insert({...knowledgeForm,user_id:user?.id,tags:knowledgeForm.tags?knowledgeForm.tags.split(",").map((t:string)=>t.trim()).filter(Boolean):[]});
+    if(ke){alert("Save failed: "+ke.message);return;}
     setShowAddKnowledge(false);setKnowledgeForm({type:"insight",title:"",content:"",tags:""});loadKnowledge();
   };
   const saveOutcome=async()=>{
     if(!outcomeForm.feature_name.trim())return;
-    await supabase.from("outcomes").insert({...outcomeForm,user_id:user?.id,project_id:outcomeForm.project_id||null,target_value:parseFloat(outcomeForm.target_value)||null}).catch(()=>{});
+    const{error:oe}=await supabase.from("outcomes").insert({...outcomeForm,user_id:user?.id,project_id:outcomeForm.project_id||null,target_value:parseFloat(outcomeForm.target_value)||null});
+    if(oe){alert("Save failed: "+oe.message);return;}
     setShowAddOutcome(false);setOutcomeForm({feature_name:"",project_id:"",hypothesis:"",target_metric:"",target_value:"",measurement_date:""});loadOutcomes();
   };
 
@@ -1806,6 +1809,17 @@ export default function PMDashboard(){
                         <span key={l} style={{fontFamily:"DM Mono",fontSize:9,padding:"3px 9px",borderRadius:100,background:"rgba(0,212,255,0.07)",border:"1px solid rgba(0,212,255,0.15)",color:"var(--acc)"}}>{l}</span>
                       ))}
                     </div>
+                    <div style={{background:"rgba(0,212,255,0.04)",border:"1px solid rgba(0,212,255,0.1)",borderRadius:8,padding:"10px 14px",marginBottom:10}}>
+                      <div style={{fontFamily:"DM Mono",fontSize:9,color:"var(--acc)",letterSpacing:".1em",marginBottom:6}}>WHAT HAPPENS WHEN BLOCKERS ARE DETECTED</div>
+                      <div style={{display:"flex",flexDirection:"column",gap:4}}>
+                        {[["🔴 Health = RED","Creates a task: 'Resolve blocker — [ticket name]' in your To-Do automatically"],["🔔 Saves prediction","Writes to risk_predictions table — Executive Briefing and Release Readiness agents read this"],["📝 Drafts alert","Writes a stakeholder email draft for Jennifer Lau (highest influence) — review before sending"],["📌 Decision Log","Saves: Sprint Health + blockers found + recommended actions as a formal decision record"],["🧠 Knowledge Base","If health is RED: saves risk pattern as knowledge item for future agent context"]].map(([label,action],i)=>(
+                          <div key={i} style={{display:"flex",gap:8,fontSize:11,padding:"3px 0"}}>
+                            <span style={{flexShrink:0,fontWeight:600,color:"var(--txt)"}}>{label}:</span>
+                            <span style={{color:"var(--mut)"}}>{action}</span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
                     {siError&&<div className="infobox ib-red" style={{marginBottom:10}}>⚠️ {siError}</div>}
                     <button style={{width:"100%",padding:13,background:siRunning||!siProject?"var(--bdr)":"linear-gradient(90deg,var(--amb),var(--acc))",border:"none",borderRadius:9,fontFamily:"Syne",fontWeight:800,fontSize:14,color:siRunning||!siProject?"var(--mut)":"#000",cursor:siRunning||!siProject?"not-allowed":"pointer",display:"flex",alignItems:"center",justifyContent:"center",gap:10}} onClick={runSprintIntelligence} disabled={siRunning||!siProject}>
                       {siRunning?<><span className="spin" style={{width:16,height:16,borderWidth:2,borderTopColor:"#000",borderColor:"rgba(0,0,0,0.2)"}}/>Investigating...</>:"⚡ Run Sprint Intelligence"}
@@ -2515,7 +2529,10 @@ export default function PMDashboard(){
                           <span style={{fontSize:11}}>{o.target_metric||"—"}</span>
                           <span className="mono dim" style={{fontSize:11}}>{o.target_value||"—"}</span>
                           <span className="mono" style={{fontSize:11,color:o.actual_value>=o.target_value?"var(--grn)":o.actual_value>0?"var(--amb)":"var(--mut)"}}>{o.actual_value||"—"}</span>
-                          <span className={`tag ${o.status==="achieved"||o.status==="exceeded"?"tag-grn":o.status==="missed"?"tag-red":o.status==="tracking"?"tag-amb":"tag-dim"}`} style={{fontSize:9}}>{o.status}</span>
+                          <div style={{display:"flex",gap:4,alignItems:"center"}}>
+                            <input type="number" className="input input-sm" style={{width:70,fontSize:10}} placeholder="Actual" defaultValue={o.actual_value||""} onBlur={async(e:any)=>{const v=parseFloat(e.target.value);if(!isNaN(v)){const st=v>=o.target_value?"achieved":v>0?"tracking":"missed";await supabase.from("outcomes").update({actual_value:v,status:st}).eq("id",o.id).catch(()=>{});loadOutcomes();}}}/>
+                            <span className={`tag ${o.status==="achieved"||o.status==="exceeded"?"tag-grn":o.status==="missed"?"tag-red":o.status==="tracking"?"tag-amb":"tag-dim"}`} style={{fontSize:9}}>{o.status}</span>
+                          </div>
                         </div>
                       ))}
                     </>
@@ -3188,6 +3205,9 @@ export default function PMDashboard(){
                           {[projects.length+" projects",okrs.length+" OKRs",decisions.slice(0,5).length+" decisions",riskPredictions.length+" risks"].map((l,i)=><span key={i} className="tag tag-blu" style={{fontSize:9}}>{l}</span>)}
                         </div>
                       </div>
+                    </div>
+                    <div style={{fontSize:10,color:"var(--mut)",padding:"6px 10px",background:"rgba(16,185,129,0.04)",border:"1px solid rgba(16,185,129,0.1)",borderRadius:6,marginBottom:8,fontFamily:"DM Mono"}}>
+                      ⚡ Runs on Claude Sonnet · Haiku pre-classifies to reduce cost · Est. ~$0.04/run
                     </div>
                     {digestError&&<div className="infobox ib-red" style={{marginBottom:10}}>⚠️ {digestError}</div>}
                     <button style={{width:"100%",padding:13,background:digestRunning?"var(--bdr)":"linear-gradient(90deg,var(--grn),var(--acc))",border:"none",borderRadius:9,fontFamily:"Syne",fontWeight:800,fontSize:14,color:"#000",cursor:digestRunning?"not-allowed":"pointer",display:"flex",alignItems:"center",justifyContent:"center",gap:10}} onClick={runDigestPage} disabled={digestRunning}>
