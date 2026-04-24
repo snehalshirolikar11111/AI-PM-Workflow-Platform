@@ -311,6 +311,28 @@ const BAR_COLOR:Record<string,string>={"on-track":"var(--grn)","at-risk":"var(--
 const KR_COLOR:Record<string,string>={"on-track":"var(--grn)","at-risk":"var(--amb)","planning":"var(--pur)"};
 const KR_TAG:Record<string,string>={"on-track":"tag-grn","at-risk":"tag-amb","planning":"tag-pur"};
 const AGE_TAG:Record<string,string>={recent:"tag-grn",old:"tag-amb",stale:"tag-red"};
+const PRIORITY_META:Record<string,{label:string;color:string;bg:string;border:string;rank:number}>={
+  p0:{label:"P0",color:"#fff",bg:"rgba(239,68,68,0.85)",border:"rgba(239,68,68,0.9)",rank:0},
+  p1:{label:"P1",color:"var(--red)",bg:"rgba(239,68,68,0.1)",border:"rgba(239,68,68,0.3)",rank:1},
+  p2:{label:"P2",color:"var(--amb)",bg:"rgba(245,158,11,0.1)",border:"rgba(245,158,11,0.3)",rank:2},
+  p3:{label:"P3",color:"var(--mut)",bg:"rgba(78,95,116,0.1)",border:"rgba(78,95,116,0.2)",rank:3},
+  high:{label:"P1",color:"var(--red)",bg:"rgba(239,68,68,0.1)",border:"rgba(239,68,68,0.3)",rank:1},
+  med:{label:"P2",color:"var(--amb)",bg:"rgba(245,158,11,0.1)",border:"rgba(245,158,11,0.3)",rank:2},
+  low:{label:"P3",color:"var(--mut)",bg:"rgba(78,95,116,0.1)",border:"rgba(78,95,116,0.2)",rank:3},
+};
+const SOURCE_META:Record<string,{label:string;icon:string;color:string}>={
+  manual:{label:"Manual",icon:"✏️",color:"var(--acc)"},
+  jira:{label:"Jira",icon:"🔷",color:"var(--pur)"},
+  "meeting-scribe":{label:"Meeting",icon:"✦",color:"var(--amb)"},
+  "sprint-intelligence-agent":{label:"Sprint Agent",icon:"⚡",color:"var(--red)"},
+  "release-readiness-agent":{label:"Release Agent",icon:"🚦",color:"var(--grn)"},
+  "risk-monitor":{label:"Risk Monitor",icon:"🔔",color:"var(--red)"},
+  "weekly-digest":{label:"Digest",icon:"📊",color:"var(--grn)"},
+  agent:{label:"Agent",icon:"🤖",color:"var(--pur)"},
+};
+const srcMeta=(s:string)=>SOURCE_META[s]||{label:s||"Other",icon:"◈",color:"var(--mut)"};
+const priMeta=(p:string)=>PRIORITY_META[p]||PRIORITY_META.p2;
+
 
 const initials=(n:string)=>n.split(' ').map(x=>x[0]).join('').toUpperCase().slice(0,2);
 const contactAge=(dt:string)=>{if(!dt)return"stale";const d=(Date.now()-new Date(dt).getTime())/86400000;return d<7?"recent":d<14?"old":"stale";};
@@ -439,7 +461,7 @@ export default function PMDashboard(){
   const [todos,setTodos]=useState<any[]>([]);
   const [todosLoading,setTodosLoading]=useState(true);
   const [showAddTask,setShowAddTask]=useState(false);
-  const [newTask,setNewTask]=useState({title:"",priority:"med",scheduled_date:""});
+  const [newTask,setNewTask]=useState({title:"",priority:"p2",scheduled_date:"",context:"",source:"manual"});
 
   // Projects
   const [projects,setProjects]=useState<any[]>([]);
@@ -818,8 +840,11 @@ export default function PMDashboard(){
   };
   const addTask=async()=>{
     if(!newTask.title.trim())return;
-    await supabase.from("tasks").insert({title:newTask.title.trim(),priority:newTask.priority,status:"open",source:"manual",user_id:user?.id,scheduled_date:newTask.scheduled_date||null});
-    setNewTask({title:"",priority:"med",scheduled_date:""});setShowAddTask(false);
+    // Dedup: check if same title+source already exists and is open
+    const{data:existing}=await supabase.from("tasks").select("id").ilike("title",newTask.title.trim()).eq("status","open").limit(1);
+    if(existing&&existing.length>0){alert("A task with this title already exists in your open list.");return;}
+    await supabase.from("tasks").insert({title:newTask.title.trim(),priority:newTask.priority,status:"open",source:newTask.source||"manual",context:newTask.context||null,user_id:user?.id,scheduled_date:newTask.scheduled_date||null,created_at:new Date().toISOString()});
+    setNewTask({title:"",priority:"p2",scheduled_date:"",context:"",source:"manual"});setShowAddTask(false);
   };
   const deleteTask=async(id:string)=>{if(!window.confirm("Delete task?"))return;setTodos(p=>p.filter((t:any)=>t.id!==id));await supabase.from("tasks").delete().eq("id",id);};
   const updatePriority=async(id:string,priority:string)=>{setTodos(p=>p.map((t:any)=>t.id===id?{...t,priority}:t));await supabase.from("tasks").update({priority}).eq("id",id);};
@@ -1228,37 +1253,204 @@ export default function PMDashboard(){
 
             {/* TODOS */}
             {page==="todos"&&(
-              <div className="g2" style={{gridTemplateColumns:"1fr 260px"}}>
-                <div className="card">
-                  <div className="ch">
-                    <div><div className="ct">To-Do · {selectedTodoDate.toLocaleDateString("en-US",{weekday:"short",month:"short",day:"numeric"})}</div>{selDateStr!==todayStr&&<div style={{fontSize:10,color:"var(--acc)",fontFamily:"DM Mono",marginTop:2}}>Scheduled tasks for this date</div>}</div>
-                    <button className="btn btn-primary btn-sm" onClick={()=>setShowAddTask(true)}>+ Add Task</button>
-                  </div>
-                  <div className="cb">
-                    {todosLoading&&<div className="loading"><div className="spin"/>Loading...</div>}
-                    {!todosLoading&&filteredTodos.length===0&&<div className="empty">No tasks for this day.<br/><span style={{fontSize:11,color:"var(--mut)"}}>Unscheduled tasks show on today. Use the date field to schedule future tasks.</span></div>}
-                    <div className="col" style={{gap:6}}>
-                      {filteredTodos.map((t:any)=>(
-                        <div key={t.id} className="todo-item">
-                          <div className={`todo-chk${t.status==="done"?" dn":""}`} onClick={()=>toggleTodo(t)}>{t.status==="done"?"✓":""}</div>
-                          <span className={`todo-txt${t.status==="done"?" dn":""}`}>{t.title}</span>
-                          {t.jira_key&&<a href={t.jira_url||"#"} target="_blank" rel="noopener noreferrer" style={{fontFamily:"DM Mono",fontSize:9,color:"var(--pur)",textDecoration:"none",flexShrink:0}}>{t.jira_key}</a>}
-                          <select className="input input-sm select" style={{width:64,padding:"2px 18px 2px 4px",fontSize:10,flexShrink:0}} value={t.priority} onChange={e=>updatePriority(t.id,e.target.value)}><option value="high">High</option><option value="med">Med</option><option value="low">Low</option></select>
-                          <input type="date" className="input input-sm" style={{width:120,fontSize:10,flexShrink:0}} title="Schedule for a day" value={t.scheduled_date||""} onChange={e=>reschedule(t.id,e.target.value)}/>
-                          <button className="btn btn-icon btn-danger btn-sm" onClick={()=>deleteTask(t.id)}>✕</button>
+              <div className="col">
+
+                {/* Decision Engine Header */}
+                {(()=>{
+                  const open=todos.filter((t:any)=>t.status==="open");
+                  const p0=open.filter((t:any)=>priMeta(t.priority).rank===0);
+                  const blocked=open.filter((t:any)=>(t.context||"").toLowerCase().includes("block"));
+                  const overdue=open.filter((t:any)=>t.scheduled_date&&t.scheduled_date<new Date().toISOString().split("T")[0]);
+                  const decisions=open.filter((t:any)=>(t.context||"").toLowerCase().includes("decision")||(t.title||"").toLowerCase().includes("decide"));
+                  if(!open.length)return null;
+                  return(
+                    <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr 1fr",gap:10}}>
+                      {[
+                        {v:p0.length,l:"P0 — Act Now",c:"var(--red)",bg:"rgba(239,68,68,0.07)",bdr:"rgba(239,68,68,0.2)",icon:"🚨"},
+                        {v:blocked.length,l:"Blocked",c:"var(--amb)",bg:"rgba(245,158,11,0.07)",bdr:"rgba(245,158,11,0.2)",icon:"🚫"},
+                        {v:overdue.length,l:"Overdue",c:"var(--red)",bg:"rgba(239,68,68,0.07)",bdr:"rgba(239,68,68,0.2)",icon:"⏰"},
+                        {v:decisions.length,l:"Needs Decision",c:"var(--acc)",bg:"rgba(0,212,255,0.07)",bdr:"rgba(0,212,255,0.2)",icon:"⚡"},
+                      ].map(({v,l,c,bg,bdr,icon})=>(
+                        <div key={l} style={{background:bg,border:`1px solid ${bdr}`,borderRadius:10,padding:"12px 14px",display:"flex",gap:10,alignItems:"center"}}>
+                          <span style={{fontSize:18}}>{icon}</span>
+                          <div><div style={{fontFamily:"Syne",fontWeight:800,fontSize:22,color:c,lineHeight:1}}>{v}</div><div style={{fontFamily:"DM Mono",fontSize:10,color:"var(--mut)",marginTop:2}}>{l}</div></div>
                         </div>
                       ))}
                     </div>
+                  );
+                })()}
+
+                <div style={{display:"grid",gridTemplateColumns:"1fr 240px",gap:14,alignItems:"start"}}>
+                  <div className="col">
+
+                    {/* Priority groups */}
+                    {(()=>{
+                      const selDate=selectedTodoDate.toISOString().split("T")[0];
+                      const todayDate=new Date().toISOString().split("T")[0];
+                      const filtered=todos.filter((t:any)=>{
+                        if(t.scheduled_date)return t.scheduled_date===selDate;
+                        return selDate===todayDate;
+                      });
+                      const sorted=[...filtered].sort((a:any,b:any)=>{
+                        const pa=priMeta(a.priority).rank,pb=priMeta(b.priority).rank;
+                        if(pa!==pb)return pa-pb;
+                        return new Date(b.created_at||0).getTime()-new Date(a.created_at||0).getTime();
+                      });
+                      const groups:{[k:string]:any[]}={p0:[],p1:[],p2:[],p3:[]};
+                      sorted.forEach((t:any)=>{
+                        const r=priMeta(t.priority).rank;
+                        const k=["p0","p1","p2","p3"][r]||"p3";
+                        groups[k].push(t);
+                      });
+                      const groupDefs=[
+                        {k:"p0",label:"P0 — Act Now",desc:"Critical blockers · immediate action required",c:"var(--red)"},
+                        {k:"p1",label:"P1 — Today",desc:"High-impact · complete before end of day",c:"#f97316"},
+                        {k:"p2",label:"P2 — This Sprint",desc:"Standard priority · complete this sprint",c:"var(--amb)"},
+                        {k:"p3",label:"P3 — Backlog",desc:"Low urgency · do when capacity allows",c:"var(--mut)"},
+                      ];
+                      if(sorted.length===0)return(
+                        <div className="card" style={{padding:32,textAlign:"center",opacity:0.5}}>
+                          <div style={{fontSize:28,marginBottom:8}}>✓</div>
+                          <div style={{fontFamily:"Syne",fontWeight:700}}>No tasks for this date</div>
+                          <div style={{fontSize:12,color:"var(--mut)",marginTop:4}}>Unscheduled tasks appear on today's view</div>
+                        </div>
+                      );
+                      return(
+                        <div className="col">
+                          {groupDefs.map(({k,label,desc,c})=>{
+                            const items=groups[k];
+                            if(!items.length)return null;
+                            return(
+                              <div key={k} className="card" style={{overflow:"hidden"}}>
+                                <div style={{padding:"9px 14px",background:`${c}10`,borderBottom:"1px solid var(--bdr)",display:"flex",alignItems:"center",justifyContent:"space-between"}}>
+                                  <div style={{display:"flex",alignItems:"center",gap:8}}>
+                                    <span style={{fontFamily:"DM Mono",fontSize:10,fontWeight:700,color:c,background:`${c}18`,border:`1px solid ${c}40`,padding:"2px 8px",borderRadius:100}}>{k.toUpperCase()}</span>
+                                    <span style={{fontFamily:"Syne",fontWeight:700,fontSize:12,color:"var(--white)"}}>{label.split("—")[1]?.trim()}</span>
+                                    <span style={{fontSize:11,color:"var(--mut)"}}>{desc}</span>
+                                  </div>
+                                  <span style={{fontFamily:"DM Mono",fontSize:10,color:"var(--mut)"}}>{items.length} task{items.length!==1?"s":""}</span>
+                                </div>
+                                <div>
+                                  {items.map((t:any)=>{
+                                    const src2=srcMeta(t.source);
+                                    const isOverdue=t.scheduled_date&&t.scheduled_date<new Date().toISOString().split("T")[0]&&t.status!=="done";
+                                    const ageStr=t.created_at?new Date(t.created_at).toLocaleDateString("en-US",{month:"short",day:"numeric"}):"—";
+                                    return(
+                                      <div key={t.id} style={{display:"flex",alignItems:"flex-start",gap:10,padding:"10px 14px",borderBottom:"1px solid var(--bdr)",transition:"background 0.1s"}} className="tr">
+                                        {/* Checkbox */}
+                                        <div className={`todo-chk${t.status==="done"?" dn":""}`} style={{marginTop:2,flexShrink:0}} onClick={()=>toggleTodo(t)}>{t.status==="done"?"✓":""}</div>
+                                        {/* Content */}
+                                        <div style={{flex:1,minWidth:0}}>
+                                          <div style={{display:"flex",alignItems:"center",gap:6,flexWrap:"wrap",marginBottom:t.context?4:0}}>
+                                            <span className={`todo-txt${t.status==="done"?" dn":""}`} style={{fontSize:13,fontWeight:t.status==="done"?400:500}}>{t.title}</span>
+                                            {t.jira_key&&<a href={t.jira_url||"#"} target="_blank" rel="noopener noreferrer" style={{fontFamily:"DM Mono",fontSize:9,color:"var(--pur)",textDecoration:"none",flexShrink:0,padding:"1px 6px",background:"rgba(124,58,237,0.08)",border:"1px solid rgba(124,58,237,0.2)",borderRadius:4}}>{t.jira_key}</a>}
+                                          </div>
+                                          {t.context&&<div style={{fontSize:11,color:"var(--mut)",lineHeight:1.5,marginTop:2}}>{t.context}</div>}
+                                          <div style={{display:"flex",alignItems:"center",gap:8,marginTop:5,flexWrap:"wrap"}}>
+                                            {/* Source badge */}
+                                            <span style={{fontFamily:"DM Mono",fontSize:9,color:src2.color,background:`${src2.color}10`,border:`1px solid ${src2.color}25`,padding:"1px 7px",borderRadius:100,flexShrink:0}}>{src2.icon} {src2.label}</span>
+                                            {/* Created date */}
+                                            <span style={{fontFamily:"DM Mono",fontSize:9,color:"var(--mut)"}}>Created {ageStr}</span>
+                                            {/* Overdue */}
+                                            {isOverdue&&<span style={{fontFamily:"DM Mono",fontSize:9,color:"var(--red)",background:"rgba(239,68,68,0.08)",border:"1px solid rgba(239,68,68,0.2)",padding:"1px 7px",borderRadius:100}}>⏰ Overdue</span>}
+                                          </div>
+                                        </div>
+                                        {/* Priority selector */}
+                                        <select className="input select" style={{width:60,padding:"3px 20px 3px 6px",fontSize:10,fontFamily:"DM Mono",flexShrink:0,color:priMeta(t.priority).color,background:priMeta(t.priority).bg,border:`1px solid ${priMeta(t.priority).border}`,borderRadius:6}} value={t.priority.startsWith("high")?"p1":t.priority.startsWith("med")?"p2":t.priority.startsWith("low")?"p3":t.priority} onChange={e=>updatePriority(t.id,e.target.value)}>
+                                          <option value="p0">P0</option><option value="p1">P1</option><option value="p2">P2</option><option value="p3">P3</option>
+                                        </select>
+                                        {/* Schedule date */}
+                                        <input type="date" className="input" style={{width:115,fontSize:10,padding:"3px 6px",flexShrink:0}} title="Schedule" value={t.scheduled_date||""} onChange={e=>reschedule(t.id,e.target.value)}/>
+                                        {/* Delete */}
+                                        <button className="btn btn-icon btn-danger btn-sm" style={{flexShrink:0,marginTop:2}} onClick={()=>deleteTask(t.id)}>✕</button>
+                                      </div>
+                                    );
+                                  })}
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      );
+                    })()}
+
                   </div>
-                </div>
-                <div className="col">
-                  <div className="card"><div className="ch"><div className="ct">Browse by Date</div></div><div className="cb"><MiniCalendar selectedDate={selectedTodoDate} onSelect={setSelectedTodoDate} eventDates={scheduledDates}/><div style={{marginTop:8,fontSize:11,color:"var(--mut)"}}>Dots = scheduled tasks</div></div></div>
-                  <div className="card"><div className="ch"><div className="ct">Overview</div></div><div className="cb">{[["Total",todos.length],["Open",todos.filter((t:any)=>t.status==="open").length],["Done",todos.filter((t:any)=>t.status==="done").length],["High priority",todos.filter((t:any)=>t.priority==="high"&&t.status==="open").length],["Scheduled",todos.filter((t:any)=>t.scheduled_date&&t.scheduled_date>todayStr).length],["From Jira",todos.filter((t:any)=>t.source==="jira").length],["From Meetings",todos.filter((t:any)=>t.source==="meeting-scribe").length]].map(([l,v])=>(<div key={l as string} style={{display:"flex",justifyContent:"space-between",padding:"6px 0",borderBottom:"1px solid var(--bdr)",fontSize:12}}><span className="dim">{l}</span><span className="mono acc" style={{fontSize:11}}>{v}</span></div>))}</div></div>
+
+                  {/* Right panel */}
+                  <div className="col">
+                    <div className="card">
+                      <div className="ch"><div className="ct">Browse by Date</div></div>
+                      <div className="cb"><MiniCalendar selectedDate={selectedTodoDate} onSelect={setSelectedTodoDate} eventDates={[...new Set(todos.filter((t:any)=>t.scheduled_date).map((t:any)=>t.scheduled_date as string))]}/><div style={{marginTop:8,fontSize:11,color:"var(--mut)"}}>Dots = scheduled tasks</div></div>
+                    </div>
+
+                    {/* Source breakdown */}
+                    <div className="card">
+                      <div className="ch"><div className="ct">By Source</div></div>
+                      <div className="cb" style={{padding:"6px 12px"}}>
+                        {(()=>{
+                          const open=todos.filter((t:any)=>t.status==="open");
+                          const bySource:{[k:string]:number}={};
+                          open.forEach((t:any)=>{const s=t.source||"manual";bySource[s]=(bySource[s]||0)+1;});
+                          const total=open.length||1;
+                          return Object.entries(bySource).sort((a:any,b:any)=>b[1]-a[1]).map(([s,n])=>{
+                            const m=srcMeta(s);
+                            return(
+                              <div key={s} style={{display:"flex",alignItems:"center",gap:8,padding:"6px 0",borderBottom:"1px solid var(--bdr)"}}>
+                                <span style={{fontSize:12}}>{m.icon}</span>
+                                <span style={{fontSize:12,flex:1}}>{m.label}</span>
+                                <div style={{width:60,height:4,background:"var(--bdr2)",borderRadius:2,overflow:"hidden"}}><div style={{height:"100%",width:`${(n as number/total)*100}%`,background:m.color,borderRadius:2}}/></div>
+                                <span style={{fontFamily:"DM Mono",fontSize:10,color:"var(--mut)",width:20,textAlign:"right"}}>{n as number}</span>
+                              </div>
+                            );
+                          });
+                        })()}
+                      </div>
+                    </div>
+
+                    {/* Priority breakdown */}
+                    <div className="card">
+                      <div className="ch"><div className="ct">By Priority</div></div>
+                      <div className="cb" style={{padding:"6px 12px"}}>
+                        {["p0","p1","p2","p3"].map(p=>{
+                          const pm=priMeta(p);
+                          const n=todos.filter((t:any)=>t.status==="open"&&priMeta(t.priority).rank===pm.rank).length;
+                          return(
+                            <div key={p} style={{display:"flex",alignItems:"center",gap:8,padding:"6px 0",borderBottom:"1px solid var(--bdr)"}}>
+                              <span style={{fontFamily:"DM Mono",fontSize:10,fontWeight:700,color:pm.color,background:pm.bg,border:`1px solid ${pm.border}`,padding:"1px 8px",borderRadius:100}}>{p.toUpperCase()}</span>
+                              <span style={{fontSize:11,flex:1,color:"var(--mut)"}}>{p==="p0"?"Act now":p==="p1"?"Today":p==="p2"?"This sprint":"Backlog"}</span>
+                              <span style={{fontFamily:"DM Mono",fontSize:12,color:n>0?pm.color:"var(--mut)",fontWeight:700}}>{n}</span>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+
+                    {/* Stats */}
+                    <div className="card">
+                      <div className="ch"><div className="ct">Overview</div></div>
+                      <div className="cb" style={{padding:"6px 12px"}}>
+                        {[
+                          ["Total open",todos.filter((t:any)=>t.status==="open").length],
+                          ["Done today",todos.filter((t:any)=>t.status==="done"&&t.updated_at?.startsWith(new Date().toISOString().split("T")[0])).length],
+                          ["Scheduled",todos.filter((t:any)=>t.scheduled_date&&t.scheduled_date>new Date().toISOString().split("T")[0]).length],
+                          ["From Jira",todos.filter((t:any)=>t.source==="jira").length],
+                          ["From Meetings",todos.filter((t:any)=>t.source==="meeting-scribe").length],
+                          ["From Agents",todos.filter((t:any)=>t.source&&t.source.includes("agent")||t.source==="risk-monitor").length],
+                        ].map(([l,v])=>(
+                          <div key={l as string} style={{display:"flex",justifyContent:"space-between",padding:"6px 0",borderBottom:"1px solid var(--bdr)",fontSize:12}}>
+                            <span className="dim">{l}</span><span className="mono acc" style={{fontSize:11}}>{v}</span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+
+                    <button className="btn btn-primary" style={{width:"100%"}} onClick={()=>setShowAddTask(true)}>+ Add Task</button>
+                  </div>
                 </div>
               </div>
             )}
 
-            {/* PROJECTS */}
+            {/* PROJECTS */}{/* PROJECTS */}
             {page==="tracker"&&(
               <div className="col">
                 <div className="card">
@@ -3559,7 +3751,7 @@ export default function PMDashboard(){
           </div>
         </Modal>)}
 
-        {showAddTask&&(<Modal title="Add Task" onClose={()=>setShowAddTask(false)}><div className="form-row"><label className="form-label">Title</label><input className="input" value={newTask.title} onChange={e=>setNewTask(p=>({...p,title:e.target.value}))} placeholder="Task description..." autoFocus onKeyDown={e=>e.key==="Enter"&&addTask()}/></div><div className="form-grid"><div className="form-row"><label className="form-label">Priority</label><select className="input select" value={newTask.priority} onChange={e=>setNewTask(p=>({...p,priority:e.target.value}))}><option value="high">High</option><option value="med">Medium</option><option value="low">Low</option></select></div><div className="form-row"><label className="form-label">Schedule for date</label><input className="input" type="date" value={newTask.scheduled_date} onChange={e=>setNewTask(p=>({...p,scheduled_date:e.target.value}))}/></div></div><div className="form-actions"><button className="btn" onClick={()=>setShowAddTask(false)}>Cancel</button><button className="btn btn-primary" onClick={addTask}>Add Task</button></div></Modal>)}
+        {showAddTask&&(<Modal title="Add Task" onClose={()=>setShowAddTask(false)}><div className="form-row"><label className="form-label">Title</label><input className="input" value={newTask.title} onChange={e=>setNewTask(p=>({...p,title:e.target.value}))} placeholder="e.g. Resolve RTVT-103 DB migration blocker" autoFocus onKeyDown={e=>e.key==="Enter"&&addTask()}/></div><div className="form-row"><label className="form-label">Context / Why (optional)</label><input className="input" value={newTask.context} onChange={e=>setNewTask(p=>({...p,context:e.target.value}))} placeholder="Blocking Sprint 14 · Kevin Wu needs unblocking · Decision needed from Raj"/></div><div className="form-grid"><div className="form-row"><label className="form-label">Priority</label><select className="input select" value={newTask.priority} onChange={e=>setNewTask(p=>({...p,priority:e.target.value}))}><option value="p0">P0 — Act now (blocker / critical)</option><option value="p1">P1 — Today (high impact)</option><option value="p2">P2 — This sprint (standard)</option><option value="p3">P3 — Backlog (low urgency)</option></select></div><div className="form-row"><label className="form-label">Source</label><select className="input select" value={newTask.source} onChange={e=>setNewTask(p=>({...p,source:e.target.value}))}><option value="manual">Manual</option><option value="jira">Jira</option><option value="meeting-scribe">Meeting</option><option value="agent">Agent</option></select></div><div className="form-row" style={{gridColumn:"1/-1"}}><label className="form-label">Schedule for date (optional)</label><input className="input" type="date" value={newTask.scheduled_date} onChange={e=>setNewTask(p=>({...p,scheduled_date:e.target.value}))}/></div></div><div className="form-actions"><button className="btn" onClick={()=>setShowAddTask(false)}>Cancel</button><button className="btn btn-primary" onClick={addTask}>Add Task</button></div></Modal>)}
 
         {showAddProj&&(<Modal title={editProj?"Edit Project":"Add Project"} onClose={()=>setShowAddProj(false)}>
           <div className="form-grid">
