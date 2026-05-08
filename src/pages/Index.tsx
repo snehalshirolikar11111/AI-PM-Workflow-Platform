@@ -2473,12 +2473,20 @@ export default function PMDashboard(){
                           <div className="card">
                             <div className="ch"><div className="ct">Recommended Actions</div></div>
                             <div className="cb">
-                              {siResult.recommended_actions.map((a:string,i:number)=>(
+                              {siResult.recommended_actions.map((a:any,i:number)=>{
+                                const text=typeof a==="string"?a:(a?.action||a?.text||a?.description||"");
+                                const owner=typeof a==="object"?a?.owner:null;
+                                const priority=typeof a==="object"?a?.priority:null;
+                                const timeline=typeof a==="object"?a?.timeline:null;
+                                return(
                                 <div key={i} style={{display:"flex",gap:10,padding:"8px 0",borderBottom:"1px solid var(--bdr)",fontSize:12,alignItems:"flex-start"}}>
                                   <div style={{width:20,height:20,borderRadius:"50%",background:"rgba(245,158,11,0.1)",border:"1px solid rgba(245,158,11,0.2)",display:"flex",alignItems:"center",justifyContent:"center",fontFamily:"DM Mono",fontSize:10,color:"var(--amb)",flexShrink:0}}>{i+1}</div>
-                                  {a}
+                                  <div style={{flex:1}}>
+                                    <div>{text}</div>
+                                    {(owner||priority||timeline)&&<div style={{fontSize:11,color:"var(--mut)",marginTop:3,display:"flex",gap:8,flexWrap:"wrap"}}>{owner&&<span>👤 {owner}</span>}{priority&&<span>⚑ {priority}</span>}{timeline&&<span>⏱ {timeline}</span>}</div>}
+                                  </div>
                                 </div>
-                              ))}
+                              );})}
                             </div>
                           </div>
                         )}
