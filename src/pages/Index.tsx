@@ -754,7 +754,7 @@ export default function PMDashboard(){
   const runTodayBriefing=useCallback(async()=>{
     setBriefingLoading(true);
     try{
-      const{data,error}=await supabase.functions.invoke("three-things-today",{});
+      const{data,error}=await supabase.functions.invoke("three-things-today-edge-function",{});
       if(data&&!error&&data.things?.length){
         const URGENCY_ICON:Record<string,string>={critical:"🔴",high:"🟡",normal:"🔵"};
         const SOURCE_ICON:Record<string,string>={jira:"🔷",email:"📧",risk:"🔔",okr:"◎",meeting:"👥",task:"☑",default:"◈"};
