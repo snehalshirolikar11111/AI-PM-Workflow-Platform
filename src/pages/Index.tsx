@@ -796,13 +796,6 @@ export default function PMDashboard(){
     }finally{syncRunning.current=false;setIsSyncing(false);}
   },[loadIntegrations,loadJira,loadGmail,loadCal,loadTasks,loadProjects]);
 
-  useEffect(()=>{autoSync();},[autoSync]);
-  useEffect(()=>{
-    const fn=()=>{if(document.visibilityState==="visible")autoSync();};
-    document.addEventListener("visibilitychange",fn);window.addEventListener("focus",fn);
-    return()=>{document.removeEventListener("visibilitychange",fn);window.removeEventListener("focus",fn);};
-  },[autoSync]);
-  useEffect(()=>{const t=setInterval(autoSync,5*60*1000);return()=>clearInterval(t);},[autoSync]);
 
 
   /* ── Week scheduling helpers ── */
