@@ -4100,6 +4100,66 @@ export default function PMDashboard(){
               </div>
             )}
 
+            {page==="guardrails"&&(
+              <div className="col">
+                <div className="g4">
+                  {(()=>{const pass=guardrails.filter((g:any)=>g.passed).length;const fail=guardrails.filter((g:any)=>!g.passed).length;const total=guardrails.length;const rate=total>0?Math.round(pass/total*100):100;return [
+                    {v:`${rate}%`,l:"Pass rate",c:"var(--grn)"},
+                    {v:`${pass}`,l:"Checks passed",c:"var(--grn)"},
+                    {v:`${fail}`,l:"Hallucinations caught",c:fail>0?"var(--red)":"var(--mut)"},
+                    {v:`${total}`,l:"Total checks",c:"var(--acc)"}
+                  ].map(({v,l,c})=>(<div key={l} className="kpi"><div className="kpi-v" style={{color:c}}>{v}</div><div className="kpi-l">{l}</div></div>));})()}
+                </div>
+                <div className="card">
+                  <div className="ch"><div className="ct">Guardrail Checks</div><button className="btn btn-sm" onClick={loadGuardrails}>⟳ Refresh</button></div>
+                  <div className="cb">
+                    {guardrails.length===0&&<div className="empty">No guardrail checks yet. Runs every 12h and after agents write decisions or risks.</div>}
+                    {guardrails.map((g:any)=>(
+                      <div key={g.id} style={{display:"flex",alignItems:"center",gap:10,padding:"9px 0",borderBottom:"1px solid var(--bdr)"}}>
+                        <span className={`tag ${g.passed?"tag-grn":"tag-red"}`} style={{fontSize:9,flexShrink:0}}>{g.passed?"PASS":"FAIL"}</span>
+                        <div style={{flex:1}}>
+                          <div style={{fontSize:12,fontWeight:600}}>{g.agent_name} · {g.check_name}</div>
+                          <div style={{fontSize:11,color:g.passed?"var(--mut)":"var(--red)"}}>{g.detail}</div>
+                        </div>
+                        <div style={{fontFamily:"DM Mono",fontSize:10,color:"var(--mut)"}}>{new Date(g.created_at).toLocaleDateString()}</div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {page==="config"&&(
+              <div className="col">
+                <div className="card">
+                  <div className="ch"><div className="ct">Anomaly Detection Thresholds</div></div>
+                  <div className="cb">
+                    <div style={{fontSize:12,color:"var(--mut)",marginBottom:12}}>The autonomous detector raises a risk when a project crosses any of these.</div>
+                    {[{k:"anomaly_blocked_threshold",l:"Blocked issues greater than",sfx:"blockers"},{k:"anomaly_bugs_threshold",l:"High-severity bugs greater than",sfx:"bugs"},{k:"anomaly_completion_threshold",l:"Completion below",sfx:"%"}].map(({k,l,sfx})=>(
+                      <div key={k} style={{display:"flex",alignItems:"center",gap:10,marginBottom:10}}>
+                        <div style={{flex:1,fontSize:13}}>{l}</div>
+                        <input className="input" type="number" style={{width:90}} value={cfgSettings[k]??""} onChange={e=>setCfgSettings((p:any)=>({...p,[k]:e.target.value}))}/>
+                        <span style={{fontSize:11,color:"var(--mut)",width:60}}>{sfx}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+                <div className="card">
+                  <div className="ch"><div className="ct">Cost Budgets (USD)</div></div>
+                  <div className="cb">
+                    {[{k:"cost_daily_budget",l:"Daily token budget"},{k:"cost_monthly_budget",l:"Monthly token budget"}].map(({k,l})=>(
+                      <div key={k} style={{display:"flex",alignItems:"center",gap:10,marginBottom:10}}>
+                        <div style={{flex:1,fontSize:13}}>{l}</div>
+                        <span style={{fontSize:12,color:"var(--mut)"}}>$</span>
+                        <input className="input" type="number" style={{width:110}} value={cfgSettings[k]??""} onChange={e=>setCfgSettings((p:any)=>({...p,[k]:e.target.value}))}/>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+                <button className="btn btn-primary" style={{alignSelf:"flex-start"}} onClick={saveSettings} disabled={cfgSaving}>{cfgSaving?"Saving...":"Save Configuration"}</button>
+              </div>
+            )}
+
             {/* PRIVACY */}
             {page==="privacy"&&(
               <div className="col">
