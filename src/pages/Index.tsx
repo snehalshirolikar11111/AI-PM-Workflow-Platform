@@ -1346,6 +1346,7 @@ export default function PMDashboard(){
             <div><div className="ph-title">{info.title}</div><div className="ph-sub">{info.sub}</div></div>
             <div style={{display:"flex",alignItems:"center",gap:10}}>
               {isSyncing&&<span style={{fontFamily:"DM Mono",fontSize:10,color:"var(--acc)"}}>⟳ syncing…</span>}
+              <button className="btn btn-sm" onClick={()=>autoSync()} disabled={isSyncing}>{isSyncing?"Syncing…":"⟳ Sync all"}</button>
               {user&&<span className="mono dim" style={{fontSize:11}}>{user.email}</span>}
             </div>
           </div>
