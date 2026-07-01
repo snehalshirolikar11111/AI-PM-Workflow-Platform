@@ -811,23 +811,35 @@ export default function PMDashboard(){
   const currentWeekStart=getWeekStart(new Date());
   const currentWeekEnd=getWeekEnd(new Date());
   /* ── Sync fns ── */
+  const jiraErrMsg=(error:any,data:any)=>{
+    const raw=(error?.message||"")+" "+JSON.stringify(data||{});
+    if(/SUSPENDED_INACTIVITY|deactivated due to inactivity/i.test(raw))return "Jira Cloud subscription is suspended for inactivity. Reactivate it in Atlassian admin, then retry.";
+    if(/invalid x-api-key|authentication_error/i.test(raw))return "Jira credentials are invalid. Update the Jira API token in Integrations.";
+    return "Jira sync failed: "+(error?.message||"unknown error");
+  };
+  const invokeJira=async(body:any)=>{
+    try{const r=await supabase.functions.invoke("jira-sync",{body});return r;}
+    catch(e:any){return{data:null,error:{message:e?.message||String(e)}};}
+  };
   const syncJira=async(pk?:string)=>{
     setSyncingInt("jira");
     if(pk){
-      const{data,error}=await supabase.functions.invoke("jira-sync",{body:{action:"pull",projectKey:pk}});
-      setSyncingInt(null);if(error){alert("Jira: "+error.message);return;}
+      const{data,error}=await invokeJira({action:"pull",projectKey:pk});
+      setSyncingInt(null);if(error){alert(jiraErrMsg(error,data));return;}
       await Promise.all([loadJira(),loadTasks(),loadProjects(),loadIntegrations()]);
       alert(`Jira: ${data?.synced||0} synced`);
     }else{
       const keyed=projects.filter((p:any)=>p.jira_key);
       if(!keyed.length){setSyncingInt(null);alert("No projects have a Jira key set. Edit a project and add the Jira key (e.g. RTVT).");return;}
-      let total=0;
+      let total=0;let firstErr:any=null;let firstData:any=null;
       for(const proj of keyed){
-        const{data}=await supabase.functions.invoke("jira-sync",{body:{action:"pull",projectKey:proj.jira_key}});
+        const{data,error}=await invokeJira({action:"pull",projectKey:proj.jira_key});
+        if(error&&!firstErr){firstErr=error;firstData=data;}
         total+=(data?.synced||0);
       }
       setSyncingInt(null);
       await Promise.all([loadJira(),loadTasks(),loadProjects(),loadIntegrations()]);
+      if(firstErr&&total===0){alert(jiraErrMsg(firstErr,firstData));return;}
       alert(`Jira: ${total} issues synced across ${keyed.length} project(s)`);
     }
   };
