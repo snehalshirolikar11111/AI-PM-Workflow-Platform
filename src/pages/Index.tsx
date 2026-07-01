@@ -272,9 +272,9 @@ const NAV = [
   {grp:"Execution",    items:[{id:"tracker",ic:"◎",lbl:"Projects"},{id:"roadmap",ic:"🗺",lbl:"Roadmap"}]},
   {grp:"AI Agents",    items:[{id:"super",ic:"🔮",lbl:"Executive Briefing"},{id:"sprint",ic:"⚡",lbl:"Sprint Intelligence"},{id:"release",ic:"🚦",lbl:"Release Readiness"}]},  {grp:"AI Workflows", items:[{id:"meetings",ic:"✦",lbl:"Meeting Intel"},{id:"priority",ic:"◈",lbl:"Prioritization"},{id:"digest",ic:"📊",lbl:"Weekly Digest"},{id:"risk",ic:"🔔",lbl:"Risk Monitor"},{id:"update",ic:"📝",lbl:"Stakeholder Update"}]},
   {grp:"Insights",     items:[{id:"optimizer",ic:"⚡",lbl:"Cost Optimizer"},{id:"decisions",ic:"📌",lbl:"Decision Log"}]},
-  {grp:"Metrics",      items:[{id:"okr",ic:"◎",lbl:"OKR Tracker"},{id:"tokens",ic:"◈",lbl:"Token Analytics"},{id:"outcomes",ic:"🎯",lbl:"Outcomes"},{id:"metrics",ic:"◎",lbl:"Pilot Metrics"}]},
+  {grp:"Metrics",      items:[{id:"okr",ic:"◎",lbl:"OKR Tracker"},{id:"tokens",ic:"◈",lbl:"Token Analytics"},{id:"outcomes",ic:"🎯",lbl:"Outcomes"},{id:"metrics",ic:"◎",lbl:"Pilot Metrics"},{id:"guardrails",ic:"🛡",lbl:"Guardrails"}]},
   {grp:"People",       items:[{id:"stakeholders",ic:"◉",lbl:"Stakeholders"}]},
-  {grp:"Settings",     items:[{id:"privacy",ic:"◈",lbl:"Privacy"},{id:"integrations",ic:"⚡",lbl:"Integrations"}]},
+  {grp:"Settings",     items:[{id:"config",ic:"⚙",lbl:"Configuration"},{id:"privacy",ic:"◈",lbl:"Privacy"},{id:"integrations",ic:"⚡",lbl:"Integrations"}]},
 ];
 
 const PAGE_INFO: Record<string,{title:string;sub:string}> = {
@@ -291,6 +291,8 @@ const PAGE_INFO: Record<string,{title:string;sub:string}> = {
   decisions:{title:"Decision Log",sub:"Every decision · rationale · data used · trade-offs · outcome status"},
   knowledge:{title:"Knowledge Memory",sub:"Past PRDs · insights · learnings · reusable patterns"},
   outcomes:{title:"Outcome Tracking",sub:"Feature impact post-launch · OKR contribution · business results"},
+  guardrails:{title:"Agent Guardrails",sub:"Offline hallucination checks · verifies agents only cite real Jira keys · pass/fail per run"},
+  config:{title:"Configuration",sub:"Anomaly thresholds and cost budgets — used by the autonomous wake"},
   optimizer:{title:"Token Cost Optimizer",sub:"Analyze any agent · reduce token spend · model recommendations · caching strategy"},
   super:{title:"Executive Briefing Agent",sub:"Autonomous multi-source intelligence · tools · cross-agent orchestration · writes back to platform"},
   agents:{title:"All Agents",sub:"All AI-powered automations — overview and quick launch"},
@@ -615,6 +617,9 @@ export default function PMDashboard(){
 
   // Outcomes
   const [outcomes,setOutcomes]=useState<any[]>([]);
+  const [guardrails,setGuardrails]=useState<any[]>([]);
+  const [cfgSettings,setCfgSettings]=useState<any>({anomaly_blocked_threshold:2,anomaly_bugs_threshold:3,anomaly_completion_threshold:30,cost_daily_budget:5,cost_monthly_budget:100});
+  const [cfgSaving,setCfgSaving]=useState(false);
   const [showAddOutcome,setShowAddOutcome]=useState(false);
   const [outcomeForm,setOutcomeForm]=useState({feature_name:"",project_id:"",hypothesis:"",target_metric:"",target_value:"",measurement_date:""});
 
@@ -694,6 +699,9 @@ export default function PMDashboard(){
   const loadDecisions=useCallback(async()=>{const{data,error}=await supabase.from("decision_log").select("*,projects(name)").order("created_at",{ascending:false});if(error)console.error("loadDecisions:",error.message);if(data)setDecisions(data);},[]);
   const loadKnowledge=useCallback(async()=>{const{data,error}=await supabase.from("knowledge_items").select("*").order("created_at",{ascending:false});if(error)console.error("loadKnowledge:",error.message);if(data)setKnowledgeItems(data);},[]);
   const loadOutcomes=useCallback(async()=>{const{data}=await supabase.from("outcomes").select("*,projects(name),okrs(objective)").order("created_at",{ascending:false});if(data)setOutcomes(data);},[]);
+  const loadGuardrails=useCallback(async()=>{const{data}=await supabase.from("agent_evals").select("*").order("created_at",{ascending:false}).limit(50);if(data)setGuardrails(data);},[]);
+  const loadSettings=useCallback(async()=>{const{data}=await supabase.from("user_settings").select("*").limit(1);if(data&&data[0])setCfgSettings((p:any)=>({...p,...data[0]}));},[]);
+  const saveSettings=async()=>{setCfgSaving(true);const{data:{user}}=await supabase.auth.getUser();await supabase.from("user_settings").update({anomaly_blocked_threshold:Number(cfgSettings.anomaly_blocked_threshold),anomaly_bugs_threshold:Number(cfgSettings.anomaly_bugs_threshold),anomaly_completion_threshold:Number(cfgSettings.anomaly_completion_threshold),cost_daily_budget:Number(cfgSettings.cost_daily_budget),cost_monthly_budget:Number(cfgSettings.cost_monthly_budget),updated_at:new Date().toISOString()}).eq("user_id",user?.id);setCfgSaving(false);alert("Settings saved ✓");};
   const loadRiskPreds=useCallback(async()=>{const{data}=await supabase.from("risk_predictions").select("*,projects(name)").eq("status","active").order("detected_at",{ascending:false});if(data)setRiskPredictions(data);},[]);
   const loadCostAnomalies=useCallback(async()=>{const{data}=await supabase.from("v_cost_anomalies").select("*").limit(10);if(data)setCostAnomalies(data);const{data:bs}=await supabase.from("v_budget_status").select("*").limit(1);if(bs&&bs[0])setBudgetStatus(bs[0]);},[]);
   const loadFeedback=useCallback(async()=>{const{data}=await supabase.from("feedback_events").select("*").order("created_at",{ascending:false}).limit(30);if(data)setFeedbackEvents(data);},[]);
@@ -713,11 +721,10 @@ export default function PMDashboard(){
   useEffect(()=>{
     loadTasks();loadProjects();loadMeetings();loadOkrs();loadStakeholders();loadMemory();
     loadIntegrations();loadJira();loadGmail();loadCal();loadAgentRuns();loadRice();
-    loadMoscow();loadRoadmap();loadAlign();loadTokens();loadDecisions();loadKnowledge();loadOutcomes();loadRiskPreds();loadCostAnomalies();loadFeedback();
+    loadMoscow();loadRoadmap();loadAlign();loadTokens();loadDecisions();loadKnowledge();loadOutcomes();loadRiskPreds();loadCostAnomalies();loadFeedback();loadGuardrails();loadSettings();
     supabase.from("decision_log").select("*").contains("tags",["agent-proposed","pending-approval"]).order("created_at",{ascending:false}).limit(10).then(({data})=>{if(data)setPendingJiraActions(data);});
   },[loadTasks,loadProjects,loadMeetings,loadOkrs,loadStakeholders,loadMemory,
-     loadIntegrations,loadJira,loadGmail,loadCal,loadAgentRuns,loadRice,loadMoscow,loadRoadmap,loadAlign,loadTokens,loadDecisions,loadKnowledge,loadOutcomes,loadRiskPreds,loadCostAnomalies,loadFeedback]);
-
+     loadIntegrations,loadJira,loadGmail,loadCal,loadAgentRuns,loadRice,loadMoscow,loadRoadmap,loadAlign,loadTokens,loadDecisions,loadKnowledge,loadOutcomes,loadRiskPreds,loadCostAnomalies,loadFeedback,loadGuardrails,loadSettings]);
   // Re-fetch RLS-protected tables once user session is confirmed
   useEffect(()=>{
     if(user){loadOkrs();loadRice();loadRoadmap();loadAlign();}
