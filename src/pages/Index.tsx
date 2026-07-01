@@ -722,12 +722,6 @@ export default function PMDashboard(){
   useEffect(()=>{
     if(user){loadOkrs();loadRice();loadRoadmap();loadAlign();}
   },[user,loadOkrs,loadRice,loadRoadmap,loadAlign]);
-  // Auto-run 3 Things Today when core data is ready
-  useEffect(()=>{
-    if(user&&todos.length>0&&!todayBriefing&&!briefingLoading&&!briefingDismissed){
-      runTodayBriefing();
-    }
-  },[user,todos.length>0]);
 
   useEffect(()=>{
     if(!user)return;
