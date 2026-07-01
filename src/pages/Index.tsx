@@ -3091,8 +3091,8 @@ export default function PMDashboard(){
                       </div>
                       <div style={{fontSize:13,lineHeight:1.7,marginBottom:10,padding:"8px 10px",background:"rgba(0,212,255,0.04)",borderRadius:7,borderLeft:"2px solid var(--acc)"}}>{d.decision}</div>
                       {d.rationale&&<div style={{marginBottom:8}}><div className="section-lbl" style={{marginBottom:3}}>Rationale</div><div style={{fontSize:12,color:"var(--mut)",lineHeight:1.6}}>{d.rationale}</div></div>}
-                      {d.trade_offs?.length>0&&<div style={{marginBottom:8}}><div className="section-lbl" style={{marginBottom:3}}>Trade-offs considered</div>{d.trade_offs.map((t:string,i:number)=><div key={i} style={{fontSize:12,display:"flex",gap:6,color:"var(--mut)",padding:"2px 0"}}><span style={{color:"var(--amb)"}}>↔</span>{t}</div>)}</div>}
-                      {d.tags?.length>0&&<div style={{display:"flex",gap:4,flexWrap:"wrap"}}>{d.tags.map((t:string,i:number)=><span key={i} className="tag tag-dim" style={{fontSize:9}}>{t}</span>)}</div>}
+                      {d.trade_offs?.length>0&&<div style={{marginBottom:8}}><div className="section-lbl" style={{marginBottom:3}}>Trade-offs considered</div>{d.trade_offs.map((t:any,i:number)=><div key={i} style={{fontSize:12,display:"flex",gap:6,color:"var(--mut)",padding:"2px 0"}}><span style={{color:"var(--amb)"}}>↔</span>{typeof t==="string"?t:(t?.action||t?.text||JSON.stringify(t))}</div>)}</div>}
+                      {d.tags?.length>0&&<div style={{display:"flex",gap:4,flexWrap:"wrap"}}>{d.tags.map((t:any,i:number)=><span key={i} className="tag tag-dim" style={{fontSize:9}}>{typeof t==="string"?t:String(t)}</span>)}</div>}
                     </div>
                   ))}
                 </div>
