@@ -755,7 +755,7 @@ export default function PMDashboard(){
   const runTodayBriefing=useCallback(async()=>{
     setBriefingLoading(true);
     try{
-      const{data,error}=await supabase.functions.invoke("three-things-today-edge-function",{});
+      const{data,error}=await supabase.functions.invoke("briefing",{body:{scope:"daily"}});
       if(data&&!error&&data.things?.length){
         const URGENCY_ICON:Record<string,string>={critical:"🔴",high:"🟡",normal:"🔵"};
         const SOURCE_ICON:Record<string,string>={jira:"🔷",email:"📧",risk:"🔔",okr:"◎",meeting:"👥",task:"☑",default:"◈"};
@@ -1117,7 +1117,7 @@ export default function PMDashboard(){
       const recentDecisions=decisions.slice(0,5).map((d:any)=>({title:d.title,decision:d.decision,date:d.created_at}));
       const projSnapshot=projects.map(p=>({name:p.name,status:p.status,progress:p.progress,owner:p.owner}));
       const activeRisks=riskPredictions.slice(0,5).map((r:any)=>({type:r.risk_type,prediction:r.prediction,confidence:r.confidence}));
-      const{data,error}=await supabase.functions.invoke("weekly-digest",{body:{focusArea:digestFocus,projects:projSnapshot,okrSummary,recentDecisions,activeRisks,userId:user?.id}});
+      const{data,error}=await supabase.functions.invoke("briefing",{body:{scope:"weekly",focusArea:digestFocus,projects:projSnapshot,okrSummary,recentDecisions,activeRisks,userId:user?.id}});
       if(error)throw new Error(error.message);
       if(data?.error)throw new Error(data.error);
       setDigestResult(data);loadAgentRuns();
@@ -1144,7 +1144,7 @@ export default function PMDashboard(){
       const projCtx=projects.slice(0,8).map(p=>({name:p.name,status:p.status,progress:p.progress,owner:p.owner,due_date:p.due_date}));
       const recentDecisions=decisions.slice(0,3).map((d:any)=>({title:d.title,decision:d.decision}));
       const okrProgress=okrs.slice(0,3).map(o=>({objective:o.objective,progress:o.overall_pct}));
-      const{data,error}=await supabase.functions.invoke("stakeholder-update",{body:{recipientName:sh?.name||"Leadership",recipientRole:sh?.role||"Executive",recipientEmail:sh?.email,tone:updateTone,projects:projCtx,recentDecisions,okrProgress,userId:user?.id}});
+      const{data,error}=await supabase.functions.invoke("briefing",{body:{scope:"stakeholder",recipientName:sh?.name||"Leadership",recipientRole:sh?.role||"Executive",recipientEmail:sh?.email,tone:updateTone,projects:projCtx,recentDecisions,okrProgress,userId:user?.id}});
       if(error)throw new Error(error.message);
       if(data?.error)throw new Error(data.error);
       setUpdateResult(data);loadAgentRuns();
