@@ -715,6 +715,7 @@ export default function PMDashboard(){
     loadTasks();loadProjects();loadMeetings();loadOkrs();loadStakeholders();loadMemory();
     loadIntegrations();loadJira();loadGmail();loadCal();loadAgentRuns();loadRice();
     loadMoscow();loadRoadmap();loadAlign();loadTokens();loadDecisions();loadKnowledge();loadOutcomes();loadRiskPreds();loadCostAnomalies();loadFeedback();
+    supabase.from("decision_log").select("*").contains("tags",["agent-proposed","pending-approval"]).order("created_at",{ascending:false}).limit(10).then(({data})=>{if(data)setPendingJiraActions(data);});
   },[loadTasks,loadProjects,loadMeetings,loadOkrs,loadStakeholders,loadMemory,
      loadIntegrations,loadJira,loadGmail,loadCal,loadAgentRuns,loadRice,loadMoscow,loadRoadmap,loadAlign,loadTokens,loadDecisions,loadKnowledge,loadOutcomes,loadRiskPreds,loadCostAnomalies,loadFeedback]);
 
@@ -2504,54 +2505,30 @@ export default function PMDashboard(){
                             {pendingJiraActions.map((a:any)=>(
                               <div key={a.id} style={{padding:"10px 12px",background:"rgba(0,212,255,0.04)",border:"1px solid rgba(0,212,255,0.12)",borderRadius:8,marginBottom:8}}>
                                 <div style={{fontWeight:600,fontSize:13,marginBottom:4}}>{a.title}</div>
-                                <div style={{fontSize:12,color:"var(--mut)",marginBottom:8}}>{a.decision}</div>
+                               <div style={{fontSize:12,color:"var(--mut)",marginBottom:8}}>{a.decision}</div>
+                                {a.rationale&&<div style={{fontSize:11,color:"var(--amb)",marginBottom:8}}>{a.rationale}</div>}
                                 <div style={{display:"flex",gap:6}}>
                                   <button className="btn btn-primary btn-sm" onClick={async()=>{
-                                    // Extract jira_key from title and execute
                                     const match=a.title.match(/([A-Z]+-\d+)/);
-                                    if(match){
+                                    const key=match?match[1]:null;
+                                    const isTransition=(a.tags||[]).includes("jira-transition");
+                                    if(key){
                                       setSyncingInt("jira");
-                                      await supabase.functions.invoke("jira-sync",{body:{action:"transition_issue",issueData:{jiraKey:match[1],transitionName:"in progress"}}});
-                                      await supabase.functions.invoke("jira-sync",{body:{action:"add_comment",issueData:{jiraKey:match[1],comment:`[Sprint Intelligence Agent] ${a.decision}`}}});
+                                      if(isTransition){
+                                        const st=(a.title.split("→")[1]||"in progress").trim();
+                                        await supabase.functions.invoke("jira-sync",{body:{action:"transition_issue",issueData:{jiraKey:key,transitionName:st}}});
+                                      }
+                                      await supabase.functions.invoke("jira-sync",{body:{action:"add_comment",issueData:{jiraKey:key,comment:`[Sprint Intelligence Agent] ${a.decision}`}}});
                                       setSyncingInt(null);
                                     }
                                     await supabase.from("decision_log").update({outcome_status:"validated",tags:["jira-action","approved"]}).eq("id",a.id);
                                     setPendingJiraActions(p=>p.filter((x:any)=>x.id!==a.id));
-                                    alert("Executed in Jira ✓");
+                                    alert("Posted to Jira ✓");
                                   }}>✓ Approve &amp; Execute in Jira</button>
                                   <button className="btn btn-sm" onClick={async()=>{
                                     await supabase.from("decision_log").update({outcome_status:"reversed",tags:["jira-action","dismissed"]}).eq("id",a.id);
                                     setPendingJiraActions(p=>p.filter((x:any)=>x.id!==a.id));
                                   }}>✕ Dismiss</button>
-                                </div>
-                              </div>
-                            ))}
-                          </div>
-                        </div>
-                      )}
-
-                      {/* Pending Jira Actions — Agent proposed, PM approves */}
-                      {pendingJiraActions.length>0&&(
-                        <div className="card" style={{border:"1px solid rgba(0,212,255,0.25)"}}>
-                          <div className="ch">
-                            <div className="ct" style={{color:"var(--acc)"}}>⚡ Agent-Proposed Jira Actions · Pending Approval</div>
-                            <span className="tag tag-blu" style={{fontSize:9}}>{pendingJiraActions.length} pending</span>
-                          </div>
-                          <div className="cb">
-                            <div style={{fontSize:12,color:"var(--mut)",marginBottom:10}}>Sprint Intelligence Agent identified these changes. Nothing executes until you approve.</div>
-                            {pendingJiraActions.map((a:any)=>(
-                              <div key={a.id} style={{padding:"10px 12px",background:"rgba(0,212,255,0.04)",border:"1px solid rgba(0,212,255,0.12)",borderRadius:8,marginBottom:8}}>
-                                <div style={{fontWeight:600,fontSize:13,marginBottom:4}}>{a.title}</div>
-                                <div style={{fontSize:12,color:"var(--mut)",marginBottom:8}}>{a.decision}</div>
-                                <div style={{display:"flex",gap:6}}>
-                                  <button className="btn btn-primary btn-sm" onClick={async()=>{
-                                    const m=a.title.match(/([A-Z]+-[0-9]+)/);
-                                    if(m){setSyncingInt("jira");await supabase.functions.invoke("jira-sync",{body:{action:"transition_issue",issueData:{jiraKey:m[1],transitionName:"in progress"}}});setSyncingInt(null);}
-                                    await supabase.from("decision_log").update({outcome_status:"validated"}).eq("id",a.id);
-                                    setPendingJiraActions((p:any[])=>p.filter((x:any)=>x.id!==a.id));
-                                    alert("Executed in Jira ✓");
-                                  }}>✓ Approve &amp; Execute</button>
-                                  <button className="btn btn-sm" onClick={async()=>{await supabase.from("decision_log").update({outcome_status:"reversed"}).eq("id",a.id);setPendingJiraActions((p:any[])=>p.filter((x:any)=>x.id!==a.id));}}>✕ Dismiss</button>
                                 </div>
                               </div>
                             ))}
