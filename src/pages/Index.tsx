@@ -2754,12 +2754,18 @@ export default function PMDashboard(){
                           <div className="card">
                             <div className="ch"><div className="ct">Actions Required</div></div>
                             <div className="cb">
-                              {rrResult.recommended_actions.map((a:string,i:number)=>(
+                              {rrResult.recommended_actions.map((a:any,i:number)=>{
+                                const isObj=a&&typeof a==="object";
+                                const text=isObj?(a.text||a.action||a.title||""):a;
+                                return (
                                 <div key={i} style={{display:"flex",gap:10,padding:"8px 0",borderBottom:"1px solid var(--bdr)",fontSize:12,alignItems:"flex-start"}}>
                                   <div style={{width:20,height:20,borderRadius:"50%",background:"rgba(0,212,255,0.1)",border:"1px solid rgba(0,212,255,0.2)",display:"flex",alignItems:"center",justifyContent:"center",fontFamily:"DM Mono",fontSize:10,color:"var(--acc)",flexShrink:0}}>{i+1}</div>
-                                  {a}
-                                </div>
-                              ))}
+                                  <div style={{flex:1}}>
+                                    <div>{text}</div>
+                                    {isObj&&(a.owner||a.priority||a.timeline)&&<div style={{fontSize:10,color:"var(--mut)",marginTop:2,display:"flex",gap:8}}>{a.owner&&<span>👤 {a.owner}</span>}{a.priority&&<span>🎯 {a.priority}</span>}{a.timeline&&<span>⏱ {a.timeline}</span>}</div>}
+                                  </div>
+                                </div>);
+                              })}
                             </div>
                           </div>
                         )}
