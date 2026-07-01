@@ -790,7 +790,7 @@ export default function PMDashboard(){
       await Promise.allSettled([
         supabase.functions.invoke("jira-sync",{body:{action:"pull"}}),
         supabase.functions.invoke("gmail-sync",{body:{action:"pull"}}),
-        supabase.functions.invoke("calendar-sync",{body:{date:new Date().toISOString().split("T")[0]}}),
+        supabase.functions.invoke("get-calendar",{body:{date:new Date().toISOString().split("T")[0]}}),
       ]);
       await Promise.allSettled([loadIntegrations(),loadJira(),loadGmail(),loadCal(),loadTasks(),loadProjects()]);
     }finally{syncRunning.current=false;setIsSyncing(false);}
@@ -835,7 +835,7 @@ export default function PMDashboard(){
   const syncCal=async(date?:string)=>{
     setSyncingInt("calendar");
     try{
-      const{data,error}=await supabase.functions.invoke("calendar-sync",{body:{date}});
+      const{data,error}=await supabase.functions.invoke("get-calendar",{body:{date}});
       // Use data even if upsert error — function still returns events
       if(data?.events?.length>0||data?.events){
         await Promise.all([loadCal(),loadIntegrations()]);
@@ -858,14 +858,14 @@ export default function PMDashboard(){
     if(!calForm.title.trim()||!calForm.startTime)return;
     setSyncingInt("cal-create");
     const date=selectedCalDate.toISOString().split("T")[0];
-    const{data,error}=await supabase.functions.invoke("calendar-sync",{body:{action:"create_event",title:calForm.title,startTime:`${date}T${calForm.startTime}:00`,endTime:`${date}T${calForm.endTime||calForm.startTime}:00`,attendees:calForm.attendees.split(",").map((e:string)=>e.trim()).filter(Boolean),description:calForm.description}});
+    const{data,error}=await supabase.functions.invoke("get-calendar",{body:{action:"create_event",title:calForm.title,startTime:`${date}T${calForm.startTime}:00`,endTime:`${date}T${calForm.endTime||calForm.startTime}:00`,attendees:calForm.attendees.split(",").map((e:string)=>e.trim()).filter(Boolean),description:calForm.description}});
     setSyncingInt(null);if(error){alert("Failed: "+error.message);return;}
     setShowAddCal(false);setCalForm({title:"",startTime:"",endTime:"",attendees:"",description:""});
     await loadCal();alert(`Created! Meet: ${data?.meet_link||"none"}`);
   };
   const deleteCalEvent=async(ev:any)=>{
     if(!window.confirm("Delete from Google Calendar?"))return;
-    if(ev.calendar_event_id)await supabase.functions.invoke("calendar-sync",{body:{action:"delete_event",eventId:ev.calendar_event_id}});
+    if(ev.calendar_event_id)await supabase.functions.invoke("get-calendar",{body:{action:"delete_event",eventId:ev.calendar_event_id}});
     await supabase.from("schedule_blocks").delete().eq("id",ev.id);loadCal();
   };
   const createJira=async()=>{
