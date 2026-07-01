@@ -270,9 +270,8 @@ const S = `
 const NAV = [
   {grp:"Today",        items:[{id:"schedule",ic:"🕐",lbl:"Daily Schedule"},{id:"todos",ic:"☑",lbl:"To-Do List"}]},
   {grp:"Execution",    items:[{id:"tracker",ic:"◎",lbl:"Projects"},{id:"roadmap",ic:"🗺",lbl:"Roadmap"}]},
-  {grp:"AI Agents",    items:[{id:"super",ic:"🔮",lbl:"Executive Briefing"},{id:"sprint",ic:"⚡",lbl:"Sprint Intelligence"},{id:"release",ic:"🚦",lbl:"Release Readiness"},{id:"research",ic:"🔍",lbl:"Research Agents"},{id:"prd",ic:"📄",lbl:"PRD Agent"}]},
-  {grp:"AI Workflows", items:[{id:"meetings",ic:"✦",lbl:"Meeting Intel"},{id:"priority",ic:"◈",lbl:"Prioritization"},{id:"digest",ic:"📊",lbl:"Weekly Digest"},{id:"risk",ic:"🔔",lbl:"Risk Monitor"},{id:"update",ic:"📝",lbl:"Stakeholder Update"}]},
-  {grp:"Insights",     items:[{id:"optimizer",ic:"⚡",lbl:"Cost Optimizer"},{id:"decisions",ic:"📌",lbl:"Decision Log"},{id:"knowledge",ic:"🧠",lbl:"Knowledge"}]},
+  {grp:"AI Agents",    items:[{id:"super",ic:"🔮",lbl:"Executive Briefing"},{id:"sprint",ic:"⚡",lbl:"Sprint Intelligence"},{id:"release",ic:"🚦",lbl:"Release Readiness"}]},  {grp:"AI Workflows", items:[{id:"meetings",ic:"✦",lbl:"Meeting Intel"},{id:"priority",ic:"◈",lbl:"Prioritization"},{id:"digest",ic:"📊",lbl:"Weekly Digest"},{id:"risk",ic:"🔔",lbl:"Risk Monitor"},{id:"update",ic:"📝",lbl:"Stakeholder Update"}]},
+  {grp:"Insights",     items:[{id:"optimizer",ic:"⚡",lbl:"Cost Optimizer"},{id:"decisions",ic:"📌",lbl:"Decision Log"}]},
   {grp:"Metrics",      items:[{id:"okr",ic:"◎",lbl:"OKR Tracker"},{id:"tokens",ic:"◈",lbl:"Token Analytics"},{id:"outcomes",ic:"🎯",lbl:"Outcomes"},{id:"metrics",ic:"◎",lbl:"Pilot Metrics"}]},
   {grp:"People",       items:[{id:"stakeholders",ic:"◉",lbl:"Stakeholders"}]},
   {grp:"Settings",     items:[{id:"privacy",ic:"◈",lbl:"Privacy"},{id:"integrations",ic:"⚡",lbl:"Integrations"}]},
