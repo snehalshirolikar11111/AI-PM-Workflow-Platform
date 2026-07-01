@@ -796,13 +796,6 @@ export default function PMDashboard(){
     }finally{syncRunning.current=false;setIsSyncing(false);}
   },[loadIntegrations,loadJira,loadGmail,loadCal,loadTasks,loadProjects]);
 
-  useEffect(()=>{autoSync();},[autoSync]);
-  useEffect(()=>{
-    const fn=()=>{if(document.visibilityState==="visible")autoSync();};
-    document.addEventListener("visibilitychange",fn);window.addEventListener("focus",fn);
-    return()=>{document.removeEventListener("visibilitychange",fn);window.removeEventListener("focus",fn);};
-  },[autoSync]);
-  useEffect(()=>{const t=setInterval(autoSync,5*60*1000);return()=>clearInterval(t);},[autoSync]);
 
 
   /* ── Week scheduling helpers ── */
@@ -1353,6 +1346,7 @@ export default function PMDashboard(){
             <div><div className="ph-title">{info.title}</div><div className="ph-sub">{info.sub}</div></div>
             <div style={{display:"flex",alignItems:"center",gap:10}}>
               {isSyncing&&<span style={{fontFamily:"DM Mono",fontSize:10,color:"var(--acc)"}}>⟳ syncing…</span>}
+              <button className="btn btn-sm" onClick={()=>autoSync()} disabled={isSyncing}>{isSyncing?"Syncing…":"⟳ Sync all"}</button>
               {user&&<span className="mono dim" style={{fontSize:11}}>{user.email}</span>}
             </div>
           </div>
